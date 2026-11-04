@@ -20,6 +20,13 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.5 — strict CSV structure, sample fixtures and data reset
+
+- Reject missing/extra CSV columns and malformed quoting instead of silently misaligning financial transactions.
+- Reject duplicate or out-of-range column mappings; require either signed Amount or Debit/Credit, never both.
+- Provide six downloadable synthetic examples: CSV, QIF, IIF, OFX, QBO and QFX. QBO/QFX samples are not bank-issued, import-certified, or identified with a financial institution.
+- Add Clear file and preview to discard the current file text, parsed rows and file input without a page reload. Already downloaded files remain on the device.
+- Preview routes stay noindex pending actual target-software UAT and a real domain.
 ## V0.4 — source integrity and date format controls
 
 - Refuse OFX files containing multiple bank/card statement sections instead of silently merging accounts.
