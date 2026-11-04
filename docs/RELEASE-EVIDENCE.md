@@ -4,18 +4,18 @@
 |---|---|---|
 | Source specification read | PASS | User-provided V3 including 250 keyword appendix |
 | Internal financial precision | PASS, synthetic cases | Integer-cent amounts, strict date parser, CSV/QIF/OFX/IIF limited readers |
-| Automated tests | PASS locally | 250 Node test cases on current working tree (including generated property cases) |
+| Automated tests | PASS, GitHub CI | 334 Node tests pass (0 fail) in branch run 41810408569; noindex build gate passes |
 | XLSX structural sample | PASS locally | .xlsx opened with openpyxl; numeric values and strings checked |
 | SEO planned route gate | PASS locally | Preview noindex; blocked CSV->QBO route absent; 250 keywords retained |
 | Real QuickBooks Online/Desktop import | **NOT RUN / BLOCKER** | No user-provided target test account or FI metadata; do not label QBO write compatible |
 | IIF target import UAT | **NOT RUN / BLOCKER** | Requires backup, version and transaction-type test |
 | Browser visual screenshot | PASS, static render | Headless Chromium rendered desktop 1440px and mobile 390px HTML/CSS; checked no horizontal overflow. Local HTTP navigation was blocked, so these used in-memory page content. |
-| Browser CSV upload/mapping/preview/download | PASS, limited | Headless Chromium with in-memory HTML/CSS and bundled module imports: uploaded a two-row CSV, selected mappings, previewed two transactions, downloaded bank-converted.csv; no JavaScript page errors. Hosted preview and full real-file matrix remain NOT RUN. |
+| Real Chrome file workflows | PASS, synthetic CI | GitHub Actions Google Chrome/Playwright served generated dist over localhost, uploaded CSV and QBO, validated mapping/acknowledgement/clear, and downloaded inspected QuickBooks CSV, XLSX and batch ZIP/JSON; zero browser exceptions. Hosted preview interaction and real bank/QuickBooks UAT are distinct, NOT RUN. |
 | Lighthouse / Core Web Vitals | NOT RUN | Production URL unavailable |
 | Stripe or subscriptions | NOT IMPLEMENTED | No merchant credentials; no paid CTA |
 | Custom domain and GSC | NOT CONFIGURED | User has not purchased a domain |
 
-**Decision:** a demonstrable free browser-local prototype that can be deployed to preview. Production SEO and commercial launch require manual UI/UAT and actual receiving-software compatibility evidence.
+**Decision:** functional local browser acceptance validated on synthetic fixtures. Production SEO, bank-specific compatibility and commercial launch still require realistic source/target software UAT and a production domain.
 
 ## V0.3 — data-integrity extension
 
@@ -120,3 +120,15 @@
 - Batch byte caps use original file byte counts passed through browser File.size, avoiding false UTF-8 re-encoding size inflation for older OFX files.
 - No names, account numbers or transaction reference values are written into validation JSON. Real bank UAT and target accounting import not performed.
 - Github CI and Cloudflare preview check pending; noindex release gate maintained.
+
+## V1.4 — Chrome E2E and typed-array ZIP performance (2026-11-04)
+
+- **PASS in GitHub CI**: 334 Node financial/parser/build tests and SEO noindex gates, plus **real Google Chrome** tests against locally served generated `dist/`. Evidence: https://github.com/garrison2025/CSV-QBO/actions/runs/41810408569
+- Chrome uploaded synthetic CSV, selected the QuickBooks CSV formatter, verified calculated cents, downloaded and inspected an actual `.csv`; modifying source column mappings invalidated the previously approved export.
+- Chrome required acknowledgement for duplicate bank transactions, preserved both rows, then verified Clear workspace disabled stale export/report buttons.
+- Chrome read a synthetic `.qbo` statement and downloaded `.xlsx`; ZIP entries were inspected to verify workbook XML and amounts.
+- Chrome uploaded two overlapping synthetic `.qif` source files into batch mode, checked duplicate warnings and explicit acknowledgement, downloaded a ZIP and verified two independent CSV outputs plus a privacy-minimized JSON manifest with no reference IDs or transaction descriptions.
+- **ZIP memory improvement:** generator now preallocates a single `Uint8Array` buffer and writes local/central headers with `DataView`; no large intermediate boxed-number arrays. Added 10 MiB synthetic file test, UTF-8 multi-entry and central directory offset checks.
+- All source files in browser acceptance are synthetic. The CI runs against `dist/` served on localhost, **not** against a production QuickBooks tenant or real bank account. Production-domain user acceptance, Web Connect `.qbo` writing, QuickBooks acceptance and bank-specific validation remain **NOT RUN / NOT RELEASED**.
+- Browser tests are CI-only and install `playwright-core` transiently; the published site itself still has zero runtime npm dependencies and no paid API.
+- GitHub main merge SHA and Cloudflare Pages successful deployment: to be verified after release merge.
