@@ -156,3 +156,30 @@ test('QIF day-first dates explicitly selected by user are parsed correctly',()=>
   assert.equal(parseQIF(bank,'us').transactions[0].date,'2026-04-11');
   assert.equal(parseQIF(bank,'eu').transactions[0].date,'2026-11-04');
 });
+
+
+test('CSV field parser rejects structural corruption rather than shifting amounts',()=>{
+  assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,Coffee,-5.00,EXTRA\n'),/expected 3 columns, found 4/);
+  assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,Coffee\n'),/expected 3 columns, found 2/);
+  assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,"Unclosed,-5.00'),/Unclosed quote/);
+  assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,"Coffee"EXTRA,-5.00'),/Unexpected text after CSV quote/);
+  assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,Cof"fee,-5.00'),/Unexpected CSV quote/);
+});
+test('CSV delimiter detection respects quoted header separators and embedded newlines',()=>{
+  const semi='Date;"Description, merchant";Amount\r\n11/04/2026;"Two; shops\nand more";-12.30\r\n';
+  const rows=parseCSV(semi);
+  assert.deepEqual(rows[0],['Date','Description, merchant','Amount']);
+  assert.equal(rows[1][1],'Two; shops\nand more');
+  assert.equal(rows[1][2],'-12.30');
+  const quoted='Date,Description,Amount\n11/04/2026,"A ""quoted"" store",2.00\n';
+  assert.equal(parseCSV(quoted)[1][1],'A "quoted" store');
+});
+test('CSV refuses conflicting or duplicate mapping choices',()=>{
+  const three=['Date','Description','Amount','Debit','Credit'];
+  const rows=[three,['11/04/2026','Transfer','-4.00','4.00','']];
+  assert.throws(()=>csvTransactions(rows),/either the signed Amount column or the Debit and Credit columns/);
+  const simple=[['Date','Description','Amount'],['11/04/2026','Lunch','-5.00']];
+  assert.throws(()=>csvTransactions(simple,{amount:1}),/assigned to both description and amount/);
+  assert.throws(()=>csvTransactions(simple,{amount:99}),/Invalid mapping/);
+  assert.equal(csvTransactions(simple).transactions[0].amount,'-5.00');
+});
