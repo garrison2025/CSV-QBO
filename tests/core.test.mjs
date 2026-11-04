@@ -634,3 +634,69 @@ test('QuickBooks validator rejects unsupported part size, headers and missing ex
  const longTx=[{date:'2026-11-04',description:'A'.repeat(80),amount:'1.00'}];
  assert.throws(()=>validateQuickBooksCSVParts(longTx,[toQuickBooksCSV(longTx)],{maxBytes:64}),/exceeded its row or byte limit/);
 });
+
+
+test('OFX XML CDATA with fake transaction tags is description data, never extra ledger rows',()=>{
+ const tx='<?xml version="1.0"?><OFX><CURDEF>USD</CURDEF><BANKTRANLIST>'+
+ '<DTSTART>20261104000000</DTSTART><DTEND>20261106000000</DTEND>'+
+ '<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20261104</DTPOSTED>'+
+ '<TRNAMT>-12.50</TRNAMT><FITID>TX1</FITID>'+
+ '<NAME><![CDATA[Bookstore <STMTTRN><TRNAMT>999.00</TRNAMT></STMTTRN> <!-- fake -->]]></NAME>'+
+ '<MEMO><![CDATA[real <NAME>other</NAME> text]]></MEMO></STMTTRN></BANKTRANLIST></OFX>';
+ const result=parseOFX(tx);
+ assert.equal(result.transactions.length,1);
+ assert.equal(result.integrity.recordCount,1);
+ assert.equal(result.transactions[0].amount,'-12.50');
+ assert.match(result.transactions[0].description,/<STMTTRN><TRNAMT>999.00/);
+ assert.equal(result.transactions[0].memo,'real <NAME>other</NAME> text');
+ assert.equal(result.integrity.postedAfterRangeCount,0);
+});
+test('OFX source XML comments cannot inject account counts, errors, other currencies or transactions',()=>{
+ const file='<?xml version="1.0"?><OFX><CURDEF>USD</CURDEF>'+
+ '<!-- <STATUS><CODE>2000</CODE><SEVERITY>ERROR</SEVERITY></STATUS>'+
+ ' <STMTRS><STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>1000.00</TRNAMT></STMTTRN></STMTRS>'+
+ ' <CURDEF>EUR</CURDEF><INVSTMTRS/> -->'+
+ '<STMTRS><BANKTRANLIST><STMTTRN><DTPOSTED>20261104</DTPOSTED>'+
+ '<TRNAMT>1.25</TRNAMT><NAME>Valid payment</NAME></STMTTRN></BANKTRANLIST></STMTRS></OFX>';
+ const result=parseOFX(file);
+ assert.equal(result.transactions.length,1);
+ assert.equal(result.transactions[0].amount,'1.25');
+ assert.equal(result.integrity.declaredCurrency,'USD');
+});
+test('OFX rejects unclosed, unexpected and nested STATUS tags instead of ignoring bank errors',()=>{
+ const base='<BANKTRANLIST><STMTTRN><DTPOSTED>20261104<TRNAMT>1.00<NAME>Test</STMTTRN></BANKTRANLIST>';
+ assert.throws(()=>parseOFX('<OFX><STATUS><CODE>2000<SEVERITY>ERROR'+base+'</OFX>'),/Unclosed OFX bank STATUS/);
+ assert.throws(()=>parseOFX('<OFX></STATUS>'+base+'</OFX>'),/Unexpected closing STATUS/);
+ assert.throws(()=>parseOFX('<OFX><STATUS><STATUS><CODE>0</STATUS></STATUS>'+base+'</OFX>'),/Nested STATUS/);
+ assert.throws(()=>parseOFX('<OFX><STATUS><SEVERITY>INFO</STATUS>'+base+'</OFX>'),/missing a required CODE/);
+ assert.throws(()=>parseOFX('<OFX><STATUS><CODE>2000<SEVERITY>ERROR</STATUS>'+base+'</OFX>'),/unsuccessful status/);
+});
+test('OFX XML strict leaf closers reject incomplete transaction data',()=>{
+ const head='<?xml version="1.0"?><OFX><BANKTRANLIST><STMTTRN>';
+ const close='</STMTTRN></BANKTRANLIST></OFX>';
+ const good='<DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00</TRNAMT><NAME>Salary</NAME>';
+ assert.equal(parseOFX(head+good+close).transactions.length,1);
+ assert.throws(()=>parseOFX(head+'<DTPOSTED>20261104<TRNAMT>1.00</TRNAMT><NAME>Salary</NAME>'+close),/Missing XML closing tag for OFX DTPOSTED/);
+ assert.throws(()=>parseOFX(head+'<DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00<NAME>Salary</NAME>'+close),/Missing XML closing tag for OFX TRNAMT/);
+ assert.throws(()=>parseOFX(head+'<DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00</TRNAMT><NAME>Salary'+close),/Missing XML closing tag for OFX NAME/);
+});
+test('OFX XML CDATA requires a matching XML closing tag but SGML leaf CDATA is supported',()=>{
+ const head='<?xml version="1.0"?><OFX><STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00</TRNAMT>';
+ const close='</STMTTRN></OFX>';
+ assert.throws(()=>parseOFX(head+'<NAME><![CDATA[Coffee]]>'+close),/Missing XML closing tag for OFX NAME/);
+ assert.equal(parseOFX('<OFX><STMTTRN><DTPOSTED>20261104<TRNAMT>1.00<NAME><![CDATA[Coffee]]><FITID>ONE</STMTTRN></OFX>').transactions[0].description,'Coffee');
+});
+test('OFX malformed CDATA and comments reject source without exporting partial transactions',()=>{
+ const tx='<STMTTRN><DTPOSTED>20261104<TRNAMT>1.00<NAME>Pay</STMTTRN>';
+ assert.throws(()=>parseOFX('<OFX><!-- never ending '+tx),/Unclosed OFX XML comment/);
+ assert.throws(()=>parseOFX('<OFX><![CDATA[never ending '+tx),/Unclosed OFX CDATA/);
+ assert.throws(()=>parseOFX('<OFX>-->'+tx+'</OFX>'),/Malformed OFX comment terminator/);
+ assert.throws(()=>parseOFX('<OFX>]]>'+tx+'</OFX>'),/Malformed OFX CDATA terminator/);
+});
+test('OFX CDATA content may contain literal script-looking text without executing tags',()=>{
+ const xml='<?xml version="1.0"?><OFX><STMTTRN><DTPOSTED>20261104</DTPOSTED>'+
+ '<TRNAMT>1.00</TRNAMT><NAME><![CDATA[Pay <script>alert(1)</script>]]></NAME></STMTTRN></OFX>';
+ const data=parseOFX(xml);
+ assert.equal(data.transactions.length,1);
+ assert.equal(data.transactions[0].description,'Pay <script>alert(1)</script>');
+});
