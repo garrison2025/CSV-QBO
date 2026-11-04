@@ -111,3 +111,12 @@
 - Added simulated DOM integration tests for click/change listeners, preview outcomes, duplicate warning acknowledgement and async file selection reset; these are NOT real QuickBooks or live-browser UAT.
 - Static build asserts download-report remains disabled before preview. Cloudflare Pages noindex release gate unchanged.
 - GitHub CI and Cloudflare deployment evidence recorded separately after merge.
+
+## V1.3 — QIF source integrity and cross-file batch overlap review (2026-11-04)
+
+- QIF bank reader now rejects overwritten duplicate financial fields, mismatched T/U amounts, repeated type headers, unknown field codes and incomplete metadata-only entries.
+- QIF lossy metadata fields are disclosed with count-only parser integrity metadata; supported U amounts are checked rather than used to duplicate or replace T.
+- Batch report adds cross-file matching ID/fingerprint counters and ordinal matches against earlier inputs, preserving separate outputs and never deleting rows. Same reference in different accounts is only a possible overlap.
+- Batch byte caps use original file byte counts passed through browser File.size, avoiding false UTF-8 re-encoding size inflation for older OFX files.
+- No names, account numbers or transaction reference values are written into validation JSON. Real bank UAT and target accounting import not performed.
+- Github CI and Cloudflare preview check pending; noindex release gate maintained.
