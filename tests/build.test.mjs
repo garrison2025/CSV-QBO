@@ -103,3 +103,29 @@ test('bank file inputs are decoded by strict byte readers, including batch mode'
  assert.match(app,/selected\.arrayBuffer\(\)/);
  assert.ok(!app.includes('await chosen.text()'));
 });
+
+
+test('synthetic OFX/QBO/QFX statement windows are declared and complete',()=>{
+ for(const filename of ['ofx-synthetic.ofx','qbo-synthetic.qbo','qfx-synthetic.qfx','ofx-xml-synthetic.ofx','ofx-win1252-synthetic.ofx']){
+  const bytes=readFileSync(path.join(root,'dist','samples',filename));
+  const ext=filename.split('.').pop();
+  const {text}=decodeFinancialBytes(bytes,ext);
+  const data=parseInput(text,ext);
+  assert.equal(data.integrity.statementRange.startInclusive,'2026-11-04',filename);
+  assert.equal(data.integrity.statementRange.endExclusive,'2026-11-06',filename);
+  assert.equal(data.integrity.postedBeforeRangeCount,0,filename);
+  assert.equal(data.integrity.postedAfterRangeCount,0,filename);
+ }
+});
+test('bank source preview displays retrieval period, without suggesting it is ledger reconciliation',()=>{
+ for(const page of ['index.html','tools/qbo-to-csv/index.html','tools/ofx-to-csv/index.html']){
+  assert.match(read(page),/id="statement-coverage"/);
+ }
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/Bank retrieval period/);
+ assert.match(app,/end exclusive/);
+ assert.match(app,/posted outside the displayed dates; no rows were removed/);
+ const compatibility=read('compatibility/index.html');
+ assert.match(compatibility,/DTSTART\/DTEND are retrieval windows/);
+ assert.match(compatibility,/not guaranteed DTPOSTED coverage/);
+});
