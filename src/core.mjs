@@ -308,7 +308,7 @@ function decodeEntities(value,xml=false){
   if(xml){
     // Unknown, incomplete, or bare ampersands are invalid XML text, not
     // harmless literal payee characters. Never silently export them.
-    if(/&(?!(?:amp|lt|gt|quot|apos|#(?:x[0-9a-f]+|[0-9]+));)/i.test(s))
+    if(/&(?!(?:amp|lt|gt|quot|apos|#(?:x[0-9a-fA-F]+|[0-9]+));)/.test(s))
       fail('Malformed or unsupported OFX XML character entity.');
     for(const character of s)if(!xmlCharacter(character.codePointAt(0)))
       fail('Invalid XML character in OFX transaction field.');
@@ -361,7 +361,7 @@ function ofxField(block,key,xml=false){
   // only a real tag can terminate a leaf and mixed text is not discarded.
   const rest=structure.slice(offset),end=rest.indexOf('<');
   const next=end<0?null:rest.slice(end).match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
-  if(next&&next[1].toUpperCase()!==key.toUpperCase())
+  if(next&&next[1].toUpperCase()!==key.toUpperCase()&&!xml)
     fail('Malformed OFX '+key+' closing tag.');
   if(xml&&(!next||next[1].toUpperCase()!==key.toUpperCase()))
     fail('Missing XML closing tag for OFX '+key+'.');
