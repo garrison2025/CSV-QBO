@@ -24,7 +24,7 @@
     "kd": 2,
     "cpc": 8.63,
     "summary": "Turn QBO bank feed transactions into an editable Excel spreadsheet, entirely in your browser.",
-    "detail": "Export a proper .xlsx workbook with date, description, signed amount and reference columns. Investment feeds and accounting splits are outside this reader's scope. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
+    "detail": "Export a proper .xlsx workbook with date, description, signed amount and reference columns. Investment feeds and accounting splits are outside this reader's scope. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software.",
     "faq": "Is the download a real Excel workbook?",
     "answer": "Yes. The application generates an .xlsx workbook locally. It is not just a CSV renamed with an Excel extension.",
     "release": "read_only_tested"
@@ -54,7 +54,7 @@
     "kd": 3,
     "cpc": 0,
     "summary": "Make a readable Excel transaction sheet from a QIF bank export.",
-    "detail": "Convert basic QIF transactions to four consistent spreadsheet columns. Verify dates and signed amounts in the preview before downloading. The reader rejects duplicate date, amount and payee fields, checks that optional U amounts agree with T, and warns when cleared-state, category, split or address details are omitted. Unsupported record codes are rejected rather than silently skipped.",
+    "detail": "Convert basic QIF transactions to four consistent spreadsheet columns. Verify dates and signed amounts in the preview before downloading. The reader rejects duplicate date, amount and payee fields, checks that optional U amounts agree with T, and warns when cleared-state, category, split or address details are omitted. Unsupported record codes are rejected rather than silently skipped. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software.",
     "faq": "Will I lose split transaction detail?",
     "answer": "Yes. This release exports basic transaction rows only and clearly warns when split/category fields are encountered.",
     "release": "read_only_tested"
@@ -84,7 +84,7 @@
     "kd": 3,
     "cpc": 0,
     "summary": "Inspect balanced IIF TRNS summaries in Excel; every supported source transaction group is checked before export.",
-    "detail": "Read complete IIF transaction groups, verify that TRNS and SPL amounts sum to zero, and export only TRNS date, amount, memo and reference. Any incomplete or unbalanced group blocks conversion.",
+    "detail": "Read complete IIF transaction groups, verify that TRNS and SPL amounts sum to zero, and export only TRNS date, amount, memo and reference. Any incomplete or unbalanced group blocks conversion. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software.",
     "faq": "Are SPL allocations or a full accounting ledger included?",
     "answer": "No. Account allocations are not exported. The generated workbook is a read-only TRNS summary, not an accounting migration or QuickBooks import file.",
     "release": "read_only_tested"
@@ -114,7 +114,7 @@
     "kd": 3,
     "cpc": 0,
     "summary": "Export OFX bank transactions to a structured Excel workbook.",
-    "detail": "For supported OFX bank feeds, exports posted date, payee name, signed amount and FITID transaction reference into .xlsx. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
+    "detail": "For supported OFX bank feeds, exports posted date, payee name, signed amount and FITID transaction reference into .xlsx. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software.",
     "faq": "Can it read investment OFX files?",
     "answer": "Not in this release. It requires standard bank STMTTRN records.",
     "release": "read_only_tested"
@@ -129,7 +129,7 @@
     "kd": 0,
     "cpc": 0,
     "summary": "Extract QFX bank transaction data into a useful Excel spreadsheet.",
-    "detail": "Read the standard STMTTRN section of a Quicken QFX bank export. Financial institution identity and account metadata are not transferred to Excel. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
+    "detail": "Read the standard STMTTRN section of a Quicken QFX bank export. Financial institution identity and account metadata are not transferred to Excel. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software.",
     "faq": "Does it alter my Quicken file?",
     "answer": "No. Your QFX stays unchanged in your browser. This is a read-only extraction.",
     "release": "read_only_tested"
