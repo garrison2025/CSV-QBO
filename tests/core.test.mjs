@@ -837,3 +837,67 @@ test('XLSX fails closed on bad dates, amounts, unsafe XML and overlong text with
  assert.match(escaped,/<t xml:space="preserve">=SUM\(1,2\) &amp; &lt;test&gt;&#13;\nsecond line<\/t>/);
  assert.ok(!escaped.includes('<f>'),'formula-looking payee should be inert inline text');
 });
+
+
+test('classic Mac CR-only QIF records preserve every bank date, signed cent, payee and reference',()=>{
+ const rows=['!Type:Bank',
+ 'D11/04/2026','T-12.34','U-12.34','PCafé ^ 北门','N000123','MReceipt 001','^',
+ 'D11/05/2026','T15.00','PSalary + bonus','NREF-A','^',
+ 'D11/06/2026','T-0.01','PLast cent','NEND','^'];
+ const cr=rows.join('\r')+'\r';
+ const lf=rows.join('\n')+'\n';
+ const mixed=rows.map((row,i)=>row+(i%3===0?'\r\n':i%3===1?'\r':'\n')).join('');
+ const expected=parseQIF(lf);
+ for(const bankText of [cr,mixed]){
+  const output=parseQIF(bankText);
+  assert.deepEqual(output.transactions,expected.transactions);
+  assert.deepEqual(output.integrity,expected.integrity);
+  assert.deepEqual(output.warnings,expected.warnings);
+  assert.equal(output.transactions.length,3);
+  assert.equal(totals(output.transactions).net,'2.65');
+  assert.equal(output.transactions[0].id,'000123');
+  assert.equal(output.transactions[0].description,'Café ^ 北门');
+ }
+});
+test('classic Mac CR-only balanced IIF journal groups read fully without dropping splits',()=>{
+ const lines=[
+ '!TRNS\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM',
+ '!SPL\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM',
+ 'TRNS\tCHECK\t11/04/2026\tBank\t-10.01\tFirst rent\t0001',
+ 'SPL\tCHECK\t11/04/2026\tExpense\t10.01\tFirst rent\t0001',
+ 'ENDTRNS',
+ 'TRNS\tDEPOSIT\t11/05/2026\tBank\t100.00\tSale revenue\t0002',
+ 'SPL\tDEPOSIT\t11/05/2026\tRevenue\t-65.00\tSale revenue\t0002',
+ 'SPL\tDEPOSIT\t11/05/2026\tFees\t-35.00\tSale revenue\t0002',
+ 'ENDTRNS'
+ ];
+ const original=lines.join('\n')+'\n';
+ const expected=parseIIF(original);
+ for(const formatted of [lines.join('\r')+'\r',lines.join('\r\n')+'\r\n',lines.map((x,i)=>x+(i%2?'\r\n':'\r')).join('')]){
+  const output=parseIIF(formatted);
+  assert.deepEqual(output.transactions,expected.transactions);
+  assert.deepEqual(output.integrity,expected.integrity);
+  assert.deepEqual(output.warnings,expected.warnings);
+  assert.equal(output.integrity.balancedGroups,2);
+  assert.equal(output.integrity.splitRows,3);
+  assert.equal(totals(output.transactions).net,'89.99');
+  assert.deepEqual(output.transactions.map(x=>x.id),['0001','0002']);
+ }
+});
+test('CR-only truncated QIF and unbalanced or unterminated IIF still fail closed',()=>{
+ const invalidQif='!Type:Bank\rD11/04/2026\rT5.00\rPPayee\r';
+ assert.throws(()=>parseQIF(invalidQif),/lacks terminating \^/);
+ const invalidIif=['!TRNS\tDATE\tAMOUNT\tMEMO','!SPL\tDATE\tAMOUNT',
+  'TRNS\t11/04/2026\t-1.00\tRent','SPL\t11/04/2026\t0.99','ENDTRNS'].join('\r')+'\r';
+ assert.throws(()=>parseIIF(invalidIif),/do not balance/);
+ const noEnd=invalidIif.replace(/\rENDTRNS\r?$/,'');
+ assert.throws(()=>parseIIF(noEnd),/missing ENDTRNS/);
+});
+test('CR-only QIF encoded with UTF-16LE BOM decodes to identical transactions',()=>{
+ const raw='!Type:Bank\rD11/04/2026\rT-0.05\rP旧式银行流水\rN00009\r^\r';
+ const bytes=new Uint8Array([0xff,0xfe,...Buffer.from(raw,'utf16le')]);
+ const decoded=decodeFinancialBytes(bytes,'qif');
+ assert.equal(decoded.encoding,'utf-16le');
+ assert.deepEqual(parseQIF(decoded.text).transactions,parseQIF(raw).transactions);
+ assert.equal(parseQIF(decoded.text).transactions[0].id,'00009');
+});
