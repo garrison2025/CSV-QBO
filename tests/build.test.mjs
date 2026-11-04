@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {parseInput,totals} from '../src/core.mjs';
+import {parseInput,totals,decodeFinancialBytes} from '../src/core.mjs';
 const root=path.resolve(import.meta.dirname,'..');
 const read=p=>readFileSync(path.join(root,'dist',p),'utf8');
 execFileSync(process.execPath,['scripts/build.mjs'],{cwd:root,env:{...process.env,SITE_URL:'',PUBLISH_SEO:''}});
@@ -74,4 +74,32 @@ test('all single-file converter workspaces expose an explicit warning acknowledg
  assert.match(app,/quickBooksCSVExportPlan\(parsed.transactions\)/);
  assert.match(app,/quickbooks-csv-validation\.json/);
  assert.match(app,/warning-ack'\)\.checked/);
+});
+
+
+test('OFX XML and Windows-1252 synthetic variants parse to two reconciled bank rows',()=>{
+ for(const [filename,expectedEncoding,firstName] of [
+  ['ofx-xml-synthetic.ofx','utf-8','Sample café & bookstore'],
+  ['ofx-win1252-synthetic.ofx','windows-1252','Sample café']
+ ]){
+  const bytes=readFileSync(path.join(root,'dist','samples',filename));
+  const decoded=decodeFinancialBytes(bytes,'ofx');
+  assert.equal(decoded.encoding,expectedEncoding,filename);
+  const parsed=parseInput(decoded.text,'ofx');
+  assert.equal(parsed.transactions.length,2,filename);
+  assert.equal(parsed.transactions[0].description,firstName,filename);
+  assert.equal(parsed.integrity.recordCount,2,filename);
+  assert.equal(totals(parsed.transactions).net,'107.50',filename);
+ }
+ const page=read('tools/ofx-to-csv/index.html');
+ assert.match(page,/\/samples\/ofx-xml-synthetic\.ofx/);
+ assert.match(page,/\/samples\/ofx-win1252-synthetic\.ofx/);
+ assert.match(page,/noindex,nofollow/);
+});
+test('bank file inputs are decoded by strict byte readers, including batch mode',()=>{
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/decodeFinancialBytes/);
+ assert.match(app,/chosen\.arrayBuffer\(\)/);
+ assert.match(app,/selected\.arrayBuffer\(\)/);
+ assert.ok(!app.includes('await chosen.text()'));
 });

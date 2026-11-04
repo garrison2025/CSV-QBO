@@ -1,4 +1,4 @@
-import {MAX_FILE_BYTES,parseCSV,guessMapping,parseInput,toCSV,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals,escapeHtml} from './core.mjs';
+import {MAX_FILE_BYTES,decodeFinancialBytes,parseCSV,guessMapping,parseInput,toCSV,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals,escapeHtml} from './core.mjs';
 import {toXLSX,toZIP} from './xlsx.mjs';
 import {batchConvert,MAX_BATCH_FILES,MAX_BATCH_BYTES} from './batch.mjs';
 
@@ -7,7 +7,7 @@ const drop=$('#drop-zone'), fileInput=$('#file-input'), formatPicker=$('#target-
 if(drop && fileInput){
   const source=drop.dataset.source||'any';
   const fixedOutput=drop.dataset.output||'csv';
-  let file=null,parsed=null,table=null,fileText="",fileExt="",audit=null,selectionEpoch=0;
+  let file=null,parsed=null,table=null,fileText="",fileExt="",fileEncoding='utf-8',audit=null,selectionEpoch=0;
   let batchFiles=[],batchArchive=null,batchInfo=null,batchHasWarnings=false,batchEpoch=0;
   const say=(msg,kind='info')=>{const box=$('#work-status');box.textContent=msg;box.dataset.state=kind;box.hidden=false;};
   function setButton(on){const btn=$('#export-button');btn.disabled=!on;btn.setAttribute('aria-disabled',String(!on));}
@@ -44,9 +44,13 @@ if(drop && fileInput){
     const warnings=parsed&&audit ? parsed.warnings.length+audit.warnings.length : 0;
     setButton(Boolean(parsed?.transactions?.length)&&(!warnings||$('#warning-ack').checked));
   });
+  function withEncodingWarning(data,encoding){
+    if(encoding!=='utf-8')data.warnings.unshift('The source file was decoded locally as '+encoding+'. Verify accented names and transaction details.');
+    return data;
+  }
   async function prepare(chosen){
     const epoch=++selectionEpoch;
-    file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#warning-ack-label').hidden=true;$('#warning-ack').checked=false;$('#file-name').textContent='';
+    file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';fileEncoding='utf-8';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#warning-ack-label').hidden=true;$('#warning-ack').checked=false;$('#file-name').textContent='';
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
     const ext=(file.name.split('.').pop()||'').toLowerCase();
@@ -54,14 +58,14 @@ if(drop && fileInput){
     if(source!=='any' && source!==ext && !(source==='csv'&&ext==='tsv')){say('This tool expects a .'+source+' input. Choose a matching file or browse another converter.','error');return;}
     $('#file-name').textContent=file.name+' • '+Math.ceil(file.size/1024)+' KB';
     try{
-      const text=await chosen.text();
+      const decoded=decodeFinancialBytes(new Uint8Array(await chosen.arrayBuffer()),ext);
       if(epoch!==selectionEpoch)return; // A superseded async read must not restore old bank data.
-      if(text.includes('\uFFFD'))throw Error('This file contains undecodable text. Export as UTF-8 before continuing.');
-      fileText=text;fileExt=ext;
+      const {text,encoding}=decoded;
+      fileText=text;fileExt=ext;fileEncoding=encoding;
       if(ext==='csv'||ext==='tsv'){
         updateMapping(parseCSV(text,ext==='tsv'?'\t':undefined)[0]);
         say('Select column mappings, then choose Preview transactions.');
-      }else{parsed=parseInput(text,ext,{dateFormat:$('#date-format').value});renderResult(parsed);}
+      }else{parsed=withEncodingWarning(parseInput(text,ext,{dateFormat:$('#date-format').value}),encoding);renderResult(parsed);}
     }catch(err){if(epoch===selectionEpoch)say(err.message||'Could not read file.','error');}
   }
   const batchPicker=$('#batch-input'),batchSelect=$('#batch-choose'),batchExport=$('#batch-export');
@@ -93,9 +97,8 @@ if(drop && fileInput){
     batchSay('Checking '+batchFiles.length+' files locally. No transaction data is uploaded.');
     await Promise.resolve();
     try{
-      const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,text:await selected.text()})));
+      const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,...decodeFinancialBytes(new Uint8Array(await selected.arrayBuffer()),selected.name.split('.').pop().toLowerCase())})));
       if(epoch!==batchEpoch)return;
-      if(texts.some(item=>item.text.includes('\uFFFD')))throw Error('A batch file contains undecodable text. Export as UTF-8 before continuing.');
       batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
       batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
       const iifGroups=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.balancedGroups||0),0);
@@ -123,7 +126,7 @@ if(drop && fileInput){
       parsed=null;setButton(false);$('#preview-panel').hidden=true;
       say('Date order changed. Select Preview transactions to validate again.');
     }else{
-      try{parsed=parseInput(fileText,fileExt,{dateFormat:$('#date-format').value});renderResult(parsed);}
+      try{parsed=withEncodingWarning(parseInput(fileText,fileExt,{dateFormat:$('#date-format').value}),fileEncoding);renderResult(parsed);}
       catch(err){parsed=null;setButton(false);$('#preview-panel').hidden=true;say(err.message||'Invalid date format.','error');}
     }
   });

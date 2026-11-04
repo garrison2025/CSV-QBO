@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals} from '../src/core.mjs';
+import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,decodeFinancialBytes,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals} from '../src/core.mjs';
 import {toXLSX,toZIP} from '../src/xlsx.mjs';
 
 test('strict cents and signed amounts',()=>{
@@ -369,4 +369,79 @@ test('QuickBooks preflight rejects oversize rows and invalid user transactions b
  assert.throws(()=>quickBooksCSVExportPlan(tooBig),/too large/);
  assert.throws(()=>quickBooksCSVExportPlan([{date:'2026-11-04',description:'',amount:'1.00'}]),/Description is required/);
  assert.throws(()=>quickBooksCSVExportPlan([{date:'2026-11-04',description:'Pay',amount:'1.234'}]),/Invalid amount/);
+});
+
+
+test('OFX SGML and XML reader handles explicit leaf XML tags and multiline text',()=>{
+ const xml='<?xml version="1.0" encoding="UTF-8"?><OFX><CURDEF>USD</CURDEF><BANKTRANLIST>'+
+  '<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20261104120000[-5:EST]</DTPOSTED><TRNAMT>-5.25</TRNAMT><FITID>R1</FITID><NAME><![CDATA[Café & Bakery]]></NAME><MEMO>First&#10;line</MEMO></STMTTRN>'+
+  '<STMTTRN><TRNTYPE>CREDIT</TRNTYPE><DTPOSTED>20261105</DTPOSTED><TRNAMT>12.00</TRNAMT><FITID>R2</FITID><NAME>Refund &#xE9;lite</NAME></STMTTRN></BANKTRANLIST></OFX>';
+ const result=parseOFX(xml);
+ assert.equal(result.transactions.length,2);
+ assert.equal(result.transactions[0].description,'Café & Bakery');
+ assert.equal(result.transactions[0].memo,'First\nline');
+ assert.equal(result.transactions[1].description,'Refund élite');
+ assert.equal(result.integrity.recordCount,2);
+ assert.equal(result.integrity.declaredCurrency,'USD');
+});
+test('OFX signed TRNAMT is authoritative regardless of TRNTYPE label',()=>{
+ const credit='<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20261104<TRNAMT>-2.50<FITID>R1<NAME>Correction</STMTTRN>';
+ const r=parseOFX('<OFX><CURDEF>USD'+credit+'</OFX>');
+ assert.equal(r.transactions[0].amount,'-2.50');
+ assert.equal(r.integrity.missingTypeCount,0);
+});
+test('OFX blocks duplicate monetary fields, conflicting XML endings and incomplete CDATA',()=>{
+ const line='<STMTTRN><DTPOSTED>20261104<TRNAMT>1.00<FITID>R1<NAME>Test</STMTTRN>';
+ const twice=line.replace('<FITID>','<TRNAMT>4.00<FITID>');
+ assert.throws(()=>parseOFX(twice),/Duplicate OFX TRNAMT/);
+ const mismatch=line.replace('<NAME>Test','<NAME>Test</MEMO>');
+ assert.throws(()=>parseOFX(mismatch),/Malformed OFX NAME closing tag/);
+ assert.throws(()=>parseOFX(line.replace('<NAME>Test','<NAME><![CDATA[Open')),/Unclosed OFX CDATA/);
+});
+test('OFX refuses unsuccessful bank status rather than reading stale embedded records',()=>{
+ const header='<STATUS><CODE>15500<SEVERITY>ERROR</STATUS>';
+ const t='<STMTTRN><DTPOSTED>20261104<TRNAMT>2.00<FITID>A<NAME>Test</STMTTRN>';
+ assert.throws(()=>parseOFX('<OFX>'+header+t+'</OFX>'),/unsuccessful status/);
+ assert.equal(parseOFX('<OFX><STATUS><CODE>0<SEVERITY>INFO</STATUS>'+t+'</OFX>').transactions.length,1);
+});
+test('OFX comments do not generate ghost transactions or transaction status',()=>{
+ const ghost='<!-- <STATUS><CODE>15500<SEVERITY>ERROR</STATUS><STMTTRN><DTPOSTED>20261104<TRNAMT>9.00<NAME>Ghost</STMTTRN> -->';
+ const real='<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261104<TRNAMT>-5.00<FITID>A<NAME>Real</STMTTRN>';
+ const r=parseOFX('<OFX>'+ghost+real+'</OFX>');
+ assert.equal(r.transactions.length,1);
+ assert.equal(r.transactions[0].description,'Real');
+ assert.throws(()=>parseOFX('<OFX><!-- invalid '+real+'</OFX>'),/Malformed OFX comment/);
+});
+test('missing FITID and TRNTYPE are disclosed as warnings without inventing identifiers',()=>{
+ const t='<STMTTRN><DTPOSTED>20261104<TRNAMT>-1.00<NAME>Unsupported bank variant</STMTTRN>';
+ const r=parseOFX(t);
+ assert.equal(r.transactions[0].id,'');
+ assert.equal(r.integrity.missingReferenceCount,1);
+ assert.equal(r.integrity.missingTypeCount,1);
+ assert.match(r.warnings.join(' '),/no FITID/);
+ assert.match(r.warnings.join(' '),/no TRNTYPE/);
+});
+test('OFX Windows-1252 bank header decodes accented descriptions without corruption',()=>{
+ const header='OFXHEADER:100\r\nDATA:OFXSGML\r\nVERSION:102\r\nENCODING:USASCII\r\nCHARSET:1252\r\n\r\n';
+ const first=header+'<OFX><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261104<TRNAMT>-4.00<FITID>1<NAME>Caf';
+ const tail='</STMTTRN></OFX>';
+ const bytes=new Uint8Array([...new TextEncoder().encode(first),0xe9,...new TextEncoder().encode(tail)]);
+ const result=decodeFinancialBytes(bytes,'ofx');
+ assert.equal(result.encoding,'windows-1252');
+ assert.equal(parseOFX(result.text).transactions[0].description,'Café');
+ assert.throws(()=>decodeFinancialBytes(bytes,'csv'),/Cannot decode utf-8/);
+});
+test('OFX encoding fails closed on unsupported declared charsets and damaged UTF-8',()=>{
+ const utf8=new TextEncoder();
+ assert.throws(()=>decodeFinancialBytes(utf8.encode('OFXHEADER:100\r\nCHARSET:936\r\n\r\n<OFX></OFX>'),'qfx'),/Unsupported OFX character set/);
+ assert.throws(()=>decodeFinancialBytes(new Uint8Array([0xc3,0x28]),'ofx'),/Cannot decode utf-8/);
+ assert.throws(()=>decodeFinancialBytes(utf8.encode('bad\u0000header'),'ofx'),/null byte/);
+});
+test('UTF-16 BOM bank exports decode locally without changing transaction amounts',()=>{
+ const data='<OFX><STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20261104<TRNAMT>15.05<FITID>U1<NAME>Unicode café</STMTTRN></OFX>';
+ const buf=Buffer.from(data,'utf16le');
+ const bytes=Buffer.concat([Buffer.from([0xff,0xfe]),buf]);
+ const decoded=decodeFinancialBytes(bytes,'ofx');
+ assert.equal(decoded.encoding,'utf-16le');
+ assert.equal(parseOFX(decoded.text).transactions[0].amount,'15.05');
 });

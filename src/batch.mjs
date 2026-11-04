@@ -43,6 +43,7 @@ export function batchConvert(inputs,{target='csv',source='any',dateFormat='us'}=
     const dateRange={first:dates[0],last:dates[dates.length-1]};
     const parserIntegrity=parsed.integrity||null;
     const warnings=[...parsed.warnings,...audit.warnings];
+    if(item.encoding&&item.encoding!=='utf-8')warnings.push('Bank file decoded locally as '+item.encoding+'. Verify source text before importing.');
     if(duplicateFile)warnings.push('File content duplicates batch item '+duplicateFile+'. No data was removed.');
     reports.push({index:i+1,inputType:ext,outputFile:name,rows:audit.summary.count,
       totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,

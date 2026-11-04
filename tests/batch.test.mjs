@@ -87,3 +87,21 @@ test('batch blocks any unbalanced IIF file and never returns partial ZIP',()=>{
   'TRNS\t11/04/2026\t-10.00\tA\nSPL\t11/04/2026\t9.99\tB\nENDTRNS\n';
  assert.throws(()=>batchConvert([{name:'good.iif',text:balanced},{name:'bad.iif',text:unbalanced}]),/Batch file 2: .*do not balance to zero/);
 });
+
+
+test('batch identifies legacy OFX encoding and missing bank transaction references without exposing descriptions',()=>{
+ const sgml='<OFX><CURDEF>USD<STMTTRN><DTPOSTED>20261104<TRNAMT>-7.00<NAME>Legacy bank transaction</STMTTRN></OFX>';
+ const result=batchConvert([{name:'private-account.ofx',text:sgml,encoding:'windows-1252'}]);
+ assert.equal(result.report.totalTransactions,1);
+ assert.equal(result.report.files[0].parserIntegrity.check,'ofx_statement_records');
+ assert.equal(result.report.files[0].parserIntegrity.missingReferenceCount,1);
+ assert.ok(result.report.files[0].warnings.some(x=>x.includes('windows-1252')));
+ assert.ok(result.report.files[0].warnings.some(x=>x.includes('no FITID')));
+ assert.ok(!JSON.stringify(result.report).includes('private-account'));
+ assert.ok(!JSON.stringify(result.report).includes('Legacy bank transaction'));
+});
+test('batch blocks OFX statements with bank error status or duplicate TRNAMT',()=>{
+ const tx='<STMTTRN><DTPOSTED>20261104<TRNAMT>7.00<NAME>Sample</STMTTRN>';
+ assert.throws(()=>batchConvert([{name:'bad.ofx',text:'<OFX><STATUS><CODE>15500<SEVERITY>ERROR</STATUS>'+tx+'</OFX>'}]),/unsuccessful status/);
+ assert.throws(()=>batchConvert([{name:'bad.ofx',text:tx.replace('<NAME>','<TRNAMT>8.00<NAME>')}]),/Duplicate OFX TRNAMT/);
+});
