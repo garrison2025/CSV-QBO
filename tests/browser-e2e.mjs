@@ -113,6 +113,27 @@ try{
  assert.match(output.content.toString('utf8'),/Sample café/);
  console.log('PASS Windows-1252 OFX browser decode and CSV download');
 
+ // Genuine XML markup must be distinguished from inert CDATA/comment content:
+ // fake STMTTRN tags inside merchant names cannot create or alter bank rows.
+ await page.goto(base+'/tools/ofx-to-csv/');
+ const xmlNote='<?xml version="1.0"?><OFX><CURDEF>USD</CURDEF><BANKTRANLIST>'+
+   '<!-- <STMTTRN><TRNAMT>900.00</TRNAMT></STMTTRN> -->'+
+   '<STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>-7.75</TRNAMT>'+
+   '<NAME><![CDATA[Merchant <script>alert(1)</script> <STMTTRN><TRNAMT>999.00</TRNAMT></STMTTRN>]]></NAME>'+
+   '</STMTTRN></BANKTRANLIST></OFX>';
+ await page.locator('#file-input').setInputFiles(file('xml-note.ofx',xmlNote));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-7.75');
+ assert.match(await page.locator('#preview-body tr').first().textContent(),/Merchant <script>alert\(1\)<\/script>/);
+ assert.equal(await page.locator('#preview-body script').count(),0);
+ await page.locator('#warning-ack').check();
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/Merchant <script>alert\(1\)<\/script>/);
+ assert.ok(!output.content.toString('utf8').includes('900.00'));
+ console.log('PASS Chrome OFX XML CDATA/comment tag isolation and escaped preview');
+
+
  // Verify the CSV -> experimental QIF workflow is an actual downloaded file.
  await page.goto(base+'/tools/csv-to-qif/');
  await page.locator('#file-input').setInputFiles(file('convert.csv',csv));
