@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.9 — lossless QIF writer and source-row self-check
+
+- Fixed a concrete loss-of-data issue in the experimental CSV → QIF writer: earlier versions replaced CR/LF and literal `^` characters in payees, references and memos with spaces without clearly telling the user. The writer now preserves safe literal `^` and Unicode and **rejects line breaks/control characters** with a row-specific error instead of changing transaction content.
+- Before returning QIF bytes to any download, the writer reads its own generated Bank QIF back using the existing local parser and compares **every row in exact order**: ISO date, signed integer-cent amount, full description/payee, reference ID and memo. Missing, changed or extra rows cause an error. This is a **source-to-wire correctness check, not proof that an external finance app accepts QIF**.
+- Added tests for literal carets, international payees, 1,200-row whole-file round trips, unsupported control characters and redacted error text. Chrome browser tests download a caret-containing synthetic QIF and attempt to export a quoted multiline CSV payee, which must fail safely without including private details in the error.
+- Updated the CSV → QIF tool landing-page FAQ to state that multiline payees cannot be represented exactly and to distinguish QIF syntax verification from real-world import compatibility.
+- No production dependencies, paid APIs, bank uploads or `.qbo` Web Connect writer. Cloudflare preview stays `noindex,nofollow` until an explicitly authorized production release.
+
 ## V1.8 — private full-file transaction search and review-only duplicate filtering
 
 - A local search box on all 12 converter tools matches the full source file across date, description, signed amount and transaction reference, not merely the currently visible page. It is case-insensitive and preserves original source row indices for subsequent review.
