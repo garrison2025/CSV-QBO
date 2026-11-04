@@ -274,6 +274,25 @@ export function parseOFX(text) {
   const accountSections=[...raw.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
   if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
   if(/<INVSTMTMSGSRSV1\b|<INVSTMTRS\b/i.test(raw))fail('Investment OFX feeds are not supported. No transactions were exported.');
+
+  // BANKTRANLIST is a single bank statement aggregate, not an arbitrary
+  // concatenation of transactions from independent source windows.
+  const listTags=[...raw.matchAll(/<\/?BANKTRANLIST\b[^>]*>/gi)];
+  let bankList=null,bankBounds=null,reportedStartDate=null,reportedEndDate=null;
+  if(listTags.length){
+    if(listTags.length!==2||/^<\//.test(listTags[0][0])||!/^<\//.test(listTags[1][0]))
+      fail('Multiple or incomplete BANKTRANLIST statement groups. Export one complete bank statement at a time.');
+    const opening=listTags[0],closing=listTags[1];
+    const begin=opening.index+opening[0].length,end=closing.index;
+    if(begin>end)fail('Invalid BANKTRANLIST boundaries.');
+    bankList=raw.slice(begin,end);
+    bankBounds={begin,end};
+    const beginRaw=ofxField(bankList,'DTSTART'),endRaw=ofxField(bankList,'DTEND');
+    if(beginRaw)reportedStartDate=isoDate(beginRaw);
+    if(endRaw)reportedEndDate=isoDate(endRaw);
+    if(reportedStartDate&&reportedEndDate&&reportedStartDate>reportedEndDate)
+      fail('OFX statement range is invalid: DTSTART is after DTEND.');
+  }
   for(const status of raw.matchAll(/<STATUS\b[^>]*>([\s\S]*?)<\/STATUS\s*>/gi)){
     const code=ofxField(status[1],'CODE'),severity=ofxField(status[1],'SEVERITY');
     if((code&&code!=='0')||/^ERROR$/i.test(severity))fail('OFX bank response reports an unsuccessful status. No transactions were exported.');
@@ -293,7 +312,9 @@ export function parseOFX(text) {
   if(!recordCount)fail('No bank STMTTRN entries found. Investment feeds are not supported.');
   const blocks=[...raw.matchAll(/<STMTTRN\b[^>]*>([\s\S]*?)<\/STMTTRN\s*>/gi)];
   if(blocks.length!==recordCount)fail('One or more OFX transaction records could not be read safely.');
-  let missingReferenceCount=0,missingTypeCount=0;
+  if(bankBounds&&blocks.some(block=>block.index<bankBounds.begin||block.index+block[0].length>bankBounds.end))
+    fail('OFX contains transactions outside the declared BANKTRANLIST. No data was exported.');
+  let missingReferenceCount=0,missingTypeCount=0,postedBeforeRangeCount=0,postedAfterRangeCount=0;
   const transactions=blocks.map((m,i)=>{
     const b=m[1];
     try{
@@ -303,19 +324,28 @@ export function parseOFX(text) {
       const id=ofxField(b,'FITID'),type=ofxField(b,'TRNTYPE');
       if(!id)missingReferenceCount++;
       if(!type)missingTypeCount++;
+      // OFX search ranges track bank system-add time, not necessarily DTPOSTED.
+      // Warn about surprises, never drop rows or treat the difference as an error.
+      const postedDate=isoDate(date);
+      if(reportedStartDate&&postedDate<reportedStartDate)postedBeforeRangeCount++;
+      if(reportedEndDate&&postedDate>reportedEndDate)postedAfterRangeCount++;
       // OFX TRNAMT is already signed. TRNTYPE does not redefine its sign.
-      return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),
+      return {date:postedDate,amount:fromMinorUnits(toMinorUnits(amount)),
         description,memo:ofxField(b,'MEMO'),id};
     }catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
   return {transactions,source:'OFX / QBO / QFX',
     integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,
-      declaredCurrency:currencyTags.length?'USD':null},
+      declaredCurrency:currencyTags.length?'USD':null,
+      statementRange:reportedStartDate||reportedEndDate?{startInclusive:reportedStartDate,endExclusive:reportedEndDate}:null,
+      postedBeforeRangeCount,postedAfterRangeCount},
     warnings:[
       'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
       ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[]),
       ...(missingReferenceCount?[missingReferenceCount+' OFX transaction(s) have no FITID; duplicate/reference checks may be incomplete.']:[]),
-      ...(missingTypeCount?[missingTypeCount+' OFX transaction(s) have no TRNTYPE; signed amounts remain unchanged.']:[])
+      ...(missingTypeCount?[missingTypeCount+' OFX transaction(s) have no TRNTYPE; signed amounts remain unchanged.']:[]),
+      ...(bankList&&(reportedStartDate==null||reportedEndDate==null)?['BANKTRANLIST has incomplete DTSTART/DTEND date coverage metadata. Verify the selected statement period.']:[]),
+      ...(postedBeforeRangeCount||postedAfterRangeCount?[(postedBeforeRangeCount+postedAfterRangeCount)+' OFX posted date(s) lie outside the reported retrieval dates. This can be legitimate because OFX search uses bank system-add time; review without dropping any rows.']:[])
     ]};
 }
 export function parseIIF(text,dateFormat='us'){
