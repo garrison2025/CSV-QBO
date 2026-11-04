@@ -251,3 +251,20 @@ test('QIF and IIF tool docs disclose CR-only compatibility and preview remains n
  assert.match(core,/function financialLines\(text\)/);
  assert.match(core,/split\(\/\\r\\n\|\\n\|\\r\/\)/);
 });
+
+
+test('OFX/QBO/QFX pages disclose exact mixed-XML text preservation and XML entity rejection',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ const relevant=tools.filter(x=>['qbo','qfx','ofx'].includes(x.input));
+ assert.equal(relevant.length,6);
+ for(const tool of relevant){
+  const html=read('tools/'+tool.slug+'/index.html');
+  assert.match(html,/OFX 2.x XML bank text now combines ordinary text, CDATA and comment-separated fragments/);
+  assert.match(html,/unknown\/invalid XML entities are rejected/);
+  assert.match(html,/OFX 1.x SGML still accepts literal ampersands/);
+  assert.match(html,/noindex,nofollow/);
+ }
+ const parser=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ assert.match(parser,/function ofxTextSegments\(fragment,xml=false\)/);
+ assert.match(parser,/Malformed or unsupported OFX XML character entity/);
+});
