@@ -164,16 +164,28 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
 }
 
 export function parseQIF(text, dateFormat='us') {
-  const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);const transactions=[];let entry={},kind='';let splits=0;
+  const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
+  const transactions=[];let entry={},kind='',splits=0,categories=0;
   const commit=()=>{
-    if (!Object.keys(entry).length) return;
-    if (!entry.date||!entry.amount) fail('QIF transaction missing D or T value.');
-    transactions.push({date:isoDate(entry.date,dateFormat),description:entry.description||entry.memo||'',amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''}); entry={};
+    if(!Object.keys(entry).length)return;
+    if(!entry.date||!entry.amount)fail('QIF transaction missing D or T value.');
+    transactions.push({date:isoDate(entry.date,dateFormat),description:entry.description||entry.memo||'',amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''});
+    entry={};
   };
-  for(const line of lines){
+  for(const line of lines) {
     if(!line)continue;
-    if(line.startsWith('!Type:')) {kind=line.slice(6).trim();if(/^Invst$/i.test(kind))fail('Investment QIF transactions are unsupported. No transactions were exported.');continue;}
-    if(line.startsWith('!'))continue;
+    if(line.startsWith('!Type:')) {
+      if(Object.keys(entry).length)fail('QIF section changed before a terminating ^.');
+      const next=line.slice(6).trim();
+      if(/^Invst$/i.test(next))fail('Investment QIF transactions are unsupported. No transactions were exported.');
+      if(!/^(Bank|CCard|Cash)$/i.test(next))fail('Unsupported QIF section type '+next+'. Only Bank, CCard and Cash transactions are supported.');
+      if(kind&&kind.toLowerCase()!==next.toLowerCase())fail('Multiple QIF transaction section types found. Export one account/type at a time.');
+      kind=next;
+      continue;
+    }
+    if(line.startsWith('!Account'))fail('QIF account-list sections are not supported. Export transactions for one account at a time.');
+    if(line.startsWith('!'))fail('Unsupported QIF directive. Export a single Bank, CCard or Cash transaction section.');
+    if(!kind)fail('QIF file is missing a supported !Type:Bank, !Type:CCard or !Type:Cash header.');
     if(line==='^'){commit();continue;}
     const k=line[0],v=line.slice(1);
     if(k==='D')entry.date=v;
@@ -181,11 +193,14 @@ export function parseQIF(text, dateFormat='us') {
     else if(k==='P')entry.description=v;
     else if(k==='M')entry.memo=v;
     else if(k==='N')entry.id=v;
+    else if(k==='L')categories++;
     else if(k==='S'||k==='E'||k==='$')splits++;
   }
-  if(Object.keys(entry).length) fail('QIF final transaction lacks terminating ^.');
+  if(Object.keys(entry).length)fail('QIF final transaction lacks terminating ^.');
   if(!transactions.length)fail('No QIF transactions found.');
-  return {transactions,source:'QIF',warnings:[kind!=='Bank'?'Only bank-style transactions were read; source QIF type: '+(kind||'unknown')+'.':'',splits?'Split/category details are not preserved in this transaction export.':''].filter(Boolean)};
+  const warnings=[];
+  if(splits||categories)warnings.push('QIF category/split allocations are not preserved in this transaction export.');
+  return {transactions,source:'QIF',warnings};
 }
 
 function decodeEntities(s){return s.replace(/&(amp|lt|gt|quot|apos);/g,(a,k)=>({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"}[k]));}
