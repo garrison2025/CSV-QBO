@@ -111,6 +111,47 @@ try{
  assert.match(cells,/Salary \^ café/);
  console.log('PASS browser QIF-to-XLSX one-cent debit and leading-zero transaction reference');
 
+ // Legacy bank exports may use Mac-style CR-only records rather than LF/CRLF.
+ // Validate the actual UI upload and independent XLSX ZIP contents.
+ await page.goto(base+'/tools/qif-to-excel/');
+ const oldQif=['!Type:Bank','D11/04/2026','T-5.25','PClassic Mac Café',
+  'N000098','^','D11/05/2026','T10.00','PRefund ☕','N000099','^',''].join('\r');
+ await page.locator('#file-input').setInputFiles(file('legacy-mac.qif',oldQif));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-count').textContent(),'2');
+ assert.equal(await page.locator('#summary-net').textContent(),'4.75');
+ assert.match(await page.locator('#preview-body').textContent(),/Classic Mac Café/);
+ if(await page.locator('#warning-ack-label').isVisible())await page.locator('#warning-ack').check();
+ output=await dl('#export-button');
+ const macSheet=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
+ assert.match(macSheet,/Classic Mac Café/);
+ assert.match(macSheet,/Refund ☕/);
+ assert.match(macSheet,/<c r="C2" s="1"><v>-5\.25<\/v><\/c>/);
+ assert.match(macSheet,/<c r="C3" s="1"><v>10\.00<\/v><\/c>/);
+ assert.match(macSheet,/000098/);
+ assert.match(macSheet,/000099/);
+ console.log('PASS Chrome QIF CR-only legacy bank file preserves two signed rows and references');
+
+ await page.goto(base+'/tools/iif-to-excel/');
+ const oldIif=[
+  '!TRNS\tDATE\tAMOUNT\tMEMO\tDOCNUM',
+  '!SPL\tDATE\tAMOUNT',
+  'TRNS\t11/04/2026\t-4.01\tOld Mac rent\t000111',
+  'SPL\t11/04/2026\t4.01',
+  'ENDTRNS',''].join('\r');
+ await page.locator('#file-input').setInputFiles(file('legacy-mac.iif',oldIif));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-4.01');
+ assert.match(await page.locator('#preview-body').textContent(),/Old Mac rent/);
+ await page.locator('#warning-ack').check();
+ output=await dl('#export-button');
+ const journalSheet=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
+ assert.match(journalSheet,/<c r="C2" s="1"><v>-4\.01<\/v><\/c>/);
+ assert.match(journalSheet,/000111/);
+ console.log('PASS Chrome IIF CR-only balanced TRNS/SPL bank-summary output without partial rows');
+
+
 
  await page.goto(base+'/');
  const qif='!Type:Bank\nD11/04/2026\nT-3.00\nPCoffee\nNREF-1\n^\n';

@@ -234,3 +234,20 @@ test('XLSX converter pages state true Excel dates, two-decimal money and text-sa
  assert.match(source,/numFmtId="164" formatCode="yyyy-mm-dd"/);
  assert.match(source,/autoFilter ref=/);
 });
+
+
+test('QIF and IIF tool docs disclose CR-only compatibility and preview remains noindex',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ const legacyTools=tools.filter(x=>x.input==='qif'||x.input==='iif');
+ assert.equal(legacyTools.length,4);
+ for(const item of legacyTools){
+  const html=read('tools/'+item.slug+'/index.html');
+  assert.match(html,/Legacy Mac-style CR-only line endings/);
+  assert.match(html,/CRLF and LF\/mixed records are supported/);
+  assert.match(html,/Record counts and signed transaction values are never normalized/);
+  assert.match(html,/noindex,nofollow/);
+ }
+ const core=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ assert.match(core,/function financialLines\(text\)/);
+ assert.match(core,/split\(\/\\r\\n\|\\n\|\\r\/\)/);
+});

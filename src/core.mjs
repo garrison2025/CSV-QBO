@@ -169,8 +169,16 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   return {transactions,warnings:[],source:'CSV'};
 }
 
+/**
+ * Financial text exports historically use CR, LF or CRLF (sometimes mixed).
+ * Normalize record boundaries only: payee/amount field values are never
+ * trimmed or rewritten as a consequence of a line-ending choice.
+ */
+function financialLines(text){
+  return String(text).replace(/^\uFEFF/,'').split(/\r\n|\n|\r/);
+}
 export function parseQIF(text, dateFormat='us') {
-  const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
+  const lines=financialLines(text);
   const transactions=[];
   let entry={},kind='',splits=0,categories=0,ignoredMetadata=0,redundantAmounts=0;
   let recordLine=0,recordSeen=false;
@@ -429,7 +437,7 @@ export function parseOFX(text) {
     ]};
 }
 export function parseIIF(text,dateFormat='us'){
-  const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
+  const lines=financialLines(text);
   let trnsHeader=null,splHeader=null,active=null,balancedGroups=0,splitRows=0,ignoredRows=0;
   const transactions=[];
   const parseHeader=(row,required,atLine)=>{

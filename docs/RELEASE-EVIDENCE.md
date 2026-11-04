@@ -190,3 +190,12 @@
 - Independent Python standard-library OOXML/ZIP gate parses a synthetic workbook and checks CRC, styles, date/money cells, literal formula-looking text, and preserved leading-zero reference IDs. Real Chrome downloads are also inspected.
 - This remains synthetic structural/data validation. Actual Microsoft Excel desktop/QuickBooks financial import UAT not performed. Preview stays noindex; no custom domain or paid APIs.
 - GitHub main CI and Cloudflare release evidence must be verified separately after merge.
+
+## V2.1 — CR-only legacy QIF/IIF input newline compatibility (2026-11-05)
+
+- Previously QIF/IIF split input only at LF and CRLF; CR-only exports from legacy Mac workflows could be parsed as a single record or rejected.
+- Shared `financialLines` helper now handles bare CR, LF, CRLF, and mixed sequences, solely at physical record boundaries. No changing description content, cents, ID, type or date values.
+- Strict fail-closed QIF `^` and IIF TRNS/SPL balancing checks remain. Batch output still separates source files; partial ZIP archives remain forbidden.
+- Added Node parity tests against LF, mixed and CR-only for two-to-three financial records, UTF-16LE QIF BOM, and malformed CR-only no-terminator/unbalanced cases. Chrome E2E uploads CR-only QIF and IIF and checks real XLSX downloads.
+- Four relevant tool pages disclose limited newline support. This is not a real-bank compatibility certificate or proof of QuickBooks app import acceptance; `noindex` remains in place.
+- Verify GitHub CI and Cloudflare release checks after merge.
