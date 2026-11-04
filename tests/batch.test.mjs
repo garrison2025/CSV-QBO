@@ -105,3 +105,27 @@ test('batch blocks OFX statements with bank error status or duplicate TRNAMT',()
  assert.throws(()=>batchConvert([{name:'bad.ofx',text:'<OFX><STATUS><CODE>15500<SEVERITY>ERROR</STATUS>'+tx+'</OFX>'}]),/unsuccessful status/);
  assert.throws(()=>batchConvert([{name:'bad.ofx',text:tx.replace('<NAME>','<TRNAMT>8.00<NAME>')}]),/Duplicate OFX TRNAMT/);
 });
+
+
+test('batch validation reports OFX retrieval window without leaking bank or transaction names',()=>{
+ const text='<OFX><CURDEF>USD<BANKTRANLIST><DTSTART>20261104<DTEND>20261106'+
+  '<STMTTRN><DTPOSTED>20261103<TRNAMT>-5.05<FITID>PRIVATE-REF-01<NAME>Private Bank Payment</STMTTRN>'+
+  '<STMTTRN><DTPOSTED>20261105<TRNAMT>7.50<FITID>PRIVATE-REF-02<NAME>Private Bank Deposit</STMTTRN>'+
+  '</BANKTRANLIST></OFX>';
+ const result=batchConvert([{name:'bank-account-private-123.ofx',text}]);
+ const item=result.report.files[0];
+ assert.equal(result.report.totalTransactions,2);
+ assert.deepEqual(item.parserIntegrity.statementRange,{startInclusive:'2026-11-04',endExclusive:'2026-11-06'});
+ assert.equal(item.parserIntegrity.postedBeforeRangeCount,1);
+ assert.equal(item.parserIntegrity.postedAfterRangeCount,0);
+ assert.equal(item.net,'2.45');
+ assert.ok(item.warnings.some(x=>x.includes('can be legitimate')));
+ const metadata=JSON.stringify(result.report);
+ for(const secret of ['PRIVATE-REF','bank-account-private','Private Bank Payment','Private Bank Deposit'])
+  assert.ok(!metadata.includes(secret));
+});
+test('batch refuses an incomplete bank list and does not create partial ZIP output',()=>{
+ const good='<OFX><BANKTRANLIST><STMTTRN><DTPOSTED>20261105<TRNAMT>2.00<NAME>Valid</STMTTRN></BANKTRANLIST></OFX>';
+ const bad='<OFX><BANKTRANLIST><STMTTRN><DTPOSTED>20261105<TRNAMT>1.00<NAME>Truncated</STMTTRN></OFX>';
+ assert.throws(()=>batchConvert([{name:'good.ofx',text:good},{name:'bad.ofx',text:bad}]),/Batch file 2: Multiple or incomplete BANKTRANLIST/);
+});

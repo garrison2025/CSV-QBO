@@ -20,6 +20,18 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.1 — OFX bank retrieval boundaries and posting-date transparency
+
+- `BANKTRANLIST` aggregates are checked for exactly one complete, non-repeated bank statement period; truncated, repeated or reversed `DTSTART`/`DTEND` sources fail clearly instead of merging entries.
+- Transaction records outside an explicitly declared BANKTRANLIST are blocked. Valid bank transaction records are never removed based on date alone.
+- OFX `DTSTART` is an inclusive retrieval start and `DTEND` is an exclusive retrieval end; those fields describe the bank's **search window**, not a guaranteed range for each transaction's `DTPOSTED` (posted) date. The OFX 2.2 specification explicitly permits older posting dates for recently-added transactions.
+- A complete date-only retrieval window and conservative posted-date exception counts are preserved in the local parser integrity summary and privacy-minimized batch report. Exceptions warn but never alter the original signed amounts or delete rows.
+- The workspace preview displays bank retrieval dates and posted-date exception counts separately from the actual transaction list; the compatibility page describes the distinction.
+- Synthetic SGML, XML and Windows-1252 samples now include proper bank retrieval boundaries; additional tests reject partial/multiple lists and preserve late-posted rows.
+- Live QuickBooks or bank-specific UAT remains **NOT RUN**; Cloudflare Pages previews remain noindex and no paid API is used.
+
+Reference: [OFX 2.2 specification, date start/end semantics](https://www.financialdataexchange.org/common/Uploaded%20files/OFX%20files/OFX%202.2.pdf).
+
 ## V1.0 — OFX/QBO/QFX variant reading with guarded bank field extraction
 
 - `decodeFinancialBytes` decodes financial input bytes locally: default strict UTF-8, UTF-16 LE/BE with BOM, and OFX 1.x with explicit `CHARSET:1252` Windows-1252. Unsupported declared charsets and damaged bytes fail instead of replacing payee names silently.
