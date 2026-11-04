@@ -129,3 +129,15 @@ test('bank source preview displays retrieval period, without suggesting it is le
  assert.match(compatibility,/DTSTART\/DTEND are retrieval windows/);
  assert.match(compatibility,/not guaranteed DTPOSTED coverage/);
 });
+
+
+test('a validation JSON download is unavailable until the current file has passed preview',()=>{
+ for(const route of ['index.html','tools/quickbooks-csv-formatter/index.html','tools/ofx-to-csv/index.html']){
+  assert.match(read(route),/id="download-report" class="subtle-btn" disabled/);
+ }
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/function invalidatePreview\(\)/);
+ assert.match(app,/Column mapping changed\. Preview transactions again/);
+ assert.match(app,/report\.disabled=true/);
+ assert.match(app,/download-report'\)\.disabled=false/);
+});
