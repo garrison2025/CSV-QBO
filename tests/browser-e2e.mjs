@@ -82,9 +82,35 @@ try{
  await page.locator('#warning-ack').check();
  output=await dl('#export-button');
  assert.ok(output.name.endsWith('.xlsx'));
- const xml=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
+ const excelParts=storedZip(output.content);
+ const xml=excelParts.get('xl/worksheets/sheet1.xml').toString('utf8');
+ const format=excelParts.get('xl/styles.xml').toString('utf8');
  assert.match(xml,/Sample bookstore/);assert.match(xml,/120\.00/);
- console.log('PASS browser QBO read-only input and actual Excel workbook download');
+ assert.match(xml,/<c r="A2" s="2"><v>46330<\/v><\/c>/);
+ assert.match(xml,/<c r="C2" s="1"><v>-12\.50<\/v><\/c>/);
+ assert.match(xml,/<c r="A3" s="2"><v>46331<\/v><\/c>/);
+ assert.match(xml,/<c r="C3" s="1"><v>120\.00<\/v><\/c>/);
+ assert.match(xml,/<autoFilter ref="A1:D3"\/>/);
+ assert.match(format,/numFmtId="164" formatCode="yyyy-mm-dd"/);
+ assert.match(format,/<cellXfs count="3">/);
+ console.log('PASS browser QBO-to-XLSX real date cells, exact-cent numeric amounts and filterable worksheet');
+
+ // Exercise the downloaded workbook with a 1-cent debit and a reference ID
+ // that must retain leading zeros. Date and amount are numeric; text stays inert.
+ await page.goto(base+'/tools/qif-to-excel/');
+ const tinyQif='!Type:Bank\nD11/04/2026\nT-0.01\nPSalary ^ café\nN00001234\n^\n';
+ await page.locator('#file-input').setInputFiles(file('small.qif',tinyQif));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ if(await page.locator('#warning-ack-label').isVisible())await page.locator('#warning-ack').check();
+ output=await dl('#export-button');
+ assert.ok(output.name.endsWith('.xlsx'));
+ const cells=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
+ assert.match(cells,/<c r="A2" s="2"><v>46330<\/v><\/c>/);
+ assert.match(cells,/<c r="C2" s="1"><v>-0.01<\/v><\/c>/);
+ assert.match(cells,/<c r="D2" t="inlineStr"><is><t xml:space="preserve">00001234<\/t><\/is><\/c>/);
+ assert.match(cells,/Salary \^ café/);
+ console.log('PASS browser QIF-to-XLSX one-cent debit and leading-zero transaction reference');
+
 
  await page.goto(base+'/');
  const qif='!Type:Bank\nD11/04/2026\nT-3.00\nPCoffee\nNREF-1\n^\n';

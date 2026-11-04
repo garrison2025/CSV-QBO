@@ -180,3 +180,13 @@
 - The generated CSV-to-QIF landing page explains what is and is not represented, and expressly excludes real finance application import certification.
 - This is not real QuickBooks UAT, a new `.qbo` writer or proof of universal QIF dialect support. Preview remains noindex.
 - CI, main merge and Cloudflare deployment evidence should be recorded separately after verification.
+
+## V2.0 — XLSX native date and exact-cent numeric cells (2026-11-05)
+
+- Prior XLSX writer emitted dates as inline text, preventing reliable native Excel date filtering/sorting. It emitted invalid or non-canonical amount strings as text instead of rejecting them.
+- Native Excel 1900 date serials with 1900-02-29 offset and stable yyyy-mm-dd style; correctly typed signed numeric amounts with two-decimal format, exact-cent validation against integer-cent input. No bank data altered.
+- Reference IDs remain text preserving leading zeros; payees are inert inline strings. XML-preserving carriage returns, invalid control/surrogate rejection, and 32,767-character Excel cell limit guard are added. Sheet includes frozen headers and autofilter.
+- Node tests verify date serials (1900-01-01=1, 1900-02-28=59, 1900-03-01=61, 2026-11-04=46330), amounts down to 0.01 and up to supported limit, text preservation and invalid input failures.
+- Independent Python standard-library OOXML/ZIP gate parses a synthetic workbook and checks CRC, styles, date/money cells, literal formula-looking text, and preserved leading-zero reference IDs. Real Chrome downloads are also inspected.
+- This remains synthetic structural/data validation. Actual Microsoft Excel desktop/QuickBooks financial import UAT not performed. Preview stays noindex; no custom domain or paid APIs.
+- GitHub main CI and Cloudflare release evidence must be verified separately after merge.

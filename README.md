@@ -20,6 +20,15 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V2.0 — native Excel dates, validated numeric cents and independently verified OOXML
+
+- **Fixed numeric cell typing:** XLSX Amount is always a signed numeric cell with a two-decimal number format. The writer validates each source amount through the shared integer-cent parser, canonicalizes to exactly two decimals and checks its binary numeric representation rounds back to the same cents before writing. Invalid/unsupported amounts now fail closed instead of silently becoming text.
+- **Fixed date semantics:** XLSX Date is now a proper numeric date cell (Excel 1900 date system), displayed consistently as `yyyy-mm-dd`. The writer handles Excel's phantom 1900-02-29 serial-number offset while rejecting invalid source dates; text dates were previously unsuitable for native Excel date sorting/filtering. No timezone or time-of-day is invented.
+- **Text safety:** Description and Reference remain literal inline strings (never formulas); leading zeros in IDs are preserved. XML-sensitive characters are escaped, CR is encoded as a numeric character reference to avoid XML newline normalization, and invalid/overlong Excel cell text is rejected without echoing private payee information in error messages.
+- **Usability:** The generated worksheet freezes row one and includes a filterable Date/Description/Amount/Reference header. These are presentation-only changes; parsed financial records and sums are untouched.
+- **Evidence:** New Node regressions check 1900/2000 date boundaries, 2026 serials, one-cent/large signed amounts, formula-looking descriptions, Unicode and XML escapes. Real Chrome downloads XLSX and inspects typed cells and styles. GitHub CI additionally validates a synthetic `.xlsx` using **independent Python standard-library ZIP + XML parsers**, including CRC, exact decimal payload and date/text styles (not proprietary Microsoft Excel acceptance).
+- **Scope:** Browser-local, no paid APIs or production dependencies. Native `.qbo` writer and actual QuickBooks/Excel desktop application UAT remain outside the verified scope; technical preview stays `noindex,nofollow`.
+
 ## V1.9 — lossless QIF writer and source-row self-check
 
 - Fixed a concrete loss-of-data issue in the experimental CSV → QIF writer: earlier versions replaced CR/LF and literal `^` characters in payees, references and memos with spaces without clearly telling the user. The writer now preserves safe literal `^` and Unicode and **rejects line breaks/control characters** with a row-specific error instead of changing transaction content.

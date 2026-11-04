@@ -755,3 +755,85 @@ test('QIF writer round-trips all 1200 ordered rows and exact cent totals',()=>{
  assert.deepEqual(checked.transactions,tx.map(t=>({...t})));
  assert.deepEqual(totals(checked.transactions),totals(tx));
 });
+
+
+function readStoredXlsxParts(archive){
+ const bytes=Buffer.from(archive),parts=new Map();
+ let at=0;
+ while(at+30<=bytes.length&&bytes.readUInt32LE(at)===0x04034b50){
+  assert.equal(bytes.readUInt16LE(at+8),0,'XLSX ZIP entries must use stored encoding');
+  const n=bytes.readUInt16LE(at+26),extra=bytes.readUInt16LE(at+28),size=bytes.readUInt32LE(at+18);
+  const name=bytes.subarray(at+30,at+30+n).toString('utf8'),begin=at+30+n+extra;
+  assert.ok(begin+size<=bytes.length,'XLSX part bytes must fit inside ZIP');
+  parts.set(name,bytes.subarray(begin,begin+size).toString('utf8'));
+  at=begin+size;
+ }
+ assert.ok(parts.has('xl/worksheets/sheet1.xml'));
+ assert.ok(parts.has('xl/styles.xml'));
+ return parts;
+}
+test('XLSX serializes real Excel dates and numeric cents with ISO date and 2-decimal formats',()=>{
+ const tx=[
+  {date:'2026-11-04',description:'Store',amount:'-12.34',id:'000123'},
+  {date:'2026-11-05',description:'Refund',amount:'120.00',id:'ID 2'}
+ ];
+ const files=readStoredXlsxParts(toXLSX(tx));
+ const sheet=files.get('xl/worksheets/sheet1.xml'),styles=files.get('xl/styles.xml');
+ assert.match(sheet,/<c r="A2" s="2"><v>46330<\/v><\/c>/);
+ assert.match(sheet,/<c r="A3" s="2"><v>46331<\/v><\/c>/);
+ assert.match(sheet,/<c r="C2" s="1"><v>-12\.34<\/v><\/c>/);
+ assert.match(sheet,/<c r="C3" s="1"><v>120\.00<\/v><\/c>/);
+ assert.match(sheet,/<c r="D2" t="inlineStr"><is><t xml:space="preserve">000123<\/t><\/is><\/c>/);
+ assert.match(styles,/numFmtId="164" formatCode="yyyy-mm-dd"/);
+ assert.match(styles,/numFmtId="2" xfId="0" applyNumberFormat="1"/);
+ assert.match(styles,/numFmtId="164" xfId="0" applyNumberFormat="1"/);
+ assert.match(sheet,/<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"\/>/);
+ assert.match(sheet,/<autoFilter ref="A1:D3"\/>/);
+ assert.match(files.get('xl/workbook.xml'),/date1904="0"/);
+ assert.ok(!sheet.includes('<f>'),'no transaction cell may become an Excel formula');
+});
+test('XLSX handles leap-year boundaries, 1900 date system and cent-extreme values',()=>{
+ const tx=[
+  {date:'1900-01-01',description:'First supported day',amount:'0.01',id:'0001'},
+  {date:'1900-02-28',description:'Before Excel phantom leap day',amount:'-0.01',id:''},
+  {date:'1900-03-01',description:'After Excel phantom leap day',amount:'9999999999999.99',id:'XL-003'},
+  {date:'2000-02-29',description:'Actual leap day',amount:'-9999999999999.99',id:'A'},
+  {date:'2100-12-31',description:'Last supported year',amount:'10.50',id:'Z'}
+ ];
+ const xml=readStoredXlsxParts(toXLSX(tx)).get('xl/worksheets/sheet1.xml');
+ for(const [row,serial]of [[2,1],[3,59],[4,61],[5,36585],[6,73415]]){
+  assert.ok(xml.includes('<c r="A'+row+'" s="2"><v>'+serial+'</v></c>'),'date serial '+row);
+ }
+ for(const [row,money]of [[2,'0.01'],[3,'-0.01'],[4,'9999999999999.99'],[5,'-9999999999999.99'],[6,'10.50']]){
+  const cell='<c r="C'+row+'" s="1"><v>'+money+'</v></c>';
+  assert.ok(xml.includes(cell),'amount numeric '+row);
+  assert.equal(BigInt(Math.round(Number(money)*100)),toMinorUnits(money),'Excel number rounds back to exact cents');
+ }
+});
+test('XLSX fails closed on bad dates, amounts, unsafe XML and overlong text without leaking financial data',()=>{
+ const source={date:'2026-11-04',description:'Confidential shop',amount:'1.00',id:'Private-REF'};
+ const bad=[
+  [{...source,date:'not a date'},/invalid transaction date/],
+  [{...source,date:'1900-02-29'},/invalid transaction date/],
+  [{...source,amount:'not a number'},/invalid amount or unsupported cent precision/],
+  [{...source,amount:'1.235'},/invalid amount or unsupported cent precision/],
+  [{...source,description:'Confidential\u0001Name'},/unsupported control character or invalid text in Description/],
+  [{...source,id:'Private\u0000ID'},/unsupported control character or invalid text in Reference/],
+  [{...source,id:'x'.repeat(32768)},/unsupported control character or invalid text in Reference/],
+  [{...source,description:'Confidential\ud800Name'},/unsupported control character or invalid text in Description/],
+ ];
+ for(const [value,pattern]of bad){
+  try{toXLSX([value]);assert.fail('Expected fail-closed XLSX rejection');}
+  catch(error){
+   if(error.code==='ERR_ASSERTION')throw error;
+   assert.match(error.message,pattern);
+   assert.ok(!error.message.includes('Confidential'));
+   assert.ok(!error.message.includes('Private-REF'));
+  }
+ }
+ const escaped=readStoredXlsxParts(toXLSX([
+  {...source,description:'=SUM(1,2) & <test>\r\nsecond line',id:'0000123'}
+ ])).get('xl/worksheets/sheet1.xml');
+ assert.match(escaped,/<t xml:space="preserve">=SUM\(1,2\) &amp; &lt;test&gt;&#13;\nsecond line<\/t>/);
+ assert.ok(!escaped.includes('<f>'),'formula-looking payee should be inert inline text');
+});
