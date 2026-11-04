@@ -917,7 +917,7 @@ test('OFX 2.x XML mixed entity text, comments and CDATA reconstructs payee and m
  assert.equal(parsed.transactions[0].memo,'before &quoted; after <test>');
  assert.equal(parsed.transactions[0].id,'TX-001');
  assert.equal(auditTransactions(parsed.transactions).summary.net,'-12.34');
- const csv=toCSV(parsed.transactions);
+ const csv=toCSV(parsed.transactions,['date','description','amount','id','memo']);
  assert.match(csv,/Book & Café &bogus; \^ 中文/);
  assert.match(csv,/before &quoted; after <test>/);
  assert.ok(!csv.includes('internal remark'),'XML comments are not data');
