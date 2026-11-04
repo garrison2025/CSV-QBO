@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.7 — full paginated transaction review with duplicate navigation
+
+- Replaced the previous **8-row-only preview** with a fully browsable **25-transaction-per-page** read-only table across all converter tools. Previous/Next controls show current page, precise displayed row range and full source transaction count.
+- Rows involved in possible duplicate detection (duplicate transaction ID or matching date/amount/description) are visually marked **Possible duplicate**. A **Next possible duplicate** control cycles through flagged **original source row numbers**, even if the flagged transaction is on another page. These warnings never remove or mutate transactions.
+- Navigation, duplicate focus and all visible previews reset whenever users select a new file, change CSV column mappings/date order, or click Clear workspace. The export and privacy-safe validation report are based on **all** source rows, never just the visible page.
+- Real Chrome E2E drives 41 pages across **1,001 synthetic bank records**, verifies the final row is visible, and then checks the downloaded QuickBooks CSV ZIP still includes all 1,001 rows. Additional Chrome regression jumps to duplicate rows 2 and 51 of a 52-transaction file, preserving the warning-acknowledgement requirement.
+- Page navigation only manipulates in-browser DOM text nodes; no bank data upload, new dependencies, auto-deduplication, or domain/SEO launch. No real QuickBooks import acceptance claimed.
+
 ## V1.6 — OFX/QBO/QFX markup and bank-status integrity
 
 - The local OFX parser distinguishes **genuine SGML/XML tags** from tag-like characters inside XML comments and `<![CDATA[...]]>` sections. It preserves CDATA as literal transaction text, while blanking markup-only views at matching offsets so that comments and descriptions cannot create phantom `STMTTRN` rows, extra `STATUS` blocks, false currencies or fake account sections.
