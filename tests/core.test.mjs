@@ -901,3 +901,76 @@ test('CR-only QIF encoded with UTF-16LE BOM decodes to identical transactions',(
  assert.deepEqual(parseQIF(decoded.text).transactions,parseQIF(raw).transactions);
  assert.equal(parseQIF(decoded.text).transactions[0].id,'00009');
 });
+
+
+test('OFX 2.x XML mixed entity text, comments and CDATA reconstructs payee and memo exactly',()=>{
+ const xml='<?xml version="1.0"?><OFX><CURDEF>USD</CURDEF>'+
+ '<BANKTRANLIST><STMTTRN><DTPOSTED>20261104</DTPOSTED>'+
+ '<TRNAMT>-12.34</TRNAMT><FITID>TX-001</FITID>'+
+ '<NAME>Book &amp; <!-- internal remark --><![CDATA[Café &bogus; ^]]> &#x4E2D;&#25991;</NAME>'+
+ '<MEMO>before<![CDATA[ &quoted; ]]><!-- hidden -->after &lt;test&gt;</MEMO>'+
+ '</STMTTRN></BANKTRANLIST></OFX>';
+ const parsed=parseOFX(xml);
+ assert.equal(parsed.transactions.length,1);
+ assert.equal(parsed.transactions[0].amount,'-12.34');
+ assert.equal(parsed.transactions[0].description,'Book & Café &bogus; ^ 中文');
+ assert.equal(parsed.transactions[0].memo,'before &quoted; after <test>');
+ assert.equal(parsed.transactions[0].id,'TX-001');
+ assert.equal(auditTransactions(parsed.transactions).summary.net,'-12.34');
+ const csv=toCSV(parsed.transactions);
+ assert.match(csv,/Book & Café &bogus; \^ 中文/);
+ assert.match(csv,/before &quoted; after <test>/);
+ assert.ok(!csv.includes('internal remark'),'XML comments are not data');
+ assert.ok(!csv.includes('hidden'),'XML comments are not data');
+});
+test('OFX XML unescaped or unknown named entities reject conversion before bank export',()=>{
+ const front='<?xml version="1.0"?><OFX><STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00</TRNAMT>';
+ const rear='</STMTTRN></OFX>';
+ for(const payee of ['A & B','A &bogus; B','A &amp B','A &#abc; B','A &#x; B',
+                      'A &AMPB; B','A &#0; B','A &#1; B','A &#xFFFF; B',
+                      'A &#xD800; B','A &#x110000; B']){
+  assert.throws(()=>parseOFX(front+'<NAME>'+payee+'</NAME>'+rear),
+    /Malformed or unsupported OFX XML character entity|Invalid OFX character entity/);
+ }
+});
+test('OFX XML rejects illegal literal controls in text and CDATA without leaking bank details',()=>{
+ const front='<?xml version="1.0"?><OFX><STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00</TRNAMT>';
+ const rear='</STMTTRN></OFX>';
+ for(const payee of ['Private\u0001Shop','Private\u000bShop','Private\ud800Shop',
+  '<![CDATA[Private\u0002Shop]]>','<![CDATA[Private\udfffShop]]>']){
+  try{parseOFX(front+'<NAME>'+payee+'</NAME>'+rear);assert.fail('Expected invalid XML');}
+  catch(error){
+   if(error.code==='ERR_ASSERTION')throw error;
+   assert.match(error.message,/Invalid XML character in OFX/);
+   assert.ok(!error.message.includes('Private'));
+  }
+ }
+});
+test('Legacy OFX 1.x SGML still accepts merchant ampersands without XML-style escaping',()=>{
+ const old='OFXHEADER:100\r\nDATA:OFXSGML\r\nVERSION:102\r\n\r\n'+
+ '<OFX><STMTTRN><DTPOSTED>20261104<TRNAMT>-9.50'+
+ '<NAME>Smith & Sons<!-- internal annotation --> Coffee & Bakes'+
+ '<FITID>000700</STMTTRN></OFX>';
+ const result=parseOFX(old);
+ assert.equal(result.transactions.length,1);
+ assert.equal(result.transactions[0].description,'Smith & Sons Coffee & Bakes');
+ assert.equal(result.transactions[0].amount,'-9.50');
+ assert.equal(result.transactions[0].id,'000700');
+});
+test('XML leaf mixed text must not be silently cut short by comments or CDATA',()=>{
+ const front='<?xml version="1.0"?><OFX><STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00</TRNAMT>';
+ const rear='</STMTTRN></OFX>';
+ const variants=[
+ ['Alpha<![CDATA[ & Beta]]> Gamma','Alpha & Beta Gamma'],
+ ['Start<!-- comment -->End','StartEnd'],
+ ['<![CDATA[First]]> and <![CDATA[Second]]>','First and Second'],
+ ['A &amp; B&#32;C','A & B C'],
+ ['<![CDATA[Original &bogus;]]>','Original &bogus;']
+ ];
+ for(const [input,expected] of variants){
+  const bank=parseOFX(front+'<NAME>'+input+'</NAME>'+rear);
+  assert.equal(bank.transactions[0].description,expected);
+ }
+ assert.throws(()=>parseOFX(front+'<NAME>one<OTHER>two</OTHER></NAME>'+rear),
+  /Missing XML closing tag for OFX NAME/);
+});
