@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V2.1 — old Mac CR-only QIF/IIF reader compatibility
+
+- Fixed a verified parser boundary limitation: QIF and IIF read logic formerly split records only on `LF` and `CRLF`; classic Mac or old finance exports with **bare CR** separators would be rejected or combine independent financial records.
+- Both QIF and IIF now accept `CR`, `LF`, `CRLF` and mixed records without changing signed amounts, dates, payees, references, source order, warnings or accounting-split rules. This changes **record boundaries only**, never financial fields.
+- Strict validation remains mandatory: truncated QIF transactions still fail if the final `^` terminator is absent; IIF groups still must have complete `TRNS`/`SPL`/`ENDTRNS` records and exactly balanced integer-cent totals. Batch output still keeps source accounts in separate files and blocks the whole ZIP on any invalid file.
+- Node coverage tests three-line-ending parity, 2+ account-like transactions, UTF-16LE BOM decoded QIF, zero-sum two-leg IIF journals and negative truncated-file cases. Chrome E2E uploads real **synthetic CR-only files** in QIF → XLSX and IIF → XLSX tools, checks every row and inspects the downloaded XLSX cells.
+- The four QIF/IIF landing pages disclose supported line endings without claiming blanket compatibility with any banking provider or actual QuickBooks imports. Preview `noindex,nofollow` remains unchanged; no paid APIs or extra runtime dependencies.
+
 ## V2.0 — native Excel dates, validated numeric cents and independently verified OOXML
 
 - **Fixed numeric cell typing:** XLSX Amount is always a signed numeric cell with a two-decimal number format. The writer validates each source amount through the shared integer-cent parser, canonicalizes to exactly two decimals and checks its binary numeric representation rounds back to the same cents before writing. Invalid/unsupported amounts now fail closed instead of silently becoming text.
