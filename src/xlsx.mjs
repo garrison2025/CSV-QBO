@@ -8,7 +8,7 @@ function zip(files){
   const local=[],center=[];let offset=0;
   for(const [name,text] of Object.entries(files)){
     const nam=utf8.encode(name),raw=text instanceof Uint8Array?text:utf8.encode(text),crc=crc32(raw),entry=[];
-    put32(entry,0x04034b50);put16(entry,20);put16(entry,0);put16(entry,0);put16(entry,0);put16(entry,0);put32(entry,crc);put32(entry,raw.length);put32(entry,raw.length);put16(entry,nam.length);put16(entry,0);entry.push(...nam,...raw);local.push(...entry);
+    put32(entry,0x04034b50);put16(entry,20);put16(entry,0);put16(entry,0);put16(entry,0);put16(entry,0);put32(entry,crc);put32(entry,raw.length);put32(entry,raw.length);put16(entry,nam.length);put16(entry,0);entry.push(...nam);for(const byte of raw)entry.push(byte);for(const byte of entry)local.push(byte);
     const c=[];put32(c,0x02014b50);put16(c,20);put16(c,20);put16(c,0);put16(c,0);put16(c,0);put16(c,0);put32(c,crc);put32(c,raw.length);put32(c,raw.length);put16(c,nam.length);put16(c,0);put16(c,0);put16(c,0);put16(c,0);put32(c,0);put32(c,offset);c.push(...nam);center.push(...c);
     offset+=entry.length;
   }
