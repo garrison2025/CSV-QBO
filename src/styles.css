@@ -7,3 +7,11 @@
 .subtle-btn:focus-visible{outline:3px solid #83c5ba;outline-offset:2px}
 #download-report{margin:6px 0 15px}
 @media(max-width:650px){.mapping-actions{align-items:stretch;flex-direction:column}.mapping-actions button{width:100%}}
+
+/* V0.4: date ordering must remain visible for each input format. */
+.date-choice{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:10px 0 16px;font-size:13px}
+.date-choice label{font-weight:650;color:var(--ink,#14312c)}
+.date-choice select{max-width:220px;min-height:38px;padding:6px 10px;border:1px solid var(--border,#d1dfdc);border-radius:8px;background:#fff;color:#18342f}
+.date-choice small{flex-basis:100%;color:var(--muted,#647873);line-height:1.5}
+.date-choice select:focus-visible{outline:3px solid rgba(14,129,117,.28);outline-offset:2px}
+@media(max-width:540px){.date-choice select{max-width:100%;width:100%}}

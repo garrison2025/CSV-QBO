@@ -20,6 +20,13 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.4 — source integrity and date format controls
+
+- Refuse OFX files containing multiple bank/card statement sections instead of silently merging accounts.
+- Explicitly reject unsupported investment QIF and OFX feeds rather than exporting misleading partial records.
+- Expose source date order for QIF and IIF as well as CSV; changing it invalidates or refreshes the transaction preview.
+- Local tests: **254/254 PASS**. QuickBooks target-software imports remain **NOT RUN**.
+
 ## V0.3 — browser-local data integrity workflow
 
 - Export **three-column QuickBooks Online CSV**, not Web Connect \`.qbo\`. Dates use explicit US \`MM/DD/YYYY\` and decimal amounts are verified with integer-cents.

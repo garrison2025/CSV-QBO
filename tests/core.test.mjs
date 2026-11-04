@@ -136,3 +136,23 @@ test('ZIP writer handles a 350 KB standalone CSV without argument spread overflo
  assert.ok(archive.length>349000);
  assert.equal(String.fromCharCode(...archive.slice(0,2)),'PK');
 });
+
+test('OFX refuses to silently merge two distinct bank accounts',()=>{
+  const bank=account=>'<STMTRS><BANKACCTFROM><ACCTID>'+account+'</ACCTID></BANKACCTFROM><BANKTRANLIST><STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>10.00</TRNAMT><FITID>'+account+'</FITID><NAME>Test</NAME></STMTTRN></BANKTRANLIST></STMTRS>';
+  const mixed='<OFX>'+bank('account1')+bank('account2')+'</OFX>';
+  assert.throws(()=>parseOFX(mixed),/Multiple bank or card accounts/);
+  assert.equal(parseOFX('<OFX>'+bank('account1')+'</OFX>').transactions.length,1);
+});
+test('OFX refuses investment feeds even if they contain bank-style records',()=>{
+  const investment='<INVSTMTMSGSRSV1><INVSTMTRS><BANKTRANLIST><STMTTRN><DTPOSTED>20261104<TRNAMT>1.00</TRNAMT></STMTTRN></BANKTRANLIST></INVSTMTRS></INVSTMTMSGSRSV1>';
+  assert.throws(()=>parseOFX(investment),/Investment OFX feeds/);
+});
+test('QIF investment type is rejected rather than silently flattened',()=>{
+  const investment='!Type:Invst\nD11/04/2026\nT-50.00\nPBuy security\n^\n';
+  assert.throws(()=>parseQIF(investment),/Investment QIF transactions/);
+});
+test('QIF day-first dates explicitly selected by user are parsed correctly',()=>{
+  const bank='!Type:Bank\nD04/11/2026\nT10.00\nPDeposit\n^\n';
+  assert.equal(parseQIF(bank,'us').transactions[0].date,'2026-04-11');
+  assert.equal(parseQIF(bank,'eu').transactions[0].date,'2026-11-04');
+});

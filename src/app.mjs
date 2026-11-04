@@ -47,6 +47,17 @@ if(drop && fileInput){
       }else{parsed=parseInput(text,ext,{dateFormat:$('#date-format').value});renderResult(parsed);}
     }catch(err){say(err.message||'Could not read file.','error');}
   }
+  // Date ordering also matters for QIF and IIF.
+  $('#date-format')?.addEventListener('change',()=>{
+    if(!file||!fileText)return;
+    if(fileExt==='csv'||fileExt==='tsv'){
+      parsed=null;setButton(false);$('#preview-panel').hidden=true;
+      say('Date order changed. Select Preview transactions to validate again.');
+    }else{
+      try{parsed=parseInput(fileText,fileExt,{dateFormat:$('#date-format').value});renderResult(parsed);}
+      catch(err){parsed=null;setButton(false);$('#preview-panel').hidden=true;say(err.message||'Invalid date format.','error');}
+    }
+  });
   fileInput.addEventListener('change',event=>prepare(event.target.files[0]));
   drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.add('is-dragging');});
   drop.addEventListener('dragleave',()=>drop.classList.remove('is-dragging'));

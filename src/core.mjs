@@ -121,7 +121,7 @@ export function parseQIF(text, dateFormat='us') {
   };
   for(const line of lines){
     if(!line)continue;
-    if(line.startsWith('!Type:')) {kind=line.slice(6);continue;}
+    if(line.startsWith('!Type:')) {kind=line.slice(6).trim();if(/^Invst$/i.test(kind))fail('Investment QIF transactions are unsupported. No transactions were exported.');continue;}
     if(line.startsWith('!'))continue;
     if(line==='^'){commit();continue;}
     const k=line[0],v=line.slice(1);
@@ -142,6 +142,10 @@ function ofxField(block,key){ const m=block.match(new RegExp('<'+key+'\\b[^>]*>\
 export function parseOFX(text) {
   const raw=String(text);
   if(/<!DOCTYPE|<!ENTITY|<script/i.test(raw))fail('Unsupported or unsafe XML declarations.');
+  // One export may include multiple accounts. Do not merge them implicitly.
+  const accountSections=[...raw.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
+  if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
+  if(/<INVSTMTMSGSRSV1\b|<INVSTMTRS\b/i.test(raw))fail('Investment OFX feeds are not supported. No transactions were exported.');
   const blocks=[...raw.matchAll(/<STMTTRN\b[^>]*>([\s\S]*?)(?=<\/STMTTRN\s*>|<STMTTRN\b|<\/BANKTRANLIST\b|$)/gi)];
   if(!blocks.length)fail('No bank STMTTRN entries found. Investment feeds are not supported.');
   const transactions=blocks.map((m,i)=>{

@@ -27,3 +27,12 @@
 **Decision:** a demonstrable free browser-local prototype that can be deployed to preview. Production SEO and commercial launch require manual UI/UAT and actual receiving-software compatibility evidence.
 
 - **Large ZIP check:** fixed argument-spread overflow and added 350 KB ZIP regression; 250/250 tests pass.
+
+## V0.4 incremental release — 2026-11-04
+
+- LOCAL PASS: 254 unit/property/build tests and preview-noindex build.
+- LOCAL PASS: OFX multiple account sections and investment files now fail closed.
+- LOCAL PASS: QIF/IIF source date order is visible and changes trigger reparsing.
+- Browser smoke for V0.4: NOT RUN in this environment; Chromium local navigation was blocked.
+- QuickBooks target import: NOT RUN; do not claim compatibility.
+- GitHub CI / Cloudflare deployment: check separately after commit.
