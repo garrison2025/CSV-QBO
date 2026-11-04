@@ -21,6 +21,7 @@ class Element {
     for(const fn of this.listeners.get(type)||[])await fn({type,target:this,preventDefault(){},dataTransfer:null,...other});
   }
   setAttribute(key,value){this.attrs[key]=value;}
+  getAttribute(key){return this.attrs[key]??null;}
   replaceChildren(...items){this.children=items;this.options=[];}
   appendChild(item){this.children.push(item);return item;}
   append(item){this.children.push(item);}
