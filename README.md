@@ -20,6 +20,15 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.5.1 — financial integrity and local-file lifecycle
+
+- Defensive CSV parsing: quoted delimiters, CR/CRLF/LF records, strict malformed-quote rejection and null-byte checks.
+- Explicit non-USD currency symbols and non-USD OFX statements fail closed. Undeclared OFX currency prompts a verification warning; no exchange-rate conversion.
+- XLSX rejects invalid XML control characters rather than generating corrupted workbooks.
+- Single and batch async reads cannot restore stale inputs after a newer selection; **Clear workspace** immediately removes in-memory source content, preview, audits and batch ZIP.
+- Detects UTF-8 replacement characters and asks users to re-export questionable bank files.
+- Regression tests added. Receiving-software QuickBooks import acceptance remains **NOT RUN**.
+
 ## V0.5 — separate browser-local batch export
 
 - Select up to **10 independent QBO/QFX/OFX/QIF/IIF bank files** (12 MB aggregate), and download a ZIP with a separately converted CSV or XLSX per input plus a validation report.
