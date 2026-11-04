@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.5 — QuickBooks CSV ordered transaction reconciliation
+
+- Manual QuickBooks Online CSV export now validates **every serialized row** against the exact originating source entry, not just aggregate debit/credit totals or row counts. The preflight checks original row ordering, formatted US dates, exact two-decimal signed amounts and full escaped descriptions, including embedded quotes, non-ASCII text, line breaks and formula-protection apostrophes.
+- Both the single-file CSV and split ZIP paths run this preflight before download. Altered payee text, swapped rows/dates, missing/extra rows or lost formula-safety prefixes cause an explicit failure. No transaction data or reference IDs are disclosed in errors or validation summaries.
+- `quickbooks-csv-validation.json` upgraded to v2. It contains safe **source row ordinal ranges**, an `orderedRowsReconciled` flag per part and aggregate reconciliation flags; never contains payee strings, check numbers or original source filenames.
+- CI now runs a real Chrome acceptance test generating **1,001 synthetic CSV rows**, actually downloading the two-part QuickBooks ZIP, inspecting both file contents and private preflight v2 report. Unit tests additionally attempt to tamper with descriptions/dates/record order while retaining source totals.
+- This is **local data integrity and CSV format verification only**, not acceptance by QuickBooks Online. No `.qbo` Web Connect writer, banking login, paid API or domain-launch change.
+
 ## V1.4 — verified real Chrome file workflows and memory-efficient ZIP exports
 
 - New **real Google Chrome/Playwright Core E2E acceptance** runs in GitHub Actions after the existing financial, build and SEO gates. It starts a local HTTP server against the generated `dist/`, uses **synthetic transactions only**, clicks actual file pickers and buttons, and downloads and inspects actual CSV, XLSX and batch ZIP artifacts.
