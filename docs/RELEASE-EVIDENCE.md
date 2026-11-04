@@ -53,3 +53,10 @@
 - Users can clear the single-file preview and source text in memory without refreshing; local batch files are a separate workspace and downloads persist on disk.
 - GitHub CI and target-software browser/UAT outcomes must be recorded separately; QBO/IIF import verification remains NOT RUN.
 - Remains preview/noindex; no production domain or verified checkout.
+
+
+## V0.6.1 financial integrity and lifecycle patch — 2026-11-04
+
+- Added tests for non-USD financial input rejection, missing OFX currency warning, CSV null-byte validation, and invalid XLSX control characters.
+- Clear Workspace now invalidates both single/batch reads, clears batch ZIP references, and resets selected file lists.
+- Automated tests and preview gating: verify in PR CI before merge. Live Cloudflare smoke and actual QuickBooks import: NOT RUN in this patch.
