@@ -222,6 +222,7 @@ try{
 
  const badXML=mixedXML.replace('Local &amp; ', 'Private merchant &unsupported; ');
  await page.locator('#file-input').setInputFiles(file('invalid-entity.ofx',badXML));
+ await page.locator('#work-status[data-state="error"]').waitFor({state:'visible'});
  assert.equal(await page.locator('#preview-panel').isHidden(),true);
  assert.equal(await page.locator('#export-button').isDisabled(),true);
  assert.equal(await page.locator('#work-status').getAttribute('data-state'),'error');
