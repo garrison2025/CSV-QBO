@@ -124,6 +124,39 @@ try{
  assert.match(output.content.toString('utf8'),/D11\/04\/2026\r\nT-12\.50\r\nPSample bookstore/);
  console.log('PASS browser CSV -> experimental QIF syntax download');
 
+ // 1,001 unique bank rows must split into two real QuickBooks CSV files and a
+ // privacy-minimized report. Check the browser-downloaded ZIP, not just a stub.
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const manyCSV=['Date,Description,Amount,Reference',...Array.from({length:1001},(_,i)=>
+   '11/04/2026,Synthetic payment '+String(i+1).padStart(4,'0')+',0.01,DEMO-'+String(i+1).padStart(4,'0')),''].join('\r\n');
+ await page.locator('#file-input').setInputFiles(file('large-synthetic.csv',manyCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'1,001');
+ assert.equal(await page.locator('#summary-net').textContent(),'10.01');
+ output=await dl('#export-button');
+ assert.ok(output.name.endsWith('.zip'));
+ const split=storedZip(output.content);
+ const first=split.get('quickbooks-online-part-001.csv');
+ const second=split.get('quickbooks-online-part-002.csv');
+ assert.ok(first&&second,'two data parts are required');
+ assert.equal(first.toString('utf8').match(/Synthetic payment \d{4}/g)?.length,1000);
+ assert.equal(second.toString('utf8').match(/Synthetic payment \d{4}/g)?.length,1);
+ assert.ok(first.toString('utf8').includes('Synthetic payment 0001,0.01'));
+ assert.ok(second.toString('utf8').includes('Synthetic payment 1001,0.01'));
+ const splitReport=JSON.parse(split.get('quickbooks-csv-validation.json').toString('utf8'));
+ assert.equal(splitReport.reportType,'Finance File Lab QuickBooks CSV preflight v2');
+ assert.equal(splitReport.orderedRowsReconciled,true);
+ assert.equal(splitReport.sourceDescriptionsReconciled,true);
+ assert.equal(splitReport.sourceAmountsReconciled,true);
+ assert.equal(splitReport.sourceRows,1001);
+ assert.deepEqual(splitReport.parts.map(p=>p.sourceRowRange),[{first:1,last:1000},{first:1001,last:1001}]);
+ assert.equal(splitReport.sourceTotals.net,'10.01');
+ assert.ok(!JSON.stringify(splitReport).includes('Synthetic payment 0001'));
+ assert.ok(!JSON.stringify(splitReport).includes('DEMO-1001'));
+ console.log('PASS Chrome 1,001-row QuickBooks CSV ZIP download, ordered data and private v2 reconciliation report');
+
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
