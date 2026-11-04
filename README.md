@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.6 — OFX/QBO/QFX markup and bank-status integrity
+
+- The local OFX parser distinguishes **genuine SGML/XML tags** from tag-like characters inside XML comments and `<![CDATA[...]]>` sections. It preserves CDATA as literal transaction text, while blanking markup-only views at matching offsets so that comments and descriptions cannot create phantom `STMTTRN` rows, extra `STATUS` blocks, false currencies or fake account sections.
+- OFX bank `STATUS` blocks now must be properly paired; nested, unclosed and unexpected closing tags fail closed. An explicit `STATUS` without a `CODE` is rejected; bank-side nonzero status codes and severity `ERROR` remain hard failures.
+- XML-declared feeds with missing closing tags for referenced transaction fields now fail rather than interpreting a truncated value. Legacy OFX 1.x SGML leaf fields without explicit closers remain supported.
+- Automated tests cover adversarial comment/CDATA tokens, unclosed bank statuses, XML leaf syntax, status-code failures, and unchanged good-data output. Real Chrome acceptance uploads a synthetic XML source with fake transaction and script-looking text inside CDATA, confirms exactly **one** bank row and safe text-only DOM rendering, then downloads and checks the CSV.
+- No external XML network parsing, paid API, server-side financial upload or `.qbo` writer was added. Original financial amounts remain signed as supplied; software import acceptance is not certified. Preview remains noindex.
+
 ## V1.5 — QuickBooks CSV ordered transaction reconciliation
 
 - Manual QuickBooks Online CSV export now validates **every serialized row** against the exact originating source entry, not just aggregate debit/credit totals or row counts. The preflight checks original row ordering, formatted US dates, exact two-decimal signed amounts and full escaped descriptions, including embedded quotes, non-ASCII text, line breaks and formula-protection apostrophes.
