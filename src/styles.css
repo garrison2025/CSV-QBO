@@ -15,3 +15,12 @@
 .date-choice small{flex-basis:100%;color:var(--muted,#647873);line-height:1.5}
 .date-choice select:focus-visible{outline:3px solid rgba(14,129,117,.28);outline-offset:2px}
 @media(max-width:540px){.date-choice select{max-width:100%;width:100%}}
+
+
+/* V0.5: transparent synthetic fixture and explicit local-data clearing. */
+.sample-help{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:12px;margin:11px 0 4px}
+.sample-help a{color:var(--accent-deep);font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.sample-help a:hover{color:var(--ink)}
+.sample-help span{color:var(--muted);line-height:1.5}
+#clear-workspace{width:100%;font-size:13px;background:#f8fbf9}
+@media(max-width:700px){.sample-help{display:block}.sample-help span{display:block;margin-top:4px}}
