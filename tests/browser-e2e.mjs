@@ -155,6 +155,16 @@ try{
  await page.locator('#preview-button').click();
  assert.equal(await page.locator('#summary-count').textContent(),'1,001');
  assert.equal(await page.locator('#summary-net').textContent(),'10.01');
+ assert.equal(await page.locator('#preview-body tr').count(),25);
+ assert.equal(await page.locator('#preview-page-status').textContent(),'Page 1 of 41');
+ assert.match(await page.locator('#preview-caption').textContent(),/downloads include all 1001 transactions/);
+ assert.equal(await page.locator('#preview-previous').isDisabled(),true);
+ for(let i=0;i<40;i++)await page.locator('#preview-next').click();
+ assert.equal(await page.locator('#preview-page-status').textContent(),'Page 41 of 41');
+ assert.equal(await page.locator('#preview-body tr').count(),1);
+ assert.match(await page.locator('#preview-body').textContent(),/Synthetic payment 1001/);
+ assert.equal(await page.locator('#preview-next').isDisabled(),true);
+ assert.equal(await page.locator('#summary-count').textContent(),'1,001');
  output=await dl('#export-button');
  assert.ok(output.name.endsWith('.zip'));
  const split=storedZip(output.content);
@@ -176,6 +186,31 @@ try{
  assert.ok(!JSON.stringify(splitReport).includes('Synthetic payment 0001'));
  assert.ok(!JSON.stringify(splitReport).includes('DEMO-1001'));
  console.log('PASS Chrome 1,001-row QuickBooks CSV ZIP download, ordered data and private v2 reconciliation report');
+
+ console.log('PASS Chrome 41-page transaction preview reaches final source row without changing exported ZIP');
+
+ // Duplicates can appear far beyond the default first page. The review
+ // control must find both original and later matching rows, without filtering.
+ const flaggedCSV=['Date,Description,Amount,Reference',...Array.from({length:52},(_,i)=>{
+   const match=i===1||i===50;
+   return '11/04/2026,'+(match?'Same merchant':'Merchant '+i)+','+(match?'-7.00':(i+1)+'.00')+','+(match?'DUP-REF':'UNIQUE-'+i);
+ }),'' ].join('\r\n');
+ await page.locator('#file-input').setInputFiles(file('flagged.csv',flaggedCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'52');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#preview-review').click();
+ assert.match(await page.locator('#preview-page-status').textContent(),/Review row 2 of 52/);
+ await page.locator('#preview-review').click();
+ assert.match(await page.locator('#preview-page-status').textContent(),/Review row 51 of 52/);
+ assert.equal(await page.locator('#preview-body tr').count(),2);
+ assert.equal(await page.locator('#preview-body tr.is-current-review-row').getAttribute('data-row-number'),'51');
+ assert.equal(await page.locator('#preview-body tr.is-review-row .row-flag').count(),1);
+ await page.locator('#warning-ack').check();
+ assert.equal(await page.locator('#export-button').isEnabled(),true);
+ console.log('PASS Chrome duplicate review locates source rows on distant pages and keeps download acknowledgement gate');
+
 
 
  // Responsive smoke check: functionality remains usable at a typical phone width.
