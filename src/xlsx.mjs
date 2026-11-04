@@ -1,18 +1,57 @@
 /** Dependency-free XLSX writer (Office Open XML, stored ZIP entries). */
 const utf8 = new TextEncoder();
 function esc(s){const text=String(s??'');if(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(text))throw new Error('Unsupported control character in Excel cell.');return text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));}
-function crc32(bytes){let crc=-1;for(const n of bytes){crc^=n;for(let i=0;i<8;i++)crc=(crc>>>1)^(0xEDB88320&-(crc&1));}return (crc^(-1))>>>0;}
-const put16=(a,v)=>{a.push(v&255,(v>>8)&255);};
-const put32=(a,v)=>{a.push(v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255);};
+// Build ZIP archives with bounded typed arrays rather than three copies of
+// millions of boxed JavaScript numbers. This matters for 8-12 MB bank batches.
+const CRC_TABLE=Uint32Array.from({length:256},(_,index)=>{
+  let value=index;
+  for(let bit=0;bit<8;bit++)value=(value>>>1)^(0xEDB88320&-(value&1));
+  return value>>>0;
+});
+function crc32(bytes){
+  let crc=0xffffffff;
+  for(const byte of bytes)crc=CRC_TABLE[(crc^byte)&255]^(crc>>>8);
+  return (crc^0xffffffff)>>>0;
+}
 function zip(files){
-  const local=[],center=[];let offset=0;
-  for(const [name,text] of Object.entries(files)){
-    const nam=utf8.encode(name),raw=text instanceof Uint8Array?text:utf8.encode(text),crc=crc32(raw),entry=[];
-    put32(entry,0x04034b50);put16(entry,20);put16(entry,0);put16(entry,0);put16(entry,0);put16(entry,0);put32(entry,crc);put32(entry,raw.length);put32(entry,raw.length);put16(entry,nam.length);put16(entry,0);entry.push(...nam);for(const byte of raw)entry.push(byte);for(const byte of entry)local.push(byte);
-    const c=[];put32(c,0x02014b50);put16(c,20);put16(c,20);put16(c,0);put16(c,0);put16(c,0);put16(c,0);put32(c,crc);put32(c,raw.length);put32(c,raw.length);put16(c,nam.length);put16(c,0);put16(c,0);put16(c,0);put16(c,0);put32(c,0);put32(c,offset);c.push(...nam);center.push(...c);
-    offset+=entry.length;
+  const entries=[];
+  let localBytes=0,centralBytes=0;
+  for(const [name,content] of Object.entries(files)){
+    const encodedName=utf8.encode(name);
+    const raw=content instanceof Uint8Array?content:utf8.encode(content);
+    if(!encodedName.length||encodedName.length>65535||raw.byteLength>0xffffffff)
+      throw new Error('ZIP entry exceeds supported name or byte limits.');
+    const offset=localBytes;
+    localBytes+=30+encodedName.length+raw.byteLength;
+    centralBytes+=46+encodedName.length;
+    entries.push({name:encodedName,raw,crc:crc32(raw),offset});
   }
-  const out=[...local,...center],e=[];put32(e,0x06054b50);put16(e,0);put16(e,0);put16(e,Object.keys(files).length);put16(e,Object.keys(files).length);put32(e,center.length);put32(e,local.length);put16(e,0);out.push(...e);return new Uint8Array(out);
+  if(entries.length>65535||localBytes+centralBytes+22>0xffffffff)
+    throw new Error('ZIP archive exceeds supported size or entry count.');
+  const output=new Uint8Array(localBytes+centralBytes+22);
+  const view=new DataView(output.buffer);
+  let cursor=0;
+  const u16=value=>{view.setUint16(cursor,value,true);cursor+=2;};
+  const u32=value=>{view.setUint32(cursor,value,true);cursor+=4;};
+  const bytes=value=>{output.set(value,cursor);cursor+=value.length;};
+
+  for(const part of entries){
+    u32(0x04034b50);u16(20);u16(0);u16(0);u16(0);u16(0);
+    u32(part.crc);u32(part.raw.length);u32(part.raw.length);
+    u16(part.name.length);u16(0);bytes(part.name);bytes(part.raw);
+  }
+  if(cursor!==localBytes)throw new Error('ZIP local directory length mismatch.');
+  for(const part of entries){
+    u32(0x02014b50);u16(20);u16(20);u16(0);u16(0);u16(0);u16(0);
+    u32(part.crc);u32(part.raw.length);u32(part.raw.length);
+    u16(part.name.length);u16(0);u16(0);u16(0);u16(0);
+    u32(0);u32(part.offset);bytes(part.name);
+  }
+  if(cursor!==localBytes+centralBytes)throw new Error('ZIP central directory length mismatch.');
+  u32(0x06054b50);u16(0);u16(0);u16(entries.length);u16(entries.length);
+  u32(centralBytes);u32(localBytes);u16(0);
+  if(cursor!==output.byteLength)throw new Error('ZIP end-of-directory length mismatch.');
+  return output;
 }
 export function toXLSX(transactions){
   if(!transactions?.length)throw new Error('No transactions to export.');

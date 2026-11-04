@@ -18,3 +18,16 @@ jobs:
           grep -q 'noindex,nofollow' dist/index.html
           grep -q 'Disallow: /' dist/robots.txt
           test ! -f dist/sitemap.xml
+      - name: Run real Chrome browser file-upload and download acceptance
+        run: |
+          command -v google-chrome
+          npm install --no-save --no-package-lock playwright-core@1.55.0
+          npm run test:browser
+      - name: Upload synthetic browser failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-failure
+          path: browser-e2e-failure.png
+          if-no-files-found: ignore
+          retention-days: 3

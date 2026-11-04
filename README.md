@@ -20,6 +20,16 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.4 — verified real Chrome file workflows and memory-efficient ZIP exports
+
+- New **real Google Chrome/Playwright Core E2E acceptance** runs in GitHub Actions after the existing financial, build and SEO gates. It starts a local HTTP server against the generated `dist/`, uses **synthetic transactions only**, clicks actual file pickers and buttons, and downloads and inspects actual CSV, XLSX and batch ZIP artifacts.
+- Browser test coverage: CSV mapping and preflight, stale-mapping invalidation, duplicate warning acknowledgement, clear workspace, QBO-source Excel workbook, batch QIF overlap/ZIP, Windows-1252 OFX file decoding and CSV download, CSV-to-QIF syntax export, a 390px responsive viewport without horizontal overflow, and privacy-minimized reports. No browser JavaScript exceptions observed in passing CI.
+- The stored-ZIP writer uses pre-sized `Uint8Array` / `DataView` buffers with a lookup-table CRC32 rather than copying millions of boxed JavaScript array elements. This reduces peak memory pressure for larger single-file Excel and multi-file ZIP exports without adding a compression dependency.
+- Automated ZIP regression includes a **10 MiB** CSV payload plus multi-entry, UTF-8 and central-directory offset validation. This is a **synthetic file-size test**, not a real bank or real QuickBooks import.
+- GitHub CI: [v1.4 browser + ZIP validation run](https://github.com/garrison2025/CSV-QBO/actions/runs/41810408569) completed with **334 passing Node tests**, Chrome E2E passing and noindex build passing.
+- Run locally: `npm run check`, then install Playwright Core only if browser acceptance is needed (`npm install --no-save --no-package-lock playwright-core@1.55.0`) and run `npm run test:browser` with Google Chrome installed. There are **no production npm dependencies**, paid APIs or banking uploads.
+- Preview Pages URLs remain `noindex`; actual bank compatibility, QuickBooks Desktop/Online import acceptance, Lighthouse and production SEO release are separate unfinished gates.
+
 ## V1.3 — QIF field integrity and batch cross-file overlap review
 
 - QIF Bank/CCard/Cash reader now rejects duplicate date, signed amount, payee, memo or reference fields before they can overwrite transaction data. Repeated `!Type:` sections, unknown QIF record codes, and metadata-only or incomplete records fail closed.
@@ -157,6 +167,6 @@ The sample domain above is a placeholder, not an owned URL. No domain or payment
 
 All file reads and transformation occur in the browser. The code contains no endpoint to upload source financial files, no bank login and no analytics collecting transaction content. Export calculations use integer cents to avoid floating-point aggregation errors. Input is restricted to 8 MB; anomalous dates and amounts fail loudly.
 
-`npm test` currently runs unit, property-style and build gates. A **synthetic test suite is not a substitute for real QuickBooks UAT**, browser interaction testing, mobile QA, or a security audit. Consult [docs/RELEASE-EVIDENCE.md](docs/RELEASE-EVIDENCE.md).
+`npm test` runs unit, property-style and static build gates. The separate Chrome acceptance script `npm run test:browser` is exercised in GitHub Actions using **synthetic financial records**. These real-browser tests do **not** substitute for real-bank sample testing, QuickBooks Online/Desktop import UAT, mobile accessibility review or a security audit. Consult [docs/RELEASE-EVIDENCE.md](docs/RELEASE-EVIDENCE.md).
 
 > Independent utility. Not affiliated with Intuit, QuickBooks, Quicken, or a bank. Financial source files should be backed up; verify imports with the receiving application.
