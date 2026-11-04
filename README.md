@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.6 — harden CSV input and provide safe interactive fixtures
+
+- Reject malformed CSV quoting or inconsistent row widths before any conversion; no silent field or amount shifts.
+- Enforce unambiguous column mappings: signed Amount **or** separate Debit and Credit, never both; refuse duplicate column assignments.
+- Download local synthetic examples for all six reader input formats. QBO and QFX examples exercise reading only and are not bank-issued or certified for accounting imports.
+- Clear selected file and transaction preview in memory with one click; previously downloaded files and opted-in mapping templates remain under the user's control.
+- The V0.5 independent-file batch ZIP workflow remains intact. No paid SaaS or .qbo writer is represented as complete.
+
 ## V0.5 — separate browser-local batch export
 
 - Select up to **10 independent QBO/QFX/OFX/QIF/IIF bank files** (12 MB aggregate), and download a ZIP with a separately converted CSV or XLSX per input plus a validation report.
