@@ -173,9 +173,12 @@ export function parseQIF(text, dateFormat='us') {
   const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
   const transactions=[];
   let entry={},kind='',splits=0,categories=0,ignoredMetadata=0,redundantAmounts=0;
-  let recordLine=0;
+  let recordLine=0,recordSeen=false;
   const commit=()=>{
-    if(!Object.keys(entry).length)return;
+    if(!Object.keys(entry).length){
+      if(recordSeen)fail('QIF transaction has metadata but no D/T financial values.');
+      return;
+    }
     if(!entry.date||!entry.amount)fail('QIF transaction near line '+recordLine+' missing D or T value.');
     if(entry.uAmount!=null){
       if(toMinorUnits(entry.amount)!==toMinorUnits(entry.uAmount))
@@ -186,7 +189,7 @@ export function parseQIF(text, dateFormat='us') {
     if(!description.trim())fail('QIF transaction near line '+recordLine+' has no payee or memo.');
     transactions.push({date:isoDate(entry.date,dateFormat),description,
       amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''});
-    entry={};recordLine=0;
+    entry={};recordLine=0;recordSeen=false;
   };
   const fieldName={D:'date',T:'amount',U:'uAmount',P:'description',M:'memo',N:'id'};
   for(let i=0;i<lines.length;i++){
@@ -206,6 +209,7 @@ export function parseQIF(text, dateFormat='us') {
     if(!kind)fail('QIF file is missing a supported !Type:Bank, !Type:CCard or !Type:Cash header.');
     if(line==='^'){commit();continue;}
     const k=line[0],v=line.slice(1);
+    recordSeen=true;
     if(k in fieldName){
       const key=fieldName[k];
       if(Object.hasOwn(entry,key))fail('QIF line '+lineNumber+': duplicate '+k+' field would overwrite financial data.');
@@ -221,7 +225,7 @@ export function parseQIF(text, dateFormat='us') {
       fail('Unsupported QIF field '+JSON.stringify(k)+' at line '+lineNumber+'. No rows were exported.');
     }
   }
-  if(Object.keys(entry).length)fail('QIF final transaction lacks terminating ^.');
+  if(recordSeen)fail('QIF final transaction lacks terminating ^.');
   if(!transactions.length)fail('No QIF transactions found.');
   const warnings=[];
   if(splits||categories)warnings.push('QIF category/split allocations are not preserved in this transaction export.');
