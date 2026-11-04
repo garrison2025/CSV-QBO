@@ -215,3 +215,22 @@ test('CSV to QIF landing page discloses strict lossless fields and no target-app
  assert.ok(!source.includes("String(t.description||'').replace(/[\\r\\n^]/g,' ')"),
   'QIF writer must never silently replace payee data');
 });
+
+
+test('XLSX converter pages state true Excel dates, two-decimal money and text-safe references',()=>{
+ const data=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ const excelTools=data.filter(x=>x.output==='xlsx');
+ assert.equal(excelTools.length,5);
+ for(const x of excelTools){
+  const html=read('tools/'+x.slug+'/index.html');
+  assert.match(html,/Excel date cells are real sortable dates/);
+  assert.match(html,/Signed amounts are validated to integer cents/);
+  assert.match(html,/references including leading zeros stay text/);
+  assert.match(html,/noindex,nofollow/);
+ }
+ const source=readFileSync(path.join(root,'src','xlsx.mjs'),'utf8');
+ assert.match(source,/function excelDateSerial/);
+ assert.match(source,/function exactExcelAmount/);
+ assert.match(source,/numFmtId="164" formatCode="yyyy-mm-dd"/);
+ assert.match(source,/autoFilter ref=/);
+});
