@@ -63,3 +63,27 @@ test('batch refuses a mixed-type QIF export rather than silently combining accou
  const mixed='!Type:Bank\nD11/04/2026\nT12.00\nPDeposit\n^\n!Type:CCard\nD11/05/2026\nT-3.00\nPCard\n^\n';
  assert.throws(()=>batchConvert([{name:'mixed.qif',text:mixed}]),/Multiple QIF transaction section types/);
 });
+
+
+test('batch includes IIF zero-sum group evidence without leaking ledger details',()=>{
+ const balanced='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n'+
+  'TRNS\t11/04/2026\t-50.00\tPrivate transaction\n'+
+  'SPL\t11/04/2026\t50.00\tSecret expense\nENDTRNS\n';
+ const result=batchConvert([{name:'PRIVATE-COMPANY.iif',text:balanced}]);
+ assert.equal(result.report.files[0].parserIntegrity.status,'passed');
+ assert.equal(result.report.files[0].parserIntegrity.balancedGroups,1);
+ assert.equal(result.report.files[0].parserIntegrity.splitRows,1);
+ assert.deepEqual(result.report.files[0].dateRange,{first:'2026-11-04',last:'2026-11-04'});
+ assert.equal(result.report.files[0].outputIsLedger,false);
+ assert.equal(result.report.reportScope.includes('not reconstructed'),true);
+ assert.equal(result.report.totalTransactions,1);
+ const metadata=JSON.stringify(result.report);
+ for(const secret of ['PRIVATE-COMPANY','Private transaction','Secret expense'])assert.ok(!metadata.includes(secret));
+});
+test('batch blocks any unbalanced IIF file and never returns partial ZIP',()=>{
+ const balanced='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n'+
+  'TRNS\t11/04/2026\t-10.00\tA\nSPL\t11/04/2026\t10.00\tB\nENDTRNS\n';
+ const unbalanced='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n'+
+  'TRNS\t11/04/2026\t-10.00\tA\nSPL\t11/04/2026\t9.99\tB\nENDTRNS\n';
+ assert.throws(()=>batchConvert([{name:'good.iif',text:balanced},{name:'bad.iif',text:unbalanced}]),/Batch file 2: .*do not balance to zero/);
+});
