@@ -184,3 +184,20 @@ test('all conversion pages provide working paginated preview and suspicious-row 
  assert.match(app,/reviewRows=\[\.\.\.new Set/);
  assert.match(app,/Preview only — downloads include all/);
 });
+
+
+test('all twelve conversion tools expose browser-local preview search and duplicate-only review controls',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ for(const tool of tools){
+   const html=read('tools/'+tool.slug+'/index.html');
+   for(const id of ['preview-search','preview-only-flags','preview-filter-status'])
+     assert.ok(html.includes('id="'+id+'"'),tool.slug+' missing '+id);
+   assert.match(html,/preview-search" type="search"[^>]*autocomplete="off"/);
+   assert.match(html,/noindex,nofollow/);
+ }
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/function matchingPreviewIndices\(\)/);
+ assert.match(app,/parsed\.transactions/);
+ assert.match(app,/Preview only — downloads include all/);
+ assert.match(app,/preview-search'\)\.value=''/);
+});

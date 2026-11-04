@@ -161,3 +161,12 @@
 - Chrome E2E uses a 1,001-row sample across 41 pages, verifies row 1001 visually, then downloads the full two-file QuickBooks ZIP; another 52-row sample tests duplicate jump row 2/51 and warning acknowledgement.
 - No change to file conversion logic or QuickBooks import certification. Preview remains noindex and browser local.
 - Verify CI and Cloudflare deployment results separately after merge.
+
+## V1.8 — browser-only full-source search and duplicate review filter (2026-11-05)
+
+- Added full-source transaction search by description, date, signed amount and reference, plus a possible-duplicates-only filter on all 12 real conversion pages.
+- Searches and duplicate view filters affect **visible preview only**; parsed source, audit warnings, user acknowledgement, reconciliation, validation reports and exported artifacts are unchanged.
+- Filter count, empty state, page status and source row review jumps are updated consistently. All query/filter state resets on new file, changed date/mapping or workspace clear. No search terms persisted or uploaded.
+- Node simulated-DOM tests and real Chrome E2E cover 1,001-row search, zero matches while export remains available, and duplicate-only inspection of later source rows.
+- Real bank and QuickBooks acceptance still NOT RUN; production SEO launch blocked until the user has a custom domain and explicit approval.
+- GitHub CI and Cloudflare deployment status to be verified after code merge.

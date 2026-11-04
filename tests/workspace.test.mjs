@@ -220,3 +220,84 @@ test('small transaction files do not show unnecessary page controls',async()=>{
  assert.equal(get('preview-navigation').hidden,true);
  assert.match(get('preview-caption').textContent,/Showing rows 1–2 of 2/);
 });
+
+
+test('local search finds the last transaction without changing source summary or export readiness',async()=>{
+ await clear();
+ const rows=['Date,Description,Amount,Other Amount,Reference'];
+ for(let i=0;i<56;i++)rows.push('11/04/2026,Merchant '+i+','+(i+1)+'.00,0.00,REF-'+i);
+ await load(rows.join('\n')+'\n');await preview();
+ assert.equal(get('summary-count').textContent,'56');
+ assert.equal(get('preview-body').children.length,25);
+ get('preview-search').value='rEf-55';
+ await get('preview-search').fire('input');
+ assert.equal(get('preview-body').children.length,1);
+ assert.equal(get('preview-body').children[0].getAttribute('data-row-number'),'56');
+ assert.equal(get('preview-page-status').textContent,'Page 1 of 1');
+ assert.match(get('preview-filter-status').textContent,/1 of 56/);
+ assert.equal(get('summary-count').textContent,'56');
+ assert.equal(get('export-button').disabled,false);
+ assert.match(get('preview-caption').textContent,/downloads include all 56 transactions/);
+ get('preview-search').value='DOES-NOT-EXIST';
+ await get('preview-search').fire('input');
+ assert.equal(get('preview-body').children.length,0);
+ assert.match(get('preview-caption').textContent,/No matching transactions/);
+ assert.equal(get('export-button').disabled,false);
+ get('preview-search').value='';
+ await get('preview-search').fire('input');
+ assert.equal(get('preview-body').children.length,25);
+});
+test('duplicate-only filter narrows visible rows but preserves warning acknowledgements and original indices',async()=>{
+ await clear();
+ const rows=['Date,Description,Amount,Other Amount,Reference'];
+ for(let i=1;i<=54;i++)rows.push('11/04/2026,'+
+   ((i===27||i===51)?'Duplicated coffee':'Unique '+i)+','+
+   ((i===27||i===51)?'-5.00':i+'.00')+',0.00,'+
+   ((i===27||i===51)?'REPEAT':'REF-'+i));
+ await load(rows.join('\n')+'\n');await preview();
+ assert.equal(get('export-button').disabled,true);
+ get('preview-only-flags').checked=true;
+ await get('preview-only-flags').fire('change');
+ assert.equal(get('preview-body').children.length,2);
+ assert.equal(get('preview-body').children[0].getAttribute('data-row-number'),'27');
+ assert.equal(get('preview-body').children[1].getAttribute('data-row-number'),'51');
+ assert.match(get('preview-filter-status').textContent,/2 of 54/);
+ await get('preview-review').fire('click');
+ assert.match(get('preview-page-status').textContent,/Review row 27 of 54/);
+ await get('preview-review').fire('click');
+ assert.match(get('preview-page-status').textContent,/Review row 51 of 54/);
+ get('preview-search').value='reference-that-does-not-exist';
+ await get('preview-search').fire('input');
+ assert.equal(get('preview-body').children.length,0);
+ assert.equal(get('preview-review').hidden,true);
+ get('preview-search').value='coffee';
+ await get('preview-search').fire('input');
+ assert.equal(get('preview-body').children.length,2);
+ assert.equal(get('preview-review').hidden,false);
+ get('warning-ack').checked=true;
+ await get('warning-ack').fire('change');
+ assert.equal(get('export-button').disabled,false);
+ assert.equal(get('summary-count').textContent,'54');
+ assert.match(get('preview-caption').textContent,/downloads include all 54 transactions/);
+});
+test('source changes and clear workspace discard local search terms, match counts and duplicate filter',async()=>{
+ await clear();await load();await preview();
+ get('preview-search').value='Coffee';
+ await get('preview-search').fire('input');
+ get('preview-only-flags').checked=true;
+ await get('preview-only-flags').fire('change');
+ assert.equal(get('preview-body').children.length,0);
+ await load();
+ assert.equal(get('preview-search').value,'');
+ assert.equal(get('preview-only-flags').checked,false);
+ assert.equal(get('preview-body').children.length,0); // CSV requires a new preview.
+ await preview();
+ assert.equal(get('preview-body').children.length,2);
+ get('preview-search').value='Salary';
+ await get('preview-search').fire('input');
+ await clear();
+ assert.equal(get('preview-search').value,'');
+ assert.equal(get('preview-only-flags').checked,false);
+ assert.equal(get('preview-filter-status').textContent,'');
+ assert.equal(get('preview-panel').hidden,true);
+});
