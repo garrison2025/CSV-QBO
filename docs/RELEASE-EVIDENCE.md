@@ -36,3 +36,11 @@
 - Browser smoke for V0.4: NOT RUN in this environment; Chromium local navigation was blocked.
 - QuickBooks target import: NOT RUN; do not claim compatibility.
 - GitHub CI / Cloudflare deployment: check separately after commit.
+
+## V0.5 incremental release — 2026-11-04
+
+- Finance safety: strict CSV width/quotes, ambiguous Amount vs Debit/Credit mappings rejected.
+- Six source-specific synthetic files, for reader demonstrations only, not QuickBooks import tests.
+- Explicit client-side Clear file and preview button. Already downloaded files and saved column mappings are unaffected.
+- CI and exact automated test count: verify after PR run. Browser cross-device smoke and target QuickBooks UAT remain NOT RUN.
+- Preview remains noindex without custom domain or payment infrastructure.
