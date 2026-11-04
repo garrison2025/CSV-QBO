@@ -44,26 +44,56 @@ export function isoDate(input, format='us') {
 export function parseCSV(text, delimiter) {
   const s = String(text ?? '').replace(/^\uFEFF/, '');
   if (delimiter == null) {
-    const first = s.split(/\r?\n/,1)[0] || '';
-    delimiter = ['\t',';',','].sort((a,b) => first.split(b).length - first.split(a).length)[0];
+    // Count separators in the first logical record only, excluding quoted fields.
+    const counts = {',': 0, ';': 0, '\t': 0};
+    let inQuotes = false;
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === '"') {
+        if (inQuotes && s[i + 1] === '"') { i++; continue; }
+        inQuotes = !inQuotes;
+      } else if (!inQuotes && (c === '\n' || c === '\r')) break;
+      else if (!inQuotes && Object.hasOwn(counts, c)) counts[c]++;
+    }
+    delimiter = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
   }
-  if (![',',';','\t'].includes(delimiter)) fail('Unsupported CSV delimiter.');
-  const records = []; let row=[], cell='', quoted=false;
-  for (let i=0;i<s.length;i++) {
-    const c=s[i];
+  if (![',', ';', '\t'].includes(delimiter)) fail('Unsupported CSV delimiter.');
+  const records = [];
+  let row = [], cell = '', quoted = false, closed = false, line = 1, recordLine = 1;
+  const commit = () => {
+    row.push(cell);
+    if (row.some(value => value.trim() !== '')) records.push({fields: row, line: recordLine});
+    row = []; cell = ''; closed = false; recordLine = line + 1;
+  };
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
     if (quoted) {
-      if (c==='"' && s[i+1]==='"') { cell+='"';i++; }
-      else if (c==='"') quoted=false;
-      else cell+=c;
-    } else if (c==='"' && cell==='') quoted=true;
-    else if (c===delimiter) { row.push(cell);cell=''; }
-    else if (c==='\n') { row.push(cell.replace(/\r$/,'')); if(row.some(x=>x!=='')) records.push(row); row=[];cell=''; }
-    else cell+=c;
+      if (c === '"' && s[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') { quoted = false; closed = true; }
+      else { cell += c; if (c === '\n') line++; }
+    } else if (c === '"') {
+      if (cell !== '' || closed) fail('Unexpected CSV quote at line ' + line + '.');
+      quoted = true;
+    } else if (c === delimiter) {
+      row.push(cell); cell = ''; closed = false;
+    } else if (c === '\r' || c === '\n') {
+      if (c === '\r' && s[i + 1] === '\n') i++;
+      commit(); line++;
+    } else if (closed) {
+      if (c !== ' ' && c !== '\t') fail('Unexpected text after CSV quote at line ' + line + '.');
+    } else cell += c;
   }
-  if (quoted) fail('Unclosed quote in CSV.');
-  if (cell!=='' || row.length) { row.push(cell.replace(/\r$/,'')); if(row.some(x=>x!=='')) records.push(row); }
+  if (quoted) fail('Unclosed quote in CSV at line ' + line + '.');
+  if (cell !== '' || row.length || closed) commit();
   if (!records.length) fail('This CSV is empty.');
-  return records;
+  const width = records[0].fields.length;
+  if (width < 2) fail('CSV needs at least two columns.');
+  for (const record of records.slice(1)) {
+    if (record.fields.length !== width) {
+      fail('CSV line ' + record.line + ': expected ' + width + ' columns, found ' + record.fields.length + '. Fix the source file before converting.');
+    }
+  }
+  return records.map(record => record.fields);
 }
 export function toCSV(rows, keys=['date','description','amount','id']) {
   function safe(value) {
@@ -94,6 +124,20 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   const map={...guesses,...mapping};
   if (map.date<0 || map.description<0) fail('Choose Date and Description columns.');
   if (map.amount<0 && (map.debit<0 || map.credit<0)) fail('Choose Amount or both Debit and Credit columns.');
+  // Never silently discard signed Amount or independent debit/credit information.
+  if (map.amount >= 0 && (map.debit >= 0 || map.credit >= 0)) {
+    fail('Choose either the signed Amount column or the Debit and Credit columns, not both. Deselect unused columns before previewing.');
+  }
+  const fields = map.amount >= 0 ? ['date','description','amount','id'] : ['date','description','debit','credit','id'];
+  const used = new Map();
+  for (const field of fields) {
+    const index = map[field];
+    if (!Number.isInteger(index) || index < -1 || index >= rows[0].length) fail('Invalid mapping for ' + field + '.');
+    if (index < 0) continue;
+    if (used.has(index)) fail('Column "' + rows[0][index] + '" is assigned to both ' + used.get(index) + ' and ' + field + '.');
+    used.set(index, field);
+  }
+
   const transactions=[];
   for(let i=1;i<rows.length;i++) {
     const r=rows[i]; if(r.every(c=>!String(c??'').trim())) continue;
