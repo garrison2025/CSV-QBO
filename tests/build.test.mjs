@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import {parseInput,totals} from '../src/core.mjs';
 const root=path.resolve(import.meta.dirname,'..');
 const read=p=>readFileSync(path.join(root,'dist',p),'utf8');
 execFileSync(process.execPath,['scripts/build.mjs'],{cwd:root,env:{...process.env,SITE_URL:'',PUBLISH_SEO:''}});
@@ -29,4 +30,24 @@ test('keyword database and 27-route plan preserved',()=>{
  assert.equal(keywords.find(x=>x.keyword==='csv to qbo converter').kd,5);
  const plan=JSON.parse(readFileSync(path.join(root,'data/seo-plan-v3.json'),'utf8'));
  assert.equal(plan.pages.length,27);
+});
+
+
+test('every published reader offers a synthetic fixture matching its input format',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ for(const tool of tools){
+   const filename=tool.input+'-synthetic.'+tool.input;
+   const location='samples/'+filename;
+   assert.ok(existsSync(path.join(root,'dist',location)),location+' should exist');
+   const page=read('tools/'+tool.slug+'/index.html');
+   assert.ok(page.includes('/'+location),tool.slug+' must link its source fixture');
+   const parsed=parseInput(read(location),tool.input,{dateFormat:'us'});
+   assert.equal(parsed.transactions.length,2,tool.slug+' synthetic sample row count');
+   assert.equal(totals(parsed.transactions).net,'107.50');
+ }
+ assert.match(read('index.html'),/samples\/csv-synthetic\.csv/);
+});
+test('clear workspace control is available on every converter page',()=>{
+ assert.match(read('index.html'),/id="clear-workspace"/);
+ assert.match(read('tools/qbo-to-csv/index.html'),/id="clear-workspace"/);
 });
