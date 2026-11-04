@@ -20,6 +20,16 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.0 — OFX/QBO/QFX variant reading with guarded bank field extraction
+
+- `decodeFinancialBytes` decodes financial input bytes locally: default strict UTF-8, UTF-16 LE/BE with BOM, and OFX 1.x with explicit `CHARSET:1252` Windows-1252. Unsupported declared charsets and damaged bytes fail instead of replacing payee names silently.
+- Browser single-file and multi-file paths now read actual bytes (`arrayBuffer`) before interpreting text; older Windows-1252 OFX files are decoded without uploading transactions or adding paid APIs.
+- The OFX reader now supports ordinary SGML leaf tags, XML leaf tags, CDATA names and decimal/hex numeric character entities; it skips complete XML comments and refuses malformed comments, duplicate transaction fields and incomplete CDATA.
+- Server-side OFX response status errors block output even when a stale STMTTRN appears in the file. Missing FITID or TRNTYPE produces explicit warnings and privacy-safe parser integrity counts rather than made-up identifiers.
+- Transaction values preserve the OFX `TRNAMT` sign as-is. `TRNTYPE` labels are not used to infer or invert amounts.
+- Added separate synthetic XML and Windows-1252 OFX fixtures linked from OFX converter pages; both contain exactly two transactions and a USD 107.50 net total.
+- This release expands synthetic compatibility, **not** real-bank / QuickBooks application certification. `.qbo` writing, payments and indexing of the temporary Pages URL remain disabled.
+
 ## V0.9 — QuickBooks Online CSV preflight and explicit risk review
 
 - `quickBooksCSVExportPlan` **reparses each generated CSV part** and reconciles its row count, exact USD cents, date coverage and UTF-8 file bytes to the original transactions. This is strictly a local *syntactic and arithmetic* preflight, not a QuickBooks Online import acceptance test.
