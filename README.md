@@ -20,6 +20,15 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.8 — private full-file transaction search and review-only duplicate filtering
+
+- A local search box on all 12 converter tools matches the full source file across date, description, signed amount and transaction reference, not merely the currently visible page. It is case-insensitive and preserves original source row indices for subsequent review.
+- A **Show possible duplicates only** checkbox restricts the on-screen preview to rows already flagged by the existing duplicate-reference or matching date/amount/description audits. The existing **Next possible duplicate** control cycles only through matches currently displayed by these preview filters.
+- Filtered results use the existing 25-row pagination; the UI states matching count versus full source transaction count, shows an explicit no-matches message, and makes clear that **downloads still include all source transactions**. Searching does not change the audit, warnings, acknowledgement state, totals or any CSV/XLSX/QIF/ZIP export.
+- Query text, filter flags and matches stay in browser memory and are reset whenever users select another source file, change CSV mapping/date order or clear the workspace. Nothing is sent to servers or stored as a search history.
+- Real Chrome E2E checks last-row searching across 1,001 synthetic transactions, no-match handling with full-file ZIP still intact, and duplicate-only results covering source rows 2 and 51 in a 52-row source. Simulated DOM tests cover reset, warning acknowledgement, filtered-page navigation and empty-state safety.
+- No paid APIs or runtime dependencies added; site is still a noindex technical preview and real QuickBooks import acceptance is not verified.
+
 ## V1.7 — full paginated transaction review with duplicate navigation
 
 - Replaced the previous **8-row-only preview** with a fully browsable **25-transaction-per-page** read-only table across all converter tools. Previous/Next controls show current page, precise displayed row range and full source transaction count.
