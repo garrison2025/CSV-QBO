@@ -61,3 +61,17 @@ test('Clear workspace covers batch state and asynchronous file-read guards',()=>
  assert.match(app,/if\(epoch!==selectionEpoch\)return/);
  assert.match(app,/if\(epoch!==batchEpoch\)return/);
 });
+
+
+test('all single-file converter workspaces expose an explicit warning acknowledgement control',()=>{
+ for(const route of ['index.html','tools/qbo-to-csv/index.html','tools/quickbooks-csv-formatter/index.html']){
+  const html=read(route);
+  assert.match(html,/id="warning-ack-label"/);
+  assert.match(html,/id="warning-ack"/);
+  assert.match(html,/I have reviewed these format and duplicate warnings/);
+ }
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/quickBooksCSVExportPlan\(parsed.transactions\)/);
+ assert.match(app,/quickbooks-csv-validation\.json/);
+ assert.match(app,/warning-ack'\)\.checked/);
+});
