@@ -20,6 +20,15 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.9 — QuickBooks Online CSV preflight and explicit risk review
+
+- `quickBooksCSVExportPlan` **reparses each generated CSV part** and reconciles its row count, exact USD cents, date coverage and UTF-8 file bytes to the original transactions. This is strictly a local *syntactic and arithmetic* preflight, not a QuickBooks Online import acceptance test.
+- Enforces at most 1,000 rows / 350,000 bytes per QuickBooks CSV part. When an export splits into multiple files, its ZIP now includes `quickbooks-csv-validation.json` with per-part counts, byte sizes, date ranges and aggregate debit/credit/net totals. No transaction descriptions, references, account IDs or source filenames are included in that manifest.
+- Duplicate transactions are **not** removed. In the single-file workspace, **any source format or duplicate warnings require explicit acknowledgement** before the export button can be used.
+- Spreadsheet-formula-like descriptions are prefixed with an apostrophe for CSV exports; the converter warns users and includes an aggregate count in the local validation reports, because this protective prefix can alter displayed description text.
+- QuickBooks Online manual CSV import remains a three-column `Date,Description,Amount` workflow; this software **does not produce `.qbo` Web Connect files**, connect bank accounts or claim successful import acceptance.
+- Cloudflare Pages remains a `noindex,nofollow` technical preview. No paid APIs or accounts have been introduced.
+
 ## V0.8 — balanced IIF group validation and auditable file summaries
 
 - IIF read-only parsing now requires complete `!TRNS`/`!SPL`-typed journal groups closed by `ENDTRNS`; it verifies each TRNS amount plus its SPL legs sums to zero using integer cents. Orphan SPLs, incomplete groups and imbalanced entries block the entire conversion.

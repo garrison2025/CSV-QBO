@@ -1,4 +1,4 @@
-import {MAX_FILE_BYTES,parseCSV,guessMapping,parseInput,toCSV,toQIF,toQuickBooksCSV,quickBooksCSVParts,auditTransactions,totals,escapeHtml} from './core.mjs';
+import {MAX_FILE_BYTES,parseCSV,guessMapping,parseInput,toCSV,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals,escapeHtml} from './core.mjs';
 import {toXLSX,toZIP} from './xlsx.mjs';
 import {batchConvert,MAX_BATCH_FILES,MAX_BATCH_BYTES} from './batch.mjs';
 
@@ -32,14 +32,21 @@ if(drop && fileInput){
     $('#preview-caption').textContent=data.transactions.length>8?'First 8 of '+data.transactions.length+' transactions are shown.':'All '+data.transactions.length+' transactions are shown.';
     $('#warning-list').replaceChildren();for(const note of [...data.warnings,...audit.warnings]){const li=document.createElement('li');li.textContent=note;$('#warning-list').append(li);}
     $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);
-    setButton(true);
     const hasWarnings=data.warnings.length+audit.warnings.length>0;
+    const ack=$('#warning-ack'),label=$('#warning-ack-label');
+    if(ack)ack.checked=false;
+    if(label)label.hidden=!hasWarnings;
+    setButton(!hasWarnings);
     const integrityNote=data.integrity?.check==='iif_trns_split_balance'?` ${data.integrity.balancedGroups} IIF group(s) balanced; only TRNS summary rows are exported.`:'';
     say((hasWarnings?'Ready with format and duplicate warnings. Review before download.':'Ready. Review the transaction preview, then download.')+integrityNote,hasWarnings?'info':'success');
   }
+  $('#warning-ack')?.addEventListener('change',()=>{
+    const warnings=parsed&&audit ? parsed.warnings.length+audit.warnings.length : 0;
+    setButton(Boolean(parsed?.transactions?.length)&&(!warnings||$('#warning-ack').checked));
+  });
   async function prepare(chosen){
     const epoch=++selectionEpoch;
-    file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#file-name').textContent='';
+    file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#warning-ack-label').hidden=true;$('#warning-ack').checked=false;$('#file-name').textContent='';
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
     const ext=(file.name.split('.').pop()||'').toLowerCase();
@@ -134,6 +141,8 @@ if(drop && fileInput){
     $('#mapping-panel').hidden=true;
     $('#preview-panel').hidden=true;
     $('#warning-box').hidden=true;
+    $('#warning-ack-label').hidden=true;
+    $('#warning-ack').checked=false;
     setButton(false);
     say('Workspace cleared, including source files, batch ZIP and previews. Previously downloaded files and saved mappings remain on your device.','success');
   });
@@ -149,7 +158,7 @@ if(drop && fileInput){
   $('#download-report')?.addEventListener('click',()=>{
     if(!parsed||!audit)return;
     const dates=parsed.transactions.map(transaction=>transaction.date).sort();
-    const report={reportType:'Finance File Lab local validation summary v2',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,outputIsLedger:false,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
+    const report={reportType:'Finance File Lab local validation summary v3',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,outputIsLedger:false,csvEscapedDescriptionCount:audit.csvFormulaGuardCount,requiresUserWarningAcknowledgement:(parsed.warnings.length+audit.warnings.length)>0,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json;charset=utf-8'});
     saveBlob(blob,'validation-summary.json');
     say('Validation summary downloaded (no account numbers or transaction descriptions).','success');
@@ -164,20 +173,25 @@ if(drop && fileInput){
   }
   $('#export-button').addEventListener('click',()=>{
     if(!parsed?.transactions?.length){say('Preview a valid file first.','error');return;}
+    if((parsed.warnings.length+audit.warnings.length)>0&&!$('#warning-ack').checked){say('Review and acknowledge the displayed warnings before exporting.','error');return;}
     const target=formatPicker?formatPicker.value:fixedOutput;
     let content,mime,ext;
     try{
       if(target==='csv'){content=toCSV(parsed.transactions);mime='text/csv;charset=utf-8';ext='csv';}
       else if(target==='qb-csv'){
-        const parts=quickBooksCSVParts(parsed.transactions);
+        const {parts,report}=quickBooksCSVExportPlan(parsed.transactions);
         if(parts.length===1){content=parts[0];mime='text/csv;charset=utf-8';ext='csv';}
-        else{content=toZIP(Object.fromEntries(parts.map((part,i)=>['quickbooks-online-part-'+String(i+1).padStart(3,'0')+'.csv',part])));mime='application/zip';ext='zip';}
+        else{
+          const files=Object.fromEntries(parts.map((part,i)=>['quickbooks-online-part-'+String(i+1).padStart(3,'0')+'.csv',part]));
+          files['quickbooks-csv-validation.json']=JSON.stringify(report,null,2);
+          content=toZIP(files);mime='application/zip';ext='zip';
+        }
       }
       else if(target==='xlsx'){content=toXLSX(parsed.transactions);mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';ext='xlsx';}
       else if(target==='qif'){content=toQIF(parsed.transactions);mime='application/x-qif';ext='qif';}
       else throw Error('Output format is not available in this release.');
       const data=new Blob([content],{type:mime});saveBlob(data,file.name.replace(/\.[^.]+$/,'')+'-converted.'+ext);
-      say('File downloaded. Always review transactions and verify compatibility before importing into accounting software.','success');
+      say(target==='qb-csv'?'QuickBooks CSV downloaded after row and amount reconciliation. This is NOT a .qbo file; manual import success is unverified.':'File downloaded. Always review transactions and verify compatibility before importing into accounting software.','success');
     }catch(err){say(err.message||'Export failed.','error');}
   });
 }

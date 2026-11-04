@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,auditTransactions,totals} from '../src/core.mjs';
+import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals} from '../src/core.mjs';
 import {toXLSX,toZIP} from '../src/xlsx.mjs';
 
 test('strict cents and signed amounts',()=>{
@@ -300,4 +300,73 @@ test('IIF warns that unrelated list rows are not included in accounting exports'
  const p=parseIIF(h+'TRNS\t11/04/2026\t-12.50\tTesting\nSPL\t11/04/2026\t12.50\tTesting\nENDTRNS\n');
  assert.equal(p.integrity.ignoredRows,2);
  assert.match(p.warnings.join(' '),/non-transaction IIF row/);
+});
+
+
+test('QuickBooks preflight re-parses 1001 export rows, checks file bounds and reconciles cents',()=>{
+ const tx=Array.from({length:1001},(_,i)=>({date:'2026-11-04',description:'Shop '+i,amount:i%2?'-0.25':'1.01',id:'REF-'+i}));
+ const {parts,report}=quickBooksCSVExportPlan(tx);
+ assert.equal(parts.length,2);
+ assert.equal(report.partCount,2);
+ assert.deepEqual(report.parts.map(p=>p.rows),[1000,1]);
+ assert.equal(report.sourceRows,1001);
+ assert.equal(report.generatedCSVReparsed,true);
+ assert.equal(report.totalsReconciled,true);
+ assert.equal(report.quickBooksImportTested,false);
+ assert.equal(report.isQBOWebConnect,false);
+ assert.equal(report.containsTransactionDescriptions,false);
+ assert.equal(report.containsTransactionReferences,false);
+ assert.equal(report.sourceFileNamesIncluded,false);
+ const all=parts.flatMap(x=>parseCSV(x).slice(1));
+ assert.equal(all.length,tx.length);
+ assert.equal(all.filter(x=>x[2]==='-0.25').length,500);
+ assert.equal(report.parts.reduce((sum,x)=>sum+x.rows,0),1001);
+ for(let i=0;i<parts.length;i++){
+  assert.equal(report.parts[i].bytes,new TextEncoder().encode(parts[i]).length);
+  assert.ok(report.parts[i].bytes<=350000);
+  assert.ok(report.parts[i].rows<=1000);
+ }
+ const summary=totals(tx);
+ assert.deepEqual(report.sourceTotals,summary);
+ const info=JSON.stringify(report);
+ assert.ok(!info.includes('REF-'));
+ assert.ok(!info.includes('Shop '));
+});
+test('QuickBooks preflight is byte-exact for UTF-8 emoji, multiline CSV and formula-like descriptions',()=>{
+ const tx=[
+  {date:'2026-11-04',description:'="Private" 😀, \nTwo lines',amount:'-5.10',id:'SECRET-ID'},
+  {date:'2026-11-05',description:'Refund café',amount:'15.15',id:'OTHER-ID'},
+  {date:'2026-11-05',description:'-not-a-number',amount:'0.01'}
+ ];
+ const {parts,report}=quickBooksCSVExportPlan(tx,{maxRows:2,maxBytes:350});
+ assert.equal(parts.length,2);
+ assert.equal(report.sourceRows,3);
+ assert.equal(report.sourceTotals.net,'10.06');
+ assert.equal(report.csvEscapedDescriptionCount,2);
+ assert.ok(report.warnings.some(x=>x.includes('apostrophe')));
+ assert.equal(parseCSV(parts[0])[1][1].startsWith("'="),true);
+ assert.equal(parseCSV(parts[1])[1][1].startsWith("'-"),true);
+ assert.equal(report.parts[0].dateRange.first,'2026-11-04');
+ assert.equal(report.parts[1].dateRange.first,'2026-11-05');
+ const reportOnly=JSON.stringify(report);
+ assert.ok(!reportOnly.includes('SECRET-ID'));
+ assert.ok(!reportOnly.includes('Two lines'));
+ assert.ok(!reportOnly.includes('Refund café'));
+});
+test('QuickBooks preflight never discards duplicate rows or silently modifies total',()=>{
+ const tx=[{date:'2026-11-04',description:'Repeat',amount:'-3.33',id:'FIT-1'},
+ {date:'2026-11-04',description:'Repeat',amount:'-3.33',id:'FIT-1'}];
+ const r=quickBooksCSVExportPlan(tx);
+ assert.equal(r.report.sourceRows,2);
+ assert.equal(parseCSV(r.parts[0]).length,3);
+ assert.equal(r.report.duplicateReferenceCount,1);
+ assert.equal(r.report.possibleDuplicateCount,1);
+ assert.equal(r.report.sourceTotals.net,'-6.66');
+ assert.ok(r.report.warnings.some(w=>w.includes('duplicates')));
+});
+test('QuickBooks preflight rejects oversize rows and invalid user transactions before ZIP',()=>{
+ const tooBig=[{date:'2026-11-04',description:'A'.repeat(350100),amount:'1.00'}];
+ assert.throws(()=>quickBooksCSVExportPlan(tooBig),/too large/);
+ assert.throws(()=>quickBooksCSVExportPlan([{date:'2026-11-04',description:'',amount:'1.00'}]),/Description is required/);
+ assert.throws(()=>quickBooksCSVExportPlan([{date:'2026-11-04',description:'Pay',amount:'1.234'}]),/Invalid amount/);
 });

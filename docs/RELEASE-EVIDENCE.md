@@ -77,3 +77,11 @@
 - Synthetic two-group IIF example is now balanced. SPL allocations are never reconstructed in CSV/XLSX; TRNS summary must not be treated as a bank statement.
 - Batch JSON v2 and single validation summary v2 include IIF parser evidence and file date coverage, while excluding source filenames/account numbers/descriptions.
 - Status pending CI and live deployment check; real QuickBooks target UAT remains NOT RUN. Preview still noindex.
+
+## V0.9 — CSV preflight and review controls (2026-11-04)
+
+- QuickBooks CSV generation now includes a round-trip, parse-after-serialize check per part, verifying counted rows, byte lengths, date ranges and exact cents before allowing any export.
+- Multi-part ZIPs include `quickbooks-csv-validation.json`: per-part row counts/bytes, aggregate debit/credit/net and privacy-sanitized warning counts, with no original filenames or transaction descriptions.
+- Warned single-file exports now require an explicit user acknowledgement; duplicates are not removed. Warnings include CSV formula-looking payees that receive a protective apostrophe prefix.
+- This validation is NOT real QuickBooks import UAT or Web Connect `.qbo` creation. The site remains noindex; payment and production SEO remain gated.
+- CI pass and live Cloudflare verification to be confirmed at merge.

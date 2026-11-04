@@ -104,11 +104,15 @@ export function parseCSV(text, delimiter) {
   }
   return records.map(record => record.fields);
 }
+function needsCsvFormulaGuard(value) {
+  const s=String(value ?? '');
+  return /^[\s]*[=+@\t\r]/.test(s) || (/^[\s]*-/.test(s) && !/^-?\d+(\.\d+)?$/.test(s.trim()));
+}
 export function toCSV(rows, keys=['date','description','amount','id']) {
   function safe(value) {
     let s=String(value ?? '');
-    // Prevent spreadsheet formula injection in text cells without altering exact amount values.
-    if (/^[\s]*[=+@\t\r]/.test(s) || (/^[\s]*-/.test(s) && !/^-?\d+(\.\d+)?$/.test(s.trim()))) s="'"+s;
+    // Prefix spreadsheet-formula-like text without modifying validated numeric amount cells.
+    if (needsCsvFormulaGuard(s)) s="'"+s;
     return /[",\n\r]/.test(s) ? '"'+s.replaceAll('"','""')+'"' : s;
   }
   return '\uFEFF' + keys.join(',') + '\r\n' + rows.map(row => keys.map(key => safe(row[key])).join(',')).join('\r\n') + '\r\n';
@@ -379,14 +383,82 @@ export function quickBooksCSVParts(transactions,{maxRows=1000,maxBytes=350000}={
   if(batch.length)parts.push(toQuickBooksCSV(batch));
   return parts;
 }
+/**
+ * Reparse every QuickBooks-compatible CSV part and reconcile exact integer
+ * cents and row counts before allowing a download. This verifies the exported
+ * CSV syntax and totals, NOT acceptance by QuickBooks Online.
+ */
+export function quickBooksCSVExportPlan(transactions,limits={}){
+  const parts=quickBooksCSVParts(transactions,limits);
+  const sourceAudit=auditTransactions(transactions);
+  const summaries=[];
+  let totalCount=0,totalIn=0n,totalOut=0n;
+  const encoder=new TextEncoder();
+  for(let i=0;i<parts.length;i++){
+    const csv=parts[i],rows=parseCSV(csv);
+    if(rows[0].join(',')!=='Date,Description,Amount')fail('QuickBooks CSV export header does not match the expected 3-column format.');
+    const records=rows.slice(1);
+    if(!records.length)fail('QuickBooks CSV export contains an empty part.');
+    const dates=[];
+    let inCents=0n,outCents=0n;
+    for(const record of records){
+      const date=isoDate(record[0],'us'),amount=toMinorUnits(record[2]);
+      if(!record[1].trim())fail('QuickBooks CSV export contains an empty Description.');
+      dates.push(date);
+      if(amount>=0n)inCents+=amount;else outCents-=amount;
+    }
+    dates.sort();
+    const bytes=encoder.encode(csv).length;
+    if(records.length>(limits.maxRows??1000)||bytes>(limits.maxBytes??350000)){
+      fail('QuickBooks CSV export exceeded its row or byte limit after serialization.');
+    }
+    totalCount+=records.length;totalIn+=inCents;totalOut+=outCents;
+    summaries.push({file:'quickbooks-online-part-'+String(i+1).padStart(3,'0')+'.csv',
+      rows:records.length,bytes,
+      dateRange:{first:dates[0],last:dates[dates.length-1]},
+      totalIn:fromMinorUnits(inCents),totalOut:fromMinorUnits(outCents),net:fromMinorUnits(inCents-outCents)});
+  }
+  if(totalCount!==sourceAudit.summary.count||
+    fromMinorUnits(totalIn)!==sourceAudit.summary.credit||
+    fromMinorUnits(totalOut)!==sourceAudit.summary.debit){
+    fail('QuickBooks CSV export reconciliation failed: source and output totals differ.');
+  }
+  const warnings=[
+    'This is QuickBooks Online manual-upload CSV, NOT a .qbo Web Connect file; actual software import has not been tested.',
+    'The three-column QuickBooks CSV omits transaction reference IDs; review duplicates before any import.'
+  ];
+  if(sourceAudit.duplicateIds.length||sourceAudit.possibleDuplicates.length){
+    warnings.push('Potential duplicates were detected in the source; no transactions have been deleted.');
+  }
+  if(sourceAudit.csvFormulaGuardCount){
+    warnings.push(sourceAudit.csvFormulaGuardCount+' formula-like description(s) were prefixed with an apostrophe to reduce spreadsheet injection risk.');
+  }
+  return {parts,report:{
+    reportType:'Finance File Lab QuickBooks CSV preflight v1',
+    outputFormat:'QuickBooks Online manual-upload 3-column CSV',
+    localOnly:true,quickBooksImportTested:false,isQBOWebConnect:false,
+    generatedCSVReparsed:true,totalsReconciled:true,
+    autoDeletedTransactions:false,containsTransactionDescriptions:false,
+    containsTransactionReferences:false,sourceFileNamesIncluded:false,
+    sourceRows:sourceAudit.summary.count,
+    sourceTotals:sourceAudit.summary,
+    duplicateReferenceCount:sourceAudit.duplicateIds.length,
+    possibleDuplicateCount:sourceAudit.possibleDuplicates.length,
+    csvEscapedDescriptionCount:sourceAudit.csvFormulaGuardCount,
+    partCount:summaries.length,parts:summaries,warnings
+  }};
+}
+
 /** Duplicate checks warn; they never mutate or drop the user's records. */
 export function auditTransactions(transactions){
   if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to audit.');
   const idIndex=new Map(),fingerprints=new Map(),duplicateIds=[],possibleDuplicates=[];
+  let csvFormulaGuardCount=0;
   const normalized=transactions.map((t,i)=>{
     const date=isoDate(t.date),amount=fromMinorUnits(toMinorUnits(t.amount));
     const description=String(t.description??'').trim();
     if(!description)fail('Transaction '+(i+1)+' has no description.');
+    if(needsCsvFormulaGuard(description))csvFormulaGuardCount++;
     const id=String(t.id??'').trim();
     if(id){
       if(idIndex.has(id))duplicateIds.push({firstRow:idIndex.get(id)+1,row:i+1,reference:id});
@@ -401,7 +473,8 @@ export function auditTransactions(transactions){
   const warnings=[];
   if(duplicateIds.length)warnings.push(duplicateIds.length+' repeated transaction reference(s) found. Review before importing; no rows were deleted.');
   if(possibleDuplicates.length)warnings.push(possibleDuplicates.length+' possible same-date, same-amount and same-description duplicate(s). Review; no rows were deleted.');
-  return {summary,duplicateIds,possibleDuplicates,warnings};
+  if(csvFormulaGuardCount)warnings.push(csvFormulaGuardCount+' spreadsheet formula-like description(s) will be prefixed with an apostrophe in CSV exports. Review the descriptions before import.');
+  return {summary,duplicateIds,possibleDuplicates,csvFormulaGuardCount,warnings};
 }
 export function totals(transactions){
   let debit=0n,credit=0n;
