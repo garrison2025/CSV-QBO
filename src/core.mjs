@@ -12,12 +12,15 @@ function fail(message) { throw new Error(message); }
 export function toMinorUnits(input) {
   const original = String(input ?? '').trim();
   if (/[€£¥₹]/.test(original)) fail('Non-USD currency symbols are unsupported. Convert currencies outside this tool.');
-  let s = original.replace(/[$\s]/g, '');
+  let s = original;
   if (!s) fail('Amount is empty.');
   let negative = false;
   if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
   if (s.startsWith('-')) { negative = !negative; s = s.slice(1); }
   else if (s.startsWith('+')) s = s.slice(1);
+  s = s.trim();
+  if (s.startsWith('$')) s = s.slice(1);
+  if (/\s/.test(s)) fail('Invalid amount spacing: ' + input + '.');
   if (/^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(s)) s = s.replaceAll(',', '');
   if (!/^\d+(\.\d{1,2})?$/.test(s)) fail('Invalid amount: ' + input + '. Use a period for decimals.');
   const parts = s.split('.');
@@ -34,7 +37,10 @@ export function isoDate(input, format='us') {
   const v = String(input ?? '').trim();
   let y, m, d, match;
   if ((match = v.match(/^(\d{4})-(\d{2})-(\d{2})$/))) { [,y,m,d] = match; }
-  else if ((match = v.match(/^(\d{4})(\d{2})(\d{2})(?:\d.*)?$/))) { [,y,m,d] = match; }
+  else if ((match = v.match(/^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2})?)?(?:\.\d{1,3})?(?:\[[+-]?\d{1,2}(?::[A-Za-z0-9_.+-]+)?\])?$/))) {
+    [,y,m,d] = match;
+    if (match[4] != null && (Number(match[4]) > 23 || Number(match[5]) > 59 || (match[6] != null && Number(match[6]) > 59))) fail('Invalid OFX clock time: ' + v);
+  }
   else if ((match = v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) {
     y = match[3]; m = format === 'eu' ? match[2] : match[1]; d = format === 'eu' ? match[1] : match[2];
   } else fail('Unsupported date: ' + v + '. Select the correct US or day-first format.');
@@ -160,16 +166,28 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
 }
 
 export function parseQIF(text, dateFormat='us') {
-  const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);const transactions=[];let entry={},kind='';let splits=0;
+  const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
+  const transactions=[];let entry={},kind='',splits=0,categories=0;
   const commit=()=>{
-    if (!Object.keys(entry).length) return;
-    if (!entry.date||!entry.amount) fail('QIF transaction missing D or T value.');
-    transactions.push({date:isoDate(entry.date,dateFormat),description:entry.description||entry.memo||'',amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''}); entry={};
+    if(!Object.keys(entry).length)return;
+    if(!entry.date||!entry.amount)fail('QIF transaction missing D or T value.');
+    transactions.push({date:isoDate(entry.date,dateFormat),description:entry.description||entry.memo||'',amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''});
+    entry={};
   };
-  for(const line of lines){
+  for(const line of lines) {
     if(!line)continue;
-    if(line.startsWith('!Type:')) {kind=line.slice(6).trim();if(/^Invst$/i.test(kind))fail('Investment QIF transactions are unsupported. No transactions were exported.');continue;}
-    if(line.startsWith('!'))continue;
+    if(line.startsWith('!Type:')) {
+      if(Object.keys(entry).length)fail('QIF section changed before a terminating ^.');
+      const next=line.slice(6).trim();
+      if(/^Invst$/i.test(next))fail('Investment QIF transactions are unsupported. No transactions were exported.');
+      if(!/^(Bank|CCard|Cash)$/i.test(next))fail('Unsupported QIF section type '+next+'. Only Bank, CCard and Cash transactions are supported.');
+      if(kind&&kind.toLowerCase()!==next.toLowerCase())fail('Multiple QIF transaction section types found. Export one account/type at a time.');
+      kind=next;
+      continue;
+    }
+    if(line.startsWith('!Account'))fail('QIF account-list sections are not supported. Export transactions for one account at a time.');
+    if(line.startsWith('!'))fail('Unsupported QIF directive. Export a single Bank, CCard or Cash transaction section.');
+    if(!kind)fail('QIF file is missing a supported !Type:Bank, !Type:CCard or !Type:Cash header.');
     if(line==='^'){commit();continue;}
     const k=line[0],v=line.slice(1);
     if(k==='D')entry.date=v;
@@ -177,11 +195,14 @@ export function parseQIF(text, dateFormat='us') {
     else if(k==='P')entry.description=v;
     else if(k==='M')entry.memo=v;
     else if(k==='N')entry.id=v;
+    else if(k==='L')categories++;
     else if(k==='S'||k==='E'||k==='$')splits++;
   }
-  if(Object.keys(entry).length) fail('QIF final transaction lacks terminating ^.');
+  if(Object.keys(entry).length)fail('QIF final transaction lacks terminating ^.');
   if(!transactions.length)fail('No QIF transactions found.');
-  return {transactions,source:'QIF',warnings:[kind!=='Bank'?'Only bank-style transactions were read; source QIF type: '+(kind||'unknown')+'.':'',splits?'Split/category details are not preserved in this transaction export.':''].filter(Boolean)};
+  const warnings=[];
+  if(splits||categories)warnings.push('QIF category/split allocations are not preserved in this transaction export.');
+  return {transactions,source:'QIF',warnings};
 }
 
 function decodeEntities(s){return s.replace(/&(amp|lt|gt|quot|apos);/g,(a,k)=>({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"}[k]));}
@@ -193,16 +214,34 @@ export function parseOFX(text) {
   const currencyTags=[...raw.matchAll(/<CURDEF\b[^>]*>\s*([^<\s]+)/gi)].map(m=>m[1].toUpperCase());
   if(/<CURDEF\b/i.test(raw)&&!currencyTags.length)fail('Invalid OFX currency declaration.');
   if(currencyTags.some(c=>c!=='USD'))fail('Only USD OFX statement currency is supported. No currency conversion is performed.');
-  // One export may include multiple accounts. Do not merge them implicitly.
   const accountSections=[...raw.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
   if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
   if(/<INVSTMTMSGSRSV1\b|<INVSTMTRS\b/i.test(raw))fail('Investment OFX feeds are not supported. No transactions were exported.');
-  const blocks=[...raw.matchAll(/<STMTTRN\b[^>]*>([\s\S]*?)(?=<\/STMTTRN\s*>|<STMTTRN\b|<\/BANKTRANLIST\b|$)/gi)];
-  if(!blocks.length)fail('No bank STMTTRN entries found. Investment feeds are not supported.');
+
+  // STMTTRN is an aggregate in SGML-style OFX 1.x and XML-style OFX 2.x.
+  // Do not silently accept a truncated or nested record; it may drop bank transactions.
+  let open=false,recordCount=0;
+  for(const token of raw.matchAll(/<\/?STMTTRN\b[^>]*>/gi)){
+    const closing=/^<\//.test(token[0]);
+    if(closing) {
+      if(!open)fail('Unexpected closing STMTTRN tag. Check the source file.');
+      open=false;
+    } else {
+      if(open)fail('Nested or unclosed STMTTRN transaction. Check the source file.');
+      open=true;recordCount++;
+    }
+  }
+  if(open)fail('Incomplete STMTTRN transaction at end of file.');
+  if(!recordCount)fail('No bank STMTTRN entries found. Investment feeds are not supported.');
+  const blocks=[...raw.matchAll(/<STMTTRN\b[^>]*>([\s\S]*?)<\/STMTTRN\s*>/gi)];
+  if(blocks.length!==recordCount)fail('One or more OFX transaction records could not be read safely.');
   const transactions=blocks.map((m,i)=>{
     const b=m[1],date=ofxField(b,'DTPOSTED'),amount=ofxField(b,'TRNAMT');
-    try{return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),description:ofxField(b,'NAME')||ofxField(b,'MEMO')||'Transaction',memo:ofxField(b,'MEMO'),id:ofxField(b,'FITID')};}
-    catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
+    const description=ofxField(b,'NAME')||ofxField(b,'MEMO');
+    try{
+      if(!description)fail('Transaction NAME and MEMO are both empty.');
+      return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),description,memo:ofxField(b,'MEMO'),id:ofxField(b,'FITID')};
+    }catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
   return {transactions,source:'OFX / QBO / QFX',warnings:[
     'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
@@ -234,7 +273,7 @@ export function toQIF(transactions){
   if(!transactions.length)fail('No transactions.');
   return '!Type:Bank\r\n'+transactions.map(t=>{
     const date=isoDate(t.date).split('-');const d=date[1]+'/'+date[2]+'/'+date[0];
-    return 'D'+d+'\r\nT'+fromMinorUnits(toMinorUnits(t.amount))+'\r\nP'+String(t.description||'').replace(/[\r\n^]/g,' ')+'\r\n'+(t.memo?'M'+String(t.memo).replace(/[\r\n^]/g,' ')+'\r\n':'')+'^\r\n';
+    return 'D'+d+'\r\nT'+fromMinorUnits(toMinorUnits(t.amount))+'\r\nP'+String(t.description||'').replace(/[\r\n^]/g,' ')+'\r\n'+(t.id?'N'+String(t.id).replace(/[\r\n^]/g,' ')+'\r\n':'')+(t.memo?'M'+String(t.memo).replace(/[\r\n^]/g,' ')+'\r\n':'')+'^\r\n';
   }).join('');
 }
 /** QuickBooks Online 3-column manual-upload CSV, not .qbo Web Connect. */

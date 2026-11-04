@@ -20,6 +20,16 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.7 — safe OFX/QIF bank record boundaries
+
+- OFX/QBO/QFX reading now rejects truncated/nested `STMTTRN` aggregates and source rows without NAME or MEMO, rather than silently outputting misleading partial transactions.
+- OFX compact timestamps must contain valid clock components and supported timezone suffixes; invalid suffixes cannot be silently treated as dates.
+- QIF reader requires one explicit `!Type:Bank`, `!Type:CCard` or `!Type:Cash` transaction section. Unknown categories, investment, account lists or mixed transaction types are blocked; category/split details are **reported as lossy**, not preserved.
+- QIF output retains available `N` check/reference field alongside memo. Import behavior remains **not verified** in a target application.
+- Amount parser rejects internal spacing instead of erasing it, while keeping V0.6.1's **USD-only** guard.
+- The earlier batch/single-file stale-read protection, full reset, CSV NUL and XLSX control-character validation are retained without replacement.
+- The project remains **noindex** on Cloudflare Pages and has no approved `.qbo` Web Connect writer, payment system or real QuickBooks UAT.
+
 ## V0.6.1 — currency integrity, encoding and local state cleanup
 
 - Financial amounts are handled as USD cents: reject explicit EUR/GBP/JPY/INR symbols and non-USD OFX currency declarations. Undeclared OFX currencies show a warning; **no exchange-rate conversion** is performed.

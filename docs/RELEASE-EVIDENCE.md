@@ -60,3 +60,12 @@
 - Added tests for non-USD financial input rejection, missing OFX currency warning, CSV null-byte validation, and invalid XLSX control characters.
 - Clear Workspace now invalidates both single/batch reads, clears batch ZIP references, and resets selected file lists.
 - Automated tests and preview gating: verify in PR CI before merge. Live Cloudflare smoke and actual QuickBooks import: NOT RUN in this patch.
+
+## V0.7 integrated release — 2026-11-04
+
+- Safer record boundaries: fail on malformed or truncated OFX STMTTRN aggregates; refuse missing payee/description and invalid timestamp clocks.
+- QIF section isolation: only explicit Bank, CCard and Cash single-type sections; category/split information remains a documented warning, N check/reference field is emitted in QIF.
+- Monetary safety: preserve V0.6.1 non-USD rejection, additionally reject internal whitespace that could otherwise change numeric value.
+- Keep V0.6.1 safeguards: CSV null-byte and XLSX control-character rejection, asynchronous stale-read protection, and complete batch/single-file memory reset.
+- Synthetic regressions were added; determine final test count/CI and deployment verification after the PR has passed.
+- QuickBooks/Quicken software import, bank fixture compatibility and commercial payment acceptance are NOT RUN.

@@ -53,3 +53,13 @@ test('file-level output names never copy source account labels or filenames',()=
  assert.deepEqual(r.report.files.map(x=>x.outputFile),['converted-001.csv']);
  assert.ok(!JSON.stringify(r.report).includes('123456'));
 });
+
+
+test('batch fails atomically on an incomplete OFX transaction',()=>{
+ const broken='<OFX><BANKTRANLIST><STMTTRN><DTPOSTED>20261104<TRNAMT>5.00<NAME>Truncated</BANKTRANLIST></OFX>';
+ assert.throws(()=>batchConvert([{name:'good.qif',text:qif('First')},{name:'broken.ofx',text:broken}]),/Batch file 2.*Incomplete STMTTRN/);
+});
+test('batch refuses a mixed-type QIF export rather than silently combining accounts',()=>{
+ const mixed='!Type:Bank\nD11/04/2026\nT12.00\nPDeposit\n^\n!Type:CCard\nD11/05/2026\nT-3.00\nPCard\n^\n';
+ assert.throws(()=>batchConvert([{name:'mixed.qif',text:mixed}]),/Multiple QIF transaction section types/);
+});
