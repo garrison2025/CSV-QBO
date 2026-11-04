@@ -30,3 +30,13 @@ test('keyword database and 27-route plan preserved',()=>{
  const plan=JSON.parse(readFileSync(path.join(root,'data/seo-plan-v3.json'),'utf8'));
  assert.equal(plan.pages.length,27);
 });
+
+test('Every workspace exposes local clearing and guards stale async imports',()=>{
+ assert.match(read('index.html'),/id="clear-file"/);
+ assert.match(read('tools/qbo-to-csv/index.html'),/id="clear-file"/);
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/selectionEpoch\+\+/);
+ assert.match(app,/batchEpoch\+\+/);
+ assert.match(app,/if\(epoch!==selectionEpoch\)return/);
+ assert.match(app,/if\(epoch!==batchEpoch\)return/);
+});
