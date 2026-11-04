@@ -39,3 +39,9 @@
 - Manifest includes sensitive aggregates, counts, formats and warnings, but not source filenames or transaction descriptions. Stays local.
 - QuickBooks import: NOT RUN. Real Web Connect `.qbo` writing: NOT IMPLEMENTED.
 - Browser smoke and Cloudflare deployment: NOT VERIFIED until validated separately.
+
+### V0.5 post-commit verification (2026-11-04)
+- GitHub CI: **PASS** on commit `368bf7e9f95ca1e20839b834a454cd78fafc88ad`, workflow run https://github.com/garrison2025/CSV-QBO/actions/runs/41790194923 (262 deterministic tests; build successful).
+- Local headless Chromium **PASS (isolated in-memory HTML/module integration, not live-site navigation)**: 2 QIF files selected through the real input, separate ZIP generated with `converted-001.csv`, `converted-002.csv` and `batch-validation.json`; no page JavaScript errors; 390px viewport had no horizontal overflow.
+- Cloudflare page sampled after code commit: fetched HTML still lacked the batch section, so the V0.5 hosted deploy is **NOT VERIFIED**. Do not claim Cloudflare production or Preview passed V0.5 until the served HTML changes.
+- Actual QuickBooks Online/Desktop import UAT: **NOT RUN**. No `.qbo` writer is available.
