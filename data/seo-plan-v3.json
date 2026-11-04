@@ -1,0 +1,1341 @@
+{
+  "schemaVersion": "3.0",
+  "updatedAt": "2026-11-04",
+  "market": "US",
+  "metricSource": "User-provided Semrush competitor organic ranking exports, two domains, 300 raw records",
+  "kdLimit": 29,
+  "deploymentStatus": "not-built",
+  "notes": [
+    "Page route is proposed, not deployed or verified.",
+    "Do not index a page until real converter and tests pass.",
+    "Volume is third-party monthly search estimate, not traffic."
+  ],
+  "policy": {
+    "kdLimitInclusive": 29,
+    "defaultPageIndexable": false,
+    "unsupportedOrPlannedRoutes": "do not deploy or index",
+    "qboClaimsRequireRealUAT": true,
+    "qifAndIifClaimsRequireTargetValidation": true,
+    "financialFilesStoredServerSide": false,
+    "keywordVolumeIsNotVisits": true
+  },
+  "pages": [
+    {
+      "route": "/tools/csv-to-qbo/",
+      "developmentStage": "P0",
+      "status": "QBO兼容验收后公开",
+      "feature": "CSV/XLSX表头映射、日期/金额校验，生成已验证兼容的QBO；未通过先提供QBO兼容CSV。",
+      "qaGate": "目标版本 + 银行机构/账户配置下的真实导入成功",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 10,
+      "primaryKeyword": "csv to qbo converter",
+      "keywords": [
+        {
+          "keyword": "csv to qbo",
+          "volume": 2400,
+          "kd": 21,
+          "cpc_usd": 9.63,
+          "source": "AccountingConverter / DocuClipper",
+          "best_traffic": 316,
+          "best_url": "https://www.docuclipper.com/solutions/convert-csv-to-qbo/",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qbo converter",
+          "volume": 1300,
+          "kd": 5,
+          "cpc_usd": 10.23,
+          "source": "AccountingConverter / DocuClipper",
+          "best_traffic": 171,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qbo converter free",
+          "volume": 590,
+          "kd": 1,
+          "cpc_usd": 7.75,
+          "source": "AccountingConverter / DocuClipper",
+          "best_traffic": 48,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qbo free",
+          "volume": 480,
+          "kd": 2,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter / DocuClipper",
+          "best_traffic": 63,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qbo converter free online",
+          "volume": 320,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 42,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qbo converter online",
+          "volume": 170,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter / DocuClipper",
+          "best_traffic": 22,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "convert csv to qbo",
+          "volume": 70,
+          "kd": 5,
+          "cpc_usd": 14.37,
+          "source": "AccountingConverter",
+          "best_traffic": 5,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv-to-qbo",
+          "volume": 40,
+          "kd": 17,
+          "cpc_usd": 9.63,
+          "source": "AccountingConverter",
+          "best_traffic": 3,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "cvs to qbo",
+          "volume": 30,
+          "kd": 18,
+          "cpc_usd": 12.05,
+          "source": "AccountingConverter",
+          "best_traffic": 3,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [
+        {
+          "keyword": "import csv to qbo",
+          "volume": 1000,
+          "kd": 30
+        }
+      ],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "actual_quickbooks_import_with_fiid_account_version_matrix",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qbo-to-csv/",
+      "developmentStage": "P1",
+      "status": "可优先开发",
+      "feature": "解析结构化QBO/OFX银行交易，输出CSV；可查看交易行与字段。",
+      "qaGate": "至少3类合法样本解析与金额核对通过",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 3,
+      "primaryKeyword": "qbo to csv converter",
+      "keywords": [
+        {
+          "keyword": "qbo to csv converter",
+          "volume": 590,
+          "kd": 2,
+          "cpc_usd": 5.05,
+          "source": "DocuClipper",
+          "best_traffic": 12,
+          "best_url": "https://www.docuclipper.com/blog/how-to-convert-csv-to-qbo/",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qbo to csv converter free",
+          "volume": 390,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter / DocuClipper",
+          "best_traffic": 17,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qbo to csv converter online",
+          "volume": 260,
+          "kd": 2,
+          "cpc_usd": 0.0,
+          "source": "DocuClipper",
+          "best_traffic": 6,
+          "best_url": "https://www.docuclipper.com/solutions/convert-csv-to-qbo/",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qbo-to-excel/",
+      "developmentStage": "P1",
+      "status": "可优先开发",
+      "feature": "解析QBO并导出XLSX；正确处理金额、日期与公式安全。",
+      "qaGate": "真实QBO样本验证、XLSX导出无公式注入",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 1,
+      "primaryKeyword": "qbo to excel converter",
+      "keywords": [
+        {
+          "keyword": "qbo to excel converter",
+          "volume": 1000,
+          "kd": 2,
+          "cpc_usd": 8.63,
+          "source": "AccountingConverter",
+          "best_traffic": 24,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/ofx-to-qbo/",
+      "developmentStage": "P1",
+      "status": "QBO兼容验收后公开",
+      "feature": "OFX文件解析，转换为验证通过的QBO规范变体，不伪造银行标识。",
+      "qaGate": "对指定QBO目标的FI/账户兼容性真实导入",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 4,
+      "primaryKeyword": "ofx to qbo",
+      "keywords": [
+        {
+          "keyword": "ofx to qbo",
+          "volume": 590,
+          "kd": 13,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 66,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "ofx to qbo converter",
+          "volume": 480,
+          "kd": 3,
+          "cpc_usd": 14.2,
+          "source": "AccountingConverter",
+          "best_traffic": 11,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "ofx to qbo converter free",
+          "volume": 390,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 31,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "convert ofx file to qbo",
+          "volume": 260,
+          "kd": 2,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 9,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-qbo",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "actual_quickbooks_import_with_fiid_account_version_matrix",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qfx-to-qbo/",
+      "developmentStage": "P1",
+      "status": "QBO兼容验收后公开",
+      "feature": "QFX→QBO格式适配，明示金融机构授权/兼容风险。",
+      "qaGate": "受支持QFX样本及合法QBO导入测试",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 2,
+      "primaryKeyword": "qfx to qbo converter",
+      "keywords": [
+        {
+          "keyword": "qfx to qbo converter",
+          "volume": 720,
+          "kd": 7,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 1,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-qbo",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qfx to qbo converter free",
+          "volume": 390,
+          "kd": 1,
+          "cpc_usd": 10.08,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-qbo",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "actual_quickbooks_import_with_fiid_account_version_matrix",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/csv-to-iif/",
+      "developmentStage": "P1",
+      "status": "IIF兼容验收后公开",
+      "feature": "按IIF事务类型与科目映射生成Desktop导入文件，支持备份提醒。",
+      "qaGate": "QuickBooks Desktop真实IIF导入，事务类型受限清单",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 5,
+      "primaryKeyword": "csv to iif",
+      "keywords": [
+        {
+          "keyword": "csv to iif",
+          "volume": 720,
+          "kd": 20,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 43,
+          "best_url": "https://accountingconverter.com/tools/csv-to-iif",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to iif converter",
+          "volume": 480,
+          "kd": 3,
+          "cpc_usd": 13.54,
+          "source": "AccountingConverter",
+          "best_traffic": 11,
+          "best_url": "https://accountingconverter.com/tools/csv-to-iif",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to iif converter for quickbooks",
+          "volume": 480,
+          "kd": 5,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 1,
+          "best_url": "https://accountingconverter.com/tools/csv-to-iif",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to iif converter free",
+          "volume": 90,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 5,
+          "best_url": "https://accountingconverter.com/tools/csv-to-iif",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to iif converter online",
+          "volume": 40,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools/csv-to-iif",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "desktop_import_backup_and_rollback_test",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/iif-to-csv/",
+      "developmentStage": "P1",
+      "status": "可优先开发",
+      "feature": "解析IIF记录类型并分类输出CSV，标记无法表达的字段。",
+      "qaGate": "多类型IIF解析，原始字段保全",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 3,
+      "primaryKeyword": "iif to csv converter",
+      "keywords": [
+        {
+          "keyword": "iif to csv converter",
+          "volume": 480,
+          "kd": 17,
+          "cpc_usd": 8.06,
+          "source": "AccountingConverter",
+          "best_traffic": 63,
+          "best_url": "https://accountingconverter.com/tools/iif-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "iif to csv",
+          "volume": 320,
+          "kd": 9,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 26,
+          "best_url": "https://accountingconverter.com/tools/iif-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "iif to csv converter free",
+          "volume": 170,
+          "kd": 11,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 13,
+          "best_url": "https://accountingconverter.com/tools/iif-to-csv",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/iif-to-excel/",
+      "developmentStage": "P1",
+      "status": "可优先开发",
+      "feature": "IIF → Excel 结构化数据表，分工作表表达事务类别。",
+      "qaGate": "验证事务结构与字段映射",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 2,
+      "primaryKeyword": "iif to excel converter",
+      "keywords": [
+        {
+          "keyword": "iif to excel converter",
+          "volume": 390,
+          "kd": 3,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 25,
+          "best_url": "https://accountingconverter.com/tools/iif-to-excel",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "iif to excel",
+          "volume": 320,
+          "kd": 11,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools/iif-to-excel",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/csv-to-qif/",
+      "developmentStage": "P1",
+      "status": "可优先开发",
+      "feature": "CSV→QIF交易文件，兼容标准子集，允许账户/日期选择。",
+      "qaGate": "QIF导入样本校验",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 5,
+      "primaryKeyword": "csv to qif converter free",
+      "keywords": [
+        {
+          "keyword": "csv to qif converter free",
+          "volume": 390,
+          "kd": 3,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 31,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qif converter free download",
+          "volume": 390,
+          "kd": 15,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 13,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qif converter",
+          "volume": 320,
+          "kd": 3,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 14,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qif",
+          "volume": 140,
+          "kd": 6,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 9,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qif free",
+          "volume": 40,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 5,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "real_target_format_validation_and_suite",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qif-to-csv/",
+      "developmentStage": "P1",
+      "status": "可优先开发",
+      "feature": "解析QIF并生成CSV；处理编码、分类和多账户信息。",
+      "qaGate": "解析完整性验证",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 6,
+      "primaryKeyword": "qif to csv",
+      "keywords": [
+        {
+          "keyword": "qif to csv",
+          "volume": 320,
+          "kd": 20,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 20,
+          "best_url": "https://accountingconverter.com/tools/qif-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to csv converter online",
+          "volume": 260,
+          "kd": 16,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 21,
+          "best_url": "https://accountingconverter.com/tools/qif-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to csv converter",
+          "volume": 260,
+          "kd": 19,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 16,
+          "best_url": "https://accountingconverter.com/tools/qif-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to csv converter free",
+          "volume": 170,
+          "kd": 5,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 11,
+          "best_url": "https://accountingconverter.com/tools/qif-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to csv free",
+          "volume": 70,
+          "kd": 2,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 5,
+          "best_url": "https://accountingconverter.com/tools/qif-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to csv converter freeware",
+          "volume": 50,
+          "kd": 3,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 4,
+          "best_url": "https://accountingconverter.com/tools/qif-to-csv",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qif-to-excel/",
+      "developmentStage": "P1",
+      "status": "可优先开发",
+      "feature": "QIF→XLSX保留分类、描述、日期与金额。",
+      "qaGate": "CSV/XLSX正确性与公式安全测试",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 4,
+      "primaryKeyword": "qif to excel",
+      "keywords": [
+        {
+          "keyword": "qif to excel converter online",
+          "volume": 480,
+          "kd": 7,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 21,
+          "best_url": "https://accountingconverter.com/tools/qif-to-excel",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to excel",
+          "volume": 480,
+          "kd": 3,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 16,
+          "best_url": "https://accountingconverter.com/tools/qif-to-excel",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "convert qif file to excel",
+          "volume": 260,
+          "kd": 4,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 4,
+          "best_url": "https://accountingconverter.com/tools/qif-to-excel",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to excel converter",
+          "volume": 140,
+          "kd": 6,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 3,
+          "best_url": "https://accountingconverter.com/tools/qif-to-excel",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qfx-to-excel/",
+      "developmentStage": "P2",
+      "status": "解析通过后开发",
+      "feature": "QFX结构化交易转Excel。",
+      "qaGate": "QFX样本合法性/格式兼容测试",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 2,
+      "primaryKeyword": "qfx to excel converter online",
+      "keywords": [
+        {
+          "keyword": "qfx to excel converter online",
+          "volume": 590,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 17,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "convert qfx to excel free",
+          "volume": 50,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 1,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/ofx-to-excel/",
+      "developmentStage": "P2",
+      "status": "解析通过后开发",
+      "feature": "OFX转可下载XLSX，显示账户来源。",
+      "qaGate": "OFX 1.x/2.x样本解析",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 2,
+      "primaryKeyword": "ofx to excel converter free",
+      "keywords": [
+        {
+          "keyword": "ofx to excel converter free",
+          "volume": 140,
+          "kd": 3,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 3,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-excel",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "ofx file to excel",
+          "volume": 90,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 1,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-excel",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/ofx-to-csv/",
+      "developmentStage": "P2",
+      "status": "解析通过后开发",
+      "feature": "OFX转CSV结构化数据。",
+      "qaGate": "OFX样本完整性测试",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 2,
+      "primaryKeyword": "ofx to csv converter",
+      "keywords": [
+        {
+          "keyword": "ofx to csv converter",
+          "volume": 50,
+          "kd": 0,
+          "cpc_usd": 15.27,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-csv",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "ofx to csv",
+          "volume": 50,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 1,
+          "best_url": "https://accountingconverter.com/tools/ofx-to-csv",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "parser_fixture_and_reconciliation",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/csv-to-ofx/",
+      "developmentStage": "P2",
+      "status": "先验证后公开",
+      "feature": "CSV格式化并输出OFX，支持明确的规范子集。",
+      "qaGate": "OFX导入器实测",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 3,
+      "primaryKeyword": "csv to ofx",
+      "keywords": [
+        {
+          "keyword": "csv to ofx",
+          "volume": 110,
+          "kd": 16,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools/csv-to-ofx",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to ofx converter",
+          "volume": 50,
+          "kd": 11,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to ofx converter online",
+          "volume": 40,
+          "kd": 0,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 3,
+          "best_url": "https://accountingconverter.com/tools/csv-to-ofx",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "real_target_format_validation_and_suite",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/csv-to-qfx/",
+      "developmentStage": "P2",
+      "status": "先验证后公开",
+      "feature": "CSV转QFX，需要限定机构/应用兼容能力。",
+      "qaGate": "QFX账户与FI适配真实测试",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 2,
+      "primaryKeyword": "csv to qfx",
+      "keywords": [
+        {
+          "keyword": "csv to qfx",
+          "volume": 90,
+          "kd": 5,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 1,
+          "best_url": "https://accountingconverter.com/tools/csv-to-qfx",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "csv to qfx converter",
+          "volume": 50,
+          "kd": 1,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 1,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "real_target_format_validation_and_suite",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/excel-to-ofx/",
+      "developmentStage": "P2",
+      "status": "先验证后公开",
+      "feature": "Excel→OFX数据清洗、金额日期校验。",
+      "qaGate": "目标OFX导入测试",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 1,
+      "primaryKeyword": "convert excel file to ofx",
+      "keywords": [
+        {
+          "keyword": "convert excel file to ofx",
+          "volume": 50,
+          "kd": 3,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 6,
+          "best_url": "https://accountingconverter.com/tools/excel-to-ofx",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "real_target_format_validation_and_suite",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qif-to-qbo/",
+      "developmentStage": "P2",
+      "status": "QBO兼容验收后公开",
+      "feature": "QIF→QBO；银行机构兼容是关键限制。",
+      "qaGate": "QuickBooks实际导入成功",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 2,
+      "primaryKeyword": "qif to qbo converter free",
+      "keywords": [
+        {
+          "keyword": "qif to qbo converter free",
+          "volume": 390,
+          "kd": 2,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 7,
+          "best_url": "https://accountingconverter.com/tools/qif-to-qbo",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [
+        {
+          "keyword": "qif to qbo converter",
+          "volume": 480,
+          "kd": 33
+        }
+      ],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "actual_quickbooks_import_with_fiid_account_version_matrix",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qbo-to-iif/",
+      "developmentStage": "P2",
+      "status": "必须桌面事务映射验证",
+      "feature": "QBO银行流水到IIF事务转换，必须明确银行流水与Desktop凭证结构差异。",
+      "qaGate": "IIF事务类型和Desktop导入实际验证",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 1,
+      "primaryKeyword": "qbo to iif converter",
+      "keywords": [
+        {
+          "keyword": "qbo to iif converter",
+          "volume": 720,
+          "kd": 21,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "desktop_import_backup_and_rollback_test",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qbo-to-pdf/",
+      "developmentStage": "P2",
+      "status": "制作真实报表后上线",
+      "feature": "QBO交易数据生成可读PDF报表，不将PDF误称为可逆银行原始账单。",
+      "qaGate": "QBO解析+PDF行数与金额核对；单独SERP意图核查",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 3,
+      "primaryKeyword": "qbo to pdf",
+      "keywords": [
+        {
+          "keyword": "qbo to pdf",
+          "volume": 1300,
+          "kd": 15,
+          "cpc_usd": 6.22,
+          "source": "DocuClipper",
+          "best_traffic": 31,
+          "best_url": "https://www.docuclipper.com/solutions/pdf-to-qbo-converter/",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qbo to pdf converter free",
+          "volume": 720,
+          "kd": 18,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter / DocuClipper",
+          "best_traffic": 46,
+          "best_url": "https://www.docuclipper.com/solutions/pdf-to-qbo-converter/",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qbo to pdf converter",
+          "volume": 480,
+          "kd": 18,
+          "cpc_usd": 0.0,
+          "source": "DocuClipper",
+          "best_traffic": 31,
+          "best_url": "https://www.docuclipper.com/solutions/pdf-to-qbo-converter/",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "transaction_count_amounts_and_nonbank_report_disclaimer",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qif-to-pdf/",
+      "developmentStage": "P2",
+      "status": "制作真实报表后上线",
+      "feature": "QIF交易记录生成可读PDF报表。",
+      "qaGate": "完整渲染及数据校验",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 4,
+      "primaryKeyword": "qif to pdf",
+      "keywords": [
+        {
+          "keyword": "qif to pdf",
+          "volume": 390,
+          "kd": 7,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 25,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to pdf converter free",
+          "volume": 390,
+          "kd": 12,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 25,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif format to pdf",
+          "volume": 110,
+          "kd": 12,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 3,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qif to pdf converter",
+          "volume": 90,
+          "kd": 11,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 3,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "transaction_count_amounts_and_nonbank_report_disclaimer",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qfx-to-pdf/",
+      "developmentStage": "P2",
+      "status": "制作真实报表后上线",
+      "feature": "QFX交易记录生成可读PDF报表。",
+      "qaGate": "完整渲染及数据校验",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 6,
+      "primaryKeyword": "qfx to pdf",
+      "keywords": [
+        {
+          "keyword": "qfx to pdf",
+          "volume": 590,
+          "kd": 4,
+          "cpc_usd": 1.34,
+          "source": "AccountingConverter",
+          "best_traffic": 11,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qfx to pdf converter",
+          "volume": 320,
+          "kd": 0,
+          "cpc_usd": 1.72,
+          "source": "AccountingConverter",
+          "best_traffic": 6,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qfx to pdf converter online free",
+          "volume": 170,
+          "kd": 4,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 5,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qfx to pdf converter free",
+          "volume": 140,
+          "kd": 4,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 4,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qfx file to pdf",
+          "volume": 140,
+          "kd": 3,
+          "cpc_usd": 1.37,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        },
+        {
+          "keyword": "qfx to pdf free",
+          "volume": 90,
+          "kd": 4,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "transaction_count_amounts_and_nonbank_report_disclaimer",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/ofx-to-pdf/",
+      "developmentStage": "P2",
+      "status": "制作真实报表后上线",
+      "feature": "OFX交易记录生成可读PDF报表。",
+      "qaGate": "真实OFX到PDF数据一致性",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 1,
+      "primaryKeyword": "ofx to pdf converter online free",
+      "keywords": [
+        {
+          "keyword": "ofx to pdf converter online free",
+          "volume": 70,
+          "kd": 6,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 2,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "transaction_count_amounts_and_nonbank_report_disclaimer",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/qfx-to-qif/",
+      "developmentStage": "P2",
+      "status": "样本验证后上线",
+      "feature": "QFX→QIF转换，保留分类和字段。",
+      "qaGate": "QFX和QIF导入数据一致性",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 1,
+      "primaryKeyword": "qfx to qif converter free",
+      "keywords": [
+        {
+          "keyword": "qfx to qif converter free",
+          "volume": 210,
+          "kd": 4,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 4,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "real_target_format_validation_and_suite",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/iif-to-qif/",
+      "developmentStage": "P2",
+      "status": "语义确认后上线",
+      "feature": "IIF事务数据至QIF银行记录存在语义缺口。",
+      "qaGate": "明确定义只支持的记录类型",
+      "seoEvidenceAvailable": true,
+      "allCompetitorKeywordCount": 1,
+      "primaryKeyword": "iif to qif converter",
+      "keywords": [
+        {
+          "keyword": "iif to qif converter",
+          "volume": 170,
+          "kd": 5,
+          "cpc_usd": 0.0,
+          "source": "AccountingConverter",
+          "best_traffic": 5,
+          "best_url": "https://accountingconverter.com/tools",
+          "status": "匹配-待功能验证"
+        }
+      ],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "real_target_format_validation_and_suite",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/quickbooks-csv-formatter/",
+      "developmentStage": "功能页/SEO待验证",
+      "status": "可开发，但无本次精确词量",
+      "feature": "修复QuickBooks Online 3/4列CSV并按行数/字节拆分。",
+      "qaGate": "官方US指南实测；关键词Volume/KD待查",
+      "seoEvidenceAvailable": false,
+      "allCompetitorKeywordCount": 0,
+      "primaryKeyword": "暂无本次证据",
+      "keywords": [],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "quickbooks_online_3_or_4_columns_real_import",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    },
+    {
+      "route": "/tools/bank-transaction-duplicate-checker/",
+      "developmentStage": "功能页/SEO待验证",
+      "status": "可开发，但无本次精确词量",
+      "feature": "安全标记重复交易，人工确认不自动删除。",
+      "qaGate": "稳定键与误报测试；关键词Volume/KD待查",
+      "seoEvidenceAvailable": false,
+      "allCompetitorKeywordCount": 0,
+      "primaryKeyword": "暂无本次证据",
+      "keywords": [],
+      "nonTargetHighKD": [],
+      "deploymentState": "not-built",
+      "isIndexable": false,
+      "includeInSitemap": false,
+      "compatibilityClaim": "unverified",
+      "releaseGate": "real_target_format_validation_and_suite",
+      "verifiedFeatureReady": false,
+      "qaEvidenceRefs": [],
+      "metaDataStatus": "proposed; not deployed"
+    }
+  ]
+}

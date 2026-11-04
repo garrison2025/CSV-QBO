@@ -1,0 +1,20 @@
+name: Validate finance file site
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run financial parsing and SEO safety gates
+        run: npm run check
+      - name: Ensure preview build remains noindex
+        run: |
+          grep -q 'noindex,nofollow' dist/index.html
+          grep -q 'Disallow: /' dist/robots.txt
+          test ! -f dist/sitemap.xml
