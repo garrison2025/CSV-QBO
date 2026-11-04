@@ -31,7 +31,11 @@ if(drop && fileInput){
     $('#summary-credit').textContent=t.credit;
     $('#preview-caption').textContent=data.transactions.length>8?'First 8 of '+data.transactions.length+' transactions are shown.':'All '+data.transactions.length+' transactions are shown.';
     $('#warning-list').replaceChildren();for(const note of [...data.warnings,...audit.warnings]){const li=document.createElement('li');li.textContent=note;$('#warning-list').append(li);}
-    $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);setButton(true);say(audit.warnings.length?'Ready with duplicate warnings. Inspect them before downloading.':'Ready. Review the transaction preview, then download.', audit.warnings.length?'info':'success');
+    $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);
+    setButton(true);
+    const hasWarnings=data.warnings.length+audit.warnings.length>0;
+    const integrityNote=data.integrity?.check==='iif_trns_split_balance'?` ${data.integrity.balancedGroups} IIF group(s) balanced; only TRNS summary rows are exported.`:'';
+    say((hasWarnings?'Ready with format and duplicate warnings. Review before download.':'Ready. Review the transaction preview, then download.')+integrityNote,hasWarnings?'info':'success');
   }
   async function prepare(chosen){
     const epoch=++selectionEpoch;
@@ -87,7 +91,8 @@ if(drop && fileInput){
       if(texts.some(item=>item.text.includes('\uFFFD')))throw Error('A batch file contains undecodable text. Export as UTF-8 before continuing.');
       batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
       batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
-      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s). No accounts merged.');
+      const iifGroups=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.balancedGroups||0),0);
+      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s).'+(iifGroups?' '+iifGroups+' balanced IIF group(s) checked.':'')+' No accounts merged.');
       if(batchHasWarnings){$('#batch-ack-label').hidden=false;batchExport.disabled=true;}
       else batchExport.disabled=false;
     }catch(err){if(epoch===batchEpoch){batchReset();batchSay(err.message||'Batch conversion failed; no files produced.',true);}}
@@ -143,7 +148,8 @@ if(drop && fileInput){
   });
   $('#download-report')?.addEventListener('click',()=>{
     if(!parsed||!audit)return;
-    const report={reportType:'Finance File Lab local validation summary',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
+    const dates=parsed.transactions.map(transaction=>transaction.date).sort();
+    const report={reportType:'Finance File Lab local validation summary v2',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,outputIsLedger:false,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json;charset=utf-8'});
     saveBlob(blob,'validation-summary.json');
     say('Validation summary downloaded (no account numbers or transaction descriptions).','success');

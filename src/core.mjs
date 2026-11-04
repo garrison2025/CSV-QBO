@@ -248,17 +248,84 @@ export function parseOFX(text) {
     ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[])
   ]};
 }
+/**
+ * Extract IIF TRNS summary rows only after checking each journal group.
+ * This is not a reconstructed ledger: SPL accounts and allocations are
+ * intentionally excluded from the output. All amounts use integer cents.
+ */
 export function parseIIF(text,dateFormat='us'){
-  const rows=String(text).replace(/^\uFEFF/,'').split(/\r?\n/).map(r=>r.split('\t'));
-  let header=null;const transactions=[];
-  for(const row of rows){const type=(row[0]||'').trim();if(type==='!TRNS'){header=row.slice(1).map(s=>s.toUpperCase());continue;}
-    if(type!=='TRNS'||!header)continue;
-    const data=Object.fromEntries(header.map((h,i)=>[h,row[i+1]||'']));
-    try{transactions.push({date:isoDate(data.DATE,dateFormat),amount:fromMinorUnits(toMinorUnits(data.AMOUNT||data.AMT)),description:data.MEMO||data.NAME||data.ACCNT||'Transaction',id:data.DOCNUM||'',memo:data.MEMO||''});}
-    catch(e){fail('IIF TRNS '+(transactions.length+1)+': '+e.message);}
+  const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
+  let trnsHeader=null,splHeader=null,active=null,balancedGroups=0,splitRows=0,ignoredRows=0;
+  const transactions=[];
+  const parseHeader=(row,required,atLine)=>{
+    const names=row.slice(1).map(name=>name.trim().toUpperCase());
+    if(new Set(names).size!==names.length)fail('IIF line '+atLine+': duplicate column names.');
+    for(const key of required){
+      if(key==='AMOUNT'){if(!names.includes('AMOUNT')&&!names.includes('AMT'))fail('IIF line '+atLine+': missing AMOUNT/AMT column.');}
+      else if(!names.includes(key))fail('IIF line '+atLine+': missing '+key+' column.');
+    }
+    return names;
+  };
+  const fields=(row,header)=>{
+    const values={};
+    for(let i=0;i<header.length;i++)values[header[i]]=String(row[i+1]??'');
+    return values;
+  };
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+    if(!line.trim())continue;
+    const row=line.split('\t'),tag=String(row[0]??'').trim().toUpperCase(),number=i+1;
+    if(tag==='!TRNS'||tag==='!SPL'){
+      if(active)fail('IIF line '+number+': a header occurred before ENDTRNS.');
+      if(tag==='!TRNS')trnsHeader=parseHeader(row,['DATE','AMOUNT'],number);
+      else splHeader=parseHeader(row,['AMOUNT'],number);
+      continue;
+    }
+    if(tag==='!ENDTRNS')continue;
+    if(tag==='TRNS'){
+      if(!trnsHeader)fail('IIF line '+number+': TRNS is missing a !TRNS header.');
+      if(active)fail('IIF line '+number+': previous TRNS is missing ENDTRNS.');
+      const record=fields(row,trnsHeader);
+      try{
+        const date=isoDate(record.DATE,dateFormat);
+        const value=toMinorUnits(record.AMOUNT||record.AMT);
+        const description=(record.MEMO||record.NAME||record.ACCNT||'').trim();
+        if(!description)fail('TRNS has no memo, name or account label.');
+        active={line:number,amount:value,splitSum:0n,splits:0,
+          transaction:{date,amount:fromMinorUnits(value),description,id:record.DOCNUM||'',memo:record.MEMO||''}};
+      }catch(e){fail('IIF TRNS line '+number+': '+e.message);}
+      continue;
+    }
+    if(tag==='SPL'){
+      if(!active)fail('IIF line '+number+': orphan SPL without a TRNS.');
+      if(!splHeader)fail('IIF line '+number+': SPL is missing a !SPL header.');
+      const record=fields(row,splHeader);
+      try{active.splitSum+=toMinorUnits(record.AMOUNT||record.AMT);}
+      catch(e){fail('IIF SPL line '+number+': '+e.message);}
+      active.splits++;splitRows++;
+      continue;
+    }
+    if(tag==='ENDTRNS'){
+      if(!active)fail('IIF line '+number+': ENDTRNS without TRNS.');
+      if(!active.splits)fail('IIF TRNS line '+active.line+': no SPL entries before ENDTRNS.');
+      if(active.amount+active.splitSum!==0n)fail('IIF TRNS line '+active.line+': TRNS and SPL amounts do not balance to zero.');
+      transactions.push(active.transaction);
+      balancedGroups++;active=null;
+      continue;
+    }
+    if(active)fail('IIF line '+number+': unexpected row type inside TRNS/SPL group.');
+    ignoredRows++;
   }
-  if(!transactions.length)fail('No supported IIF TRNS rows found.');
-  return {transactions,source:'IIF',warnings:['TRNS summary rows only. SPL entries, account allocations and double-entry relationships are not preserved. Do not use for accounting migration.']};
+  if(active)fail('IIF TRNS line '+active.line+': missing ENDTRNS at end of file.');
+  if(!transactions.length)fail('No complete, balanced IIF TRNS groups found.');
+  const warnings=[
+    'Checked '+balancedGroups+' IIF TRNS group(s) and '+splitRows+' SPL row(s) for zero-sum consistency. The CSV/Excel output contains TRNS summaries ONLY, not SPL allocations or a reconstructed accounting ledger.',
+    'TRNS amounts are account-side accounting entries, not necessarily bank transactions. Do not import this summary as a bank statement or an accounting migration.'
+  ];
+  if(ignoredRows)warnings.push(ignoredRows+' non-transaction IIF row(s) were ignored; only checked TRNS groups are exported.');
+  return {transactions,source:'IIF',
+    integrity:{check:'iif_trns_split_balance',status:'passed',balancedGroups,splitRows,ignoredRows},
+    warnings};
 }
 export function parseInput(text,format,opts={}) {
   if(String(text).length>MAX_FILE_BYTES)fail('File exceeds the 8 MB browser processing limit.');

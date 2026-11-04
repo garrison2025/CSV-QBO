@@ -69,3 +69,11 @@
 - Keep V0.6.1 safeguards: CSV null-byte and XLSX control-character rejection, asynchronous stale-read protection, and complete batch/single-file memory reset.
 - Synthetic regressions were added; determine final test count/CI and deployment verification after the PR has passed.
 - QuickBooks/Quicken software import, bank fixture compatibility and commercial payment acceptance are NOT RUN.
+
+## V0.8 — IIF group integrity and source-coverage reports (2026-11-04)
+
+- Parse-only IIF protection: require valid TRNS, SPL, and ENDTRNS sequence; zero-sum check in USD integer cents per group, not just totals across the whole file.
+- Strict failure for missing headers, orphan legs, no SPL, unbalanced split sums or truncated records. Invalid IIF blocks all exports.
+- Synthetic two-group IIF example is now balanced. SPL allocations are never reconstructed in CSV/XLSX; TRNS summary must not be treated as a bank statement.
+- Batch JSON v2 and single validation summary v2 include IIF parser evidence and file date coverage, while excluding source filenames/account numbers/descriptions.
+- Status pending CI and live deployment check; real QuickBooks target UAT remains NOT RUN. Preview still noindex.

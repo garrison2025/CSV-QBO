@@ -44,9 +44,16 @@ test('OFX SGML and XML-style bank transactions',()=>{
  assert.equal(parseOFX(xml).transactions[0].amount,'100.20');
  assert.throws(()=>parseOFX('<!DOCTYPE a><OFX/>'));
 });
-test('IIF only TRNS summary, split warning',()=>{
- const r=parseIIF('!TRNS\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM\nTRNS\tCHECK\t11/04/2026\tCash\t-50.00\tRent\t100\nSPL\tCHECK\t11/04/2026\tExpense\t50.00\nENDTRNS\n');
- assert.equal(r.transactions.length,1);assert.equal(r.transactions[0].description,'Rent');assert.match(r.warnings[0],/SPL/);
+test('IIF only exports a checked, balanced TRNS summary',()=>{
+ const text='!TRNS\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM\n'+
+   '!SPL\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM\n'+
+   'TRNS\tCHECK\t11/04/2026\tCash\t-50.00\tRent\t100\n'+
+   'SPL\tCHECK\t11/04/2026\tRent expense\t50.00\tRent\t100\nENDTRNS\n';
+ const r=parseIIF(text);
+ assert.equal(r.transactions.length,1);
+ assert.equal(r.transactions[0].amount,'-50.00');
+ assert.deepEqual(r.integrity,{check:'iif_trns_split_balance',status:'passed',balancedGroups:1,splitRows:1,ignoredRows:0});
+ assert.match(r.warnings.join(' '),/not SPL allocations/);
 });
 test('real XLSX ZIP output and QuickBooks formatter CSV output',()=>{
  const records=[{date:'2026-11-04',description:'Refund',amount:'12.30',id:'X'}];
@@ -249,4 +256,48 @@ test('QIF read-only export records loss of category allocations',()=>{
  assert.match(parseQIF(bank).warnings.join(' '),/category\/split/);
  const card='!Type:CCard\nD11/04/2026\nT-5\nPCard\n^\n';
  assert.equal(parseQIF(card).transactions[0].amount,'-5.00');
+});
+
+
+test('IIF rejects incomplete TRNS groups and orphan SPL or ENDTRNS lines',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n';
+ const trns='TRNS\t11/04/2026\t-19.95\tPayment\n';
+ const spl='SPL\t11/04/2026\t19.95\tExpense\n';
+ assert.throws(()=>parseIIF(h+trns+spl),/missing ENDTRNS/);
+ assert.throws(()=>parseIIF(h+trns+'ENDTRNS\n'),/no SPL entries/);
+ assert.throws(()=>parseIIF(h+spl),/orphan SPL/);
+ assert.throws(()=>parseIIF(h+'ENDTRNS\n'),/ENDTRNS without TRNS/);
+ assert.throws(()=>parseIIF(h+trns+trns+spl+'ENDTRNS\n'),/previous TRNS is missing ENDTRNS/);
+});
+test('IIF rejects unbalanced TRNS/SPL groups and keeps output all-or-nothing',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n';
+ const good='TRNS\t11/04/2026\t-5.00\tGood\nSPL\t11/04/2026\t5.00\tGood\nENDTRNS\n';
+ const bad='TRNS\t11/05/2026\t-9.00\tBad\nSPL\t11/05/2026\t8.99\tBad\nENDTRNS\n';
+ assert.throws(()=>parseIIF(h+good+bad),/do not balance to zero/);
+});
+test('IIF balance checks sum multiple SPL legs using exact cents',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n';
+ const x=h+'TRNS\t11/04/2026\t-12.37\tSupplier\n'+
+  'SPL\t11/04/2026\t10.11\tExpense\nSPL\t11/04/2026\t2.26\tTax\nENDTRNS\n';
+ const p=parseIIF(x);
+ assert.equal(p.transactions.length,1);
+ assert.equal(p.integrity.balancedGroups,1);
+ assert.equal(p.integrity.splitRows,2);
+ assert.equal(p.transactions[0].amount,'-12.37');
+});
+test('IIF validates headers, amounts, dates and account data without returning partial rows',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n';
+ assert.throws(()=>parseIIF('TRNS\t11/04/2026\t-4.00\tTest'),/missing a !TRNS header/);
+ assert.throws(()=>parseIIF('!TRNS\tDATE\tMEMO\n'),/missing AMOUNT\/AMT column/);
+ assert.throws(()=>parseIIF('!TRNS\tDATE\tAMOUNT\tDATE\n'),/duplicate column names/);
+ assert.throws(()=>parseIIF(h+'TRNS\t11/04/2026\tbad\tTest\n'),/Invalid amount/);
+ assert.throws(()=>parseIIF(h+'TRNS\t2026-02-30\t-4.00\tTest\n'),/Invalid calendar date/);
+ assert.throws(()=>parseIIF(h+'TRNS\t11/04/2026\t-4.00\tTest\nSPL\t11/04/2026\twrong\tExpense\n'),/Invalid amount/);
+});
+test('IIF warns that unrelated list rows are not included in accounting exports',()=>{
+ const h='!ACCNT\tNAME\tTYPE\nACCNT\tSynthetic account\tBANK\n'+
+  '!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tDATE\tAMOUNT\tMEMO\n';
+ const p=parseIIF(h+'TRNS\t11/04/2026\t-12.50\tTesting\nSPL\t11/04/2026\t12.50\tTesting\nENDTRNS\n');
+ assert.equal(p.integrity.ignoredRows,2);
+ assert.match(p.warnings.join(' '),/non-transaction IIF row/);
 });
