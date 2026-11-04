@@ -30,6 +30,17 @@ if(drop && fileInput){
     $('#preview-panel').hidden=false;$('#summary-count').textContent=t.count.toLocaleString('en-US');$('#summary-net').textContent=t.net;$('#summary-debit').textContent=t.debit;
     $('#summary-credit').textContent=t.credit;
     $('#preview-caption').textContent=data.transactions.length>8?'First 8 of '+data.transactions.length+' transactions are shown.':'All '+data.transactions.length+' transactions are shown.';
+
+    const statement=$('#statement-coverage'),window=data.integrity?.statementRange;
+    if(statement) {
+      const start=window?.startInclusive||'not supplied';
+      const end=window?.endExclusive||'not supplied';
+      const hasWindow=window&&(window.startInclusive||window.endExclusive);
+      const outside=(data.integrity?.postedBeforeRangeCount||0)+(data.integrity?.postedAfterRangeCount||0);
+      statement.hidden=!hasWindow;
+      if(hasWindow)statement.textContent='Bank retrieval period: '+start+' to '+end+' (end exclusive; OFX bank search window, not a guarantee of posted-date coverage). '+outside+' transaction(s) posted outside the displayed dates; no rows were removed.';
+      else statement.textContent='';
+    }
     $('#warning-list').replaceChildren();for(const note of [...data.warnings,...audit.warnings]){const li=document.createElement('li');li.textContent=note;$('#warning-list').append(li);}
     $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);
     const hasWarnings=data.warnings.length+audit.warnings.length>0;
@@ -102,7 +113,9 @@ if(drop && fileInput){
       batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
       batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
       const iifGroups=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.balancedGroups||0),0);
-      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s).'+(iifGroups?' '+iifGroups+' balanced IIF group(s) checked.':'')+' No accounts merged.');
+      const statementWindows=batchInfo.report.files.filter(item=>item.parserIntegrity?.statementRange).length;
+      const dateExceptions=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.postedBeforeRangeCount||0)+(item.parserIntegrity?.postedAfterRangeCount||0),0);
+      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s).'+(iifGroups?' '+iifGroups+' balanced IIF group(s) checked.':'')+(statementWindows?' '+statementWindows+' OFX retrieval window(s) noted; '+dateExceptions+' posted-date exceptions (no rows removed).':'')+' No accounts merged.');
       if(batchHasWarnings){$('#batch-ack-label').hidden=false;batchExport.disabled=true;}
       else batchExport.disabled=false;
     }catch(err){if(epoch===batchEpoch){batchReset();batchSay(err.message||'Batch conversion failed; no files produced.',true);}}
