@@ -209,11 +209,64 @@ export function parseQIF(text, dateFormat='us') {
   return {transactions,source:'QIF',warnings};
 }
 
-function decodeEntities(s){return s.replace(/&(amp|lt|gt|quot|apos);/g,(a,k)=>({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"}[k]));}
-function ofxField(block,key){ const m=block.match(new RegExp('<'+key+'\\b[^>]*>\\s*([^<\\r\\n]+)','i'));return m?decodeEntities(m[1].trim()):''; }
+/** Decode bank files locally. OFX 1.x frequently declares the Windows-1252 code page. */
+export function decodeFinancialBytes(input,format=''){
+  const bytes=input instanceof Uint8Array?input:new Uint8Array(input);
+  if(bytes.byteLength>MAX_FILE_BYTES)fail('File exceeds the 8 MB browser processing limit.');
+  let encoding='utf-8';
+  if(bytes[0]===0xff&&bytes[1]===0xfe)encoding='utf-16le';
+  else if(bytes[0]===0xfe&&bytes[1]===0xff)encoding='utf-16be';
+  else if(bytes[0]===0xef&&bytes[1]===0xbb&&bytes[2]===0xbf)encoding='utf-8';
+  else if(['ofx','qbo','qfx'].includes(String(format).toLowerCase())){
+    const header=new TextDecoder('windows-1252').decode(bytes.subarray(0,Math.min(bytes.length,4096))).split(/<OFX\b/i)[0];
+    if(/^\s*OFXHEADER\s*:/im.test(header)){
+      const charset=header.match(/^CHARSET\s*:\s*([^\r\n]+)/im)?.[1].trim().toUpperCase();
+      if(charset&&/^(1252|CP1252|WINDOWS-1252|ISO-8859-1|8859-1)$/.test(charset))encoding='windows-1252';
+      else if(charset&&/^(65001|UTF-8|UTF8|UNICODE|NONE)$/.test(charset))encoding='utf-8';
+      else if(charset)fail('Unsupported OFX character set: '+charset+'. Re-export in UTF-8 or Windows-1252.');
+    }
+  }
+  let text;
+  try{text=new TextDecoder(encoding,{fatal:true}).decode(bytes);}
+  catch{fail('Cannot decode '+encoding+' financial file safely. Export as UTF-8 before retrying.');}
+  if(text.includes('\uFFFD'))fail('File contains undecodable replacement characters. Re-export in a supported encoding.');
+  if(text.includes('\u0000'))fail('Unsupported null byte in financial file.');
+  return {text,encoding};
+}
+function decodeEntities(s){
+  return s.replace(/&(?:(amp|lt|gt|quot|apos)|#(x[0-9a-f]+|[0-9]+));/gi,(raw,named,numeric)=>{
+    if(named)return {amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"}[named.toLowerCase()];
+    const num=numeric[0].toLowerCase()==='x'?parseInt(numeric.slice(1),16):parseInt(numeric,10);
+    if(!Number.isSafeInteger(num)||num<1||num>0x10ffff||(num>=0xd800&&num<=0xdfff))fail('Invalid OFX character entity.');
+    return String.fromCodePoint(num);
+  });
+}
+function ofxField(block,key){
+  const matches=[...block.matchAll(new RegExp('<'+key+'\\b[^>]*>','gi'))];
+  if(matches.length>1)fail('Duplicate OFX '+key+' fields in one record.');
+  if(!matches.length)return '';
+  const match=matches[0],rest=block.slice(match.index+match[0].length);
+  const trimmed=rest.trimStart();
+  if(trimmed.startsWith('<![CDATA[')){
+    const close=trimmed.indexOf(']]>');
+    if(close<0)fail('Unclosed OFX CDATA in '+key+'.');
+    const after=trimmed.slice(close+3).trimStart();
+    if(after&&!new RegExp('^</'+key+'\\s*>','i').test(after))fail('Malformed OFX CDATA field '+key+'.');
+    return trimmed.slice(9,close).trim();
+  }
+  const end=rest.indexOf('<');
+  const raw=(end<0?rest:rest.slice(0,end)).trim();
+  if(end>=0){
+    const next=rest.slice(end).match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
+    if(next&&next[1].toUpperCase()!==key.toUpperCase())fail('Malformed OFX '+key+' closing tag.');
+  }
+  return decodeEntities(raw);
+}
 export function parseOFX(text) {
-  const raw=String(text);
-  if(/<!DOCTYPE|<!ENTITY|<script/i.test(raw))fail('Unsupported or unsafe XML declarations.');
+  const original=String(text);
+  if(/<!DOCTYPE|<!ENTITY|<script/i.test(original))fail('Unsupported or unsafe XML declarations.');
+  const raw=original.replace(/<!--[\s\S]*?-->/g,'');
+  if(raw.includes('<!--')||raw.includes('-->'))fail('Malformed OFX comment. No transactions were exported.');
   if(/<(?:CURRENCY|ORIGCURRENCY)\b/i.test(raw))fail('OFX per-transaction currency conversion is unsupported.');
   const currencyTags=[...raw.matchAll(/<CURDEF\b[^>]*>\s*([^<\s]+)/gi)].map(m=>m[1].toUpperCase());
   if(/<CURDEF\b/i.test(raw)&&!currencyTags.length)fail('Invalid OFX currency declaration.');
@@ -221,9 +274,10 @@ export function parseOFX(text) {
   const accountSections=[...raw.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
   if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
   if(/<INVSTMTMSGSRSV1\b|<INVSTMTRS\b/i.test(raw))fail('Investment OFX feeds are not supported. No transactions were exported.');
-
-  // STMTTRN is an aggregate in SGML-style OFX 1.x and XML-style OFX 2.x.
-  // Do not silently accept a truncated or nested record; it may drop bank transactions.
+  for(const status of raw.matchAll(/<STATUS\b[^>]*>([\s\S]*?)<\/STATUS\s*>/gi)){
+    const code=ofxField(status[1],'CODE'),severity=ofxField(status[1],'SEVERITY');
+    if((code&&code!=='0')||/^ERROR$/i.test(severity))fail('OFX bank response reports an unsuccessful status. No transactions were exported.');
+  }
   let open=false,recordCount=0;
   for(const token of raw.matchAll(/<\/?STMTTRN\b[^>]*>/gi)){
     const closing=/^<\//.test(token[0]);
@@ -239,24 +293,31 @@ export function parseOFX(text) {
   if(!recordCount)fail('No bank STMTTRN entries found. Investment feeds are not supported.');
   const blocks=[...raw.matchAll(/<STMTTRN\b[^>]*>([\s\S]*?)<\/STMTTRN\s*>/gi)];
   if(blocks.length!==recordCount)fail('One or more OFX transaction records could not be read safely.');
+  let missingReferenceCount=0,missingTypeCount=0;
   const transactions=blocks.map((m,i)=>{
-    const b=m[1],date=ofxField(b,'DTPOSTED'),amount=ofxField(b,'TRNAMT');
-    const description=ofxField(b,'NAME')||ofxField(b,'MEMO');
+    const b=m[1];
     try{
+      const date=ofxField(b,'DTPOSTED'),amount=ofxField(b,'TRNAMT');
+      const description=ofxField(b,'NAME')||ofxField(b,'MEMO');
       if(!description)fail('Transaction NAME and MEMO are both empty.');
-      return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),description,memo:ofxField(b,'MEMO'),id:ofxField(b,'FITID')};
+      const id=ofxField(b,'FITID'),type=ofxField(b,'TRNTYPE');
+      if(!id)missingReferenceCount++;
+      if(!type)missingTypeCount++;
+      // OFX TRNAMT is already signed. TRNTYPE does not redefine its sign.
+      return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),
+        description,memo:ofxField(b,'MEMO'),id};
     }catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
-  return {transactions,source:'OFX / QBO / QFX',warnings:[
-    'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
-    ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[])
-  ]};
+  return {transactions,source:'OFX / QBO / QFX',
+    integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,
+      declaredCurrency:currencyTags.length?'USD':null},
+    warnings:[
+      'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
+      ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[]),
+      ...(missingReferenceCount?[missingReferenceCount+' OFX transaction(s) have no FITID; duplicate/reference checks may be incomplete.']:[]),
+      ...(missingTypeCount?[missingTypeCount+' OFX transaction(s) have no TRNTYPE; signed amounts remain unchanged.']:[])
+    ]};
 }
-/**
- * Extract IIF TRNS summary rows only after checking each journal group.
- * This is not a reconstructed ledger: SPL accounts and allocations are
- * intentionally excluded from the output. All amounts use integer cents.
- */
 export function parseIIF(text,dateFormat='us'){
   const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
   let trnsHeader=null,splHeader=null,active=null,balancedGroups=0,splitRows=0,ignoredRows=0;
