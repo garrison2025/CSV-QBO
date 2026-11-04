@@ -174,9 +174,9 @@
     "kd": 3,
     "cpc": 0,
     "summary": "Map a CSV bank transaction list and generate a basic QIF Bank file for testing.",
-    "detail": "QIF output structure is validated locally, but actual importing into individual finance software versions is not verified. Do not use this for production accounting without testing.",
-    "faq": "Is QIF import compatibility guaranteed?",
-    "answer": "No. The file is syntax-checked, but target software import behavior has not been independently validated.",
+    "detail": "QIF Bank export is generated entirely in your browser, then re-parsed to compare every source transaction's date, signed amount, payee, reference and memo in exact order. Literal carets (^) and Unicode are preserved; newlines and control characters in QIF text fields cause a clear error instead of silently modifying the bank data. This is syntax validation only: your finance application's real import behavior is unverified.",
+    "faq": "Can I convert CSV payees with line breaks or a ^ character without altering data?",
+    "answer": "A literal ^ in a payee or reference is preserved. QIF uses one physical line for each field, so payees, references or memos containing newlines/control characters cannot be exported losslessly; the tool blocks that QIF download. The file is checked by reading it back locally, but compatibility with specific accounting apps remains unverified.",
     "release": "syntax_only"
   }
 ]
