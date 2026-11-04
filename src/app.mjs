@@ -34,7 +34,7 @@ if(drop && fileInput){
     $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);setButton(true);say(audit.warnings.length?'Ready with duplicate warnings. Inspect them before downloading.':'Ready. Review the transaction preview, then download.', audit.warnings.length?'info':'success');
   }
   async function prepare(chosen){
-    file=chosen;parsed=null;audit=null;table=null;setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;
+    file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#file-name').textContent='';
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
     const ext=(file.name.split('.').pop()||'').toLowerCase();
@@ -107,6 +107,18 @@ if(drop && fileInput){
       try{parsed=parseInput(fileText,fileExt,{dateFormat:$('#date-format').value});renderResult(parsed);}
       catch(err){parsed=null;setButton(false);$('#preview-panel').hidden=true;say(err.message||'Invalid date format.','error');}
     }
+  });
+  $('#clear-workspace')?.addEventListener('click',()=>{
+    file=null;parsed=null;audit=null;table=null;fileText='';fileExt='';
+    fileInput.value='';
+    $('#file-name').textContent='';
+    $('#preview-body').replaceChildren();
+    $('#warning-list').replaceChildren();
+    $('#mapping-panel').hidden=true;
+    $('#preview-panel').hidden=true;
+    $('#warning-box').hidden=true;
+    setButton(false);
+    say('Workspace cleared. Source file and preview are no longer retained by this page. Already downloaded files remain on your device.','success');
   });
   fileInput.addEventListener('change',event=>prepare(event.target.files[0]));
   drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.add('is-dragging');});
