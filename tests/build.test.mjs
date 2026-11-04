@@ -141,3 +141,18 @@ test('a validation JSON download is unavailable until the current file has passe
  assert.match(app,/report\.disabled=true/);
  assert.match(app,/download-report'\)\.disabled=false/);
 });
+
+
+test('batch UI preserves original file sizes and reports cross-file overlaps without merging accounts',()=>{
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ const batch=readFileSync(path.join(root,'src','batch.mjs'),'utf8');
+ assert.match(app,/byteLength:selected\.size/);
+ assert.match(app,/crossFileReferenceMatches\+batchInfo\.report\.crossFileFingerprintMatches/);
+ assert.match(batch,/crossFileMatchesAreWarningsOnly:true/);
+ assert.match(batch,/matchedEarlierFileNumbers/);
+ assert.match(batch,/autoMergedAccounts:false/);
+ assert.match(batch,/autoDeletedTransactions:false/);
+ const page=read('tools/qif-to-csv/index.html');
+ assert.match(page,/unknown codes fail with an error/i);
+ assert.match(page,/noindex,nofollow/);
+});
