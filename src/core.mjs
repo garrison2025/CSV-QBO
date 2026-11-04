@@ -430,6 +430,9 @@ export function quickBooksCSVExportPlan(transactions,limits={}){
   if(sourceAudit.duplicateIds.length||sourceAudit.possibleDuplicates.length){
     warnings.push('Potential duplicates were detected in the source; no transactions have been deleted.');
   }
+  if(sourceAudit.csvFormulaGuardCount){
+    warnings.push(sourceAudit.csvFormulaGuardCount+' formula-like description(s) were prefixed with an apostrophe to reduce spreadsheet injection risk.');
+  }
   return {parts,report:{
     reportType:'Finance File Lab QuickBooks CSV preflight v1',
     outputFormat:'QuickBooks Online manual-upload 3-column CSV',
