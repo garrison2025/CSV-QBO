@@ -190,3 +190,35 @@ test('batch fails atomically for QIF contradictory U/T amounts, even after a val
  const broken='!Type:Bank\nD11/04/2026\nT1.00\nU2.00\nPWrong amount\n^\n';
  assert.throws(()=>batchConvert([{name:'ok.qif',text:good},{name:'broken.qif',text:broken}]),/Batch file 2.*T and U amount fields disagree/);
 });
+
+
+test('batch keeps CR-only QIF and IIF accounts separate with exact signed totals',()=>{
+ const classicQif=['!Type:Bank','D11/04/2026','T-1.99','PBank Coffee','NREF-ONE','^',''].join('\r');
+ const classicIif=[
+  '!TRNS\tDATE\tAMOUNT\tMEMO\tDOCNUM',
+  '!SPL\tDATE\tAMOUNT',
+  'TRNS\t11/05/2026\t9.50\tSales\tID-0002',
+  'SPL\t11/05/2026\t-9.50','ENDTRNS',''
+ ].join('\r');
+ const {archive,report}=batchConvert([
+  {name:'older.qif',text:classicQif},
+  {name:'ledger.iif',text:classicIif}
+ ],{target:'csv'});
+ assert.equal(report.totalFiles,2);
+ assert.equal(report.totalTransactions,2);
+ assert.deepEqual(report.files.map(x=>x.net),['-1.99','9.50']);
+ assert.deepEqual(report.files.map(x=>x.rows),[1,1]);
+ assert.equal(report.autoMergedAccounts,false);
+ assert.equal(report.autoDeletedTransactions,false);
+ assert.equal(String.fromCharCode(...archive.slice(0,2)),'PK');
+ assert.ok(!JSON.stringify(report).includes('Bank Coffee'));
+ assert.ok(!JSON.stringify(report).includes('REF-ONE'));
+ assert.ok(!JSON.stringify(report).includes('ID-0002'));
+});
+test('one malformed CR-only QIF record blocks the complete batch archive',()=>{
+ const valid='!Type:Bank\rD11/04/2026\rT1.00\rPValid\r^\r';
+ const invalid='!Type:Bank\rD11/04/2026\rT1.00\rPMissing terminator\r';
+ assert.throws(()=>batchConvert([
+  {name:'ok.qif',text:valid},{name:'truncated.qif',text:invalid}
+ ]),/Batch file 2: QIF final transaction lacks terminating \^/);
+});
