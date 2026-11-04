@@ -10,12 +10,16 @@ function fail(message) { throw new Error(message); }
 
 /** Strict decimal to integer cents, avoiding floating point math. USD-only normalized model. */
 export function toMinorUnits(input) {
-  let s = String(input ?? '').trim().replace(/[$€£\s]/g, '');
+  // Keep separators intact: removing internal whitespace could turn "1 2.34" into "12.34".
+  let s = String(input ?? '').trim();
   if (!s) fail('Amount is empty.');
   let negative = false;
   if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
   if (s.startsWith('-')) { negative = !negative; s = s.slice(1); }
   else if (s.startsWith('+')) s = s.slice(1);
+  s = s.trim();
+  if (/^[$€£]/.test(s)) s = s.slice(1);
+  if (/\s/.test(s)) fail('Invalid amount spacing: ' + input + '.');
   if (/^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(s)) s = s.replaceAll(',', '');
   if (!/^\d+(\.\d{1,2})?$/.test(s)) fail('Invalid amount: ' + input + '. Use a period for decimals.');
   const parts = s.split('.');
@@ -186,16 +190,34 @@ function ofxField(block,key){ const m=block.match(new RegExp('<'+key+'\\b[^>]*>\
 export function parseOFX(text) {
   const raw=String(text);
   if(/<!DOCTYPE|<!ENTITY|<script/i.test(raw))fail('Unsupported or unsafe XML declarations.');
-  // One export may include multiple accounts. Do not merge them implicitly.
   const accountSections=[...raw.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
   if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
   if(/<INVSTMTMSGSRSV1\b|<INVSTMTRS\b/i.test(raw))fail('Investment OFX feeds are not supported. No transactions were exported.');
-  const blocks=[...raw.matchAll(/<STMTTRN\b[^>]*>([\s\S]*?)(?=<\/STMTTRN\s*>|<STMTTRN\b|<\/BANKTRANLIST\b|$)/gi)];
-  if(!blocks.length)fail('No bank STMTTRN entries found. Investment feeds are not supported.');
+
+  // STMTTRN is an aggregate in SGML-style OFX 1.x and XML-style OFX 2.x.
+  // Do not silently accept a truncated or nested record; it may drop bank transactions.
+  let open=false,recordCount=0;
+  for(const token of raw.matchAll(/<\/?STMTTRN\b[^>]*>/gi)){
+    const closing=/^<\//.test(token[0]);
+    if(closing) {
+      if(!open)fail('Unexpected closing STMTTRN tag. Check the source file.');
+      open=false;
+    } else {
+      if(open)fail('Nested or unclosed STMTTRN transaction. Check the source file.');
+      open=true;recordCount++;
+    }
+  }
+  if(open)fail('Incomplete STMTTRN transaction at end of file.');
+  if(!recordCount)fail('No bank STMTTRN entries found. Investment feeds are not supported.');
+  const blocks=[...raw.matchAll(/<STMTTRN\b[^>]*>([\s\S]*?)<\/STMTTRN\s*>/gi)];
+  if(blocks.length!==recordCount)fail('One or more OFX transaction records could not be read safely.');
   const transactions=blocks.map((m,i)=>{
     const b=m[1],date=ofxField(b,'DTPOSTED'),amount=ofxField(b,'TRNAMT');
-    try{return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),description:ofxField(b,'NAME')||ofxField(b,'MEMO')||'Transaction',memo:ofxField(b,'MEMO'),id:ofxField(b,'FITID')};}
-    catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
+    const description=ofxField(b,'NAME')||ofxField(b,'MEMO');
+    try{
+      if(!description)fail('Transaction NAME and MEMO are both empty.');
+      return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),description,memo:ofxField(b,'MEMO'),id:ofxField(b,'FITID')};
+    }catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
   return {transactions,source:'OFX / QBO / QFX',warnings:['Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.']};
 }
@@ -224,7 +246,7 @@ export function toQIF(transactions){
   if(!transactions.length)fail('No transactions.');
   return '!Type:Bank\r\n'+transactions.map(t=>{
     const date=isoDate(t.date).split('-');const d=date[1]+'/'+date[2]+'/'+date[0];
-    return 'D'+d+'\r\nT'+fromMinorUnits(toMinorUnits(t.amount))+'\r\nP'+String(t.description||'').replace(/[\r\n^]/g,' ')+'\r\n'+(t.memo?'M'+String(t.memo).replace(/[\r\n^]/g,' ')+'\r\n':'')+'^\r\n';
+    return 'D'+d+'\r\nT'+fromMinorUnits(toMinorUnits(t.amount))+'\r\nP'+String(t.description||'').replace(/[\r\n^]/g,' ')+'\r\n'+(t.id?'N'+String(t.id).replace(/[\r\n^]/g,' ')+'\r\n':'')+(t.memo?'M'+String(t.memo).replace(/[\r\n^]/g,' ')+'\r\n':'')+'^\r\n';
   }).join('');
 }
 /** QuickBooks Online 3-column manual-upload CSV, not .qbo Web Connect. */
