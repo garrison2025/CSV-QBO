@@ -22,7 +22,7 @@ jobs:
         run: |
           command -v google-chrome
           npm install --no-save --no-package-lock playwright-core@1.55.0
-          node tests/browser-e2e.mjs
+          npm run test:browser
       - name: Upload synthetic browser failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
