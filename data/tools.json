@@ -39,7 +39,7 @@
     "kd": 20,
     "cpc": 0,
     "summary": "Export bank-style QIF transaction records to CSV without creating an account.",
-    "detail": "Read QIF D/T/P/M/N bank fields, review the result and export. QIF split categories and investment records are not reproduced. The reader rejects duplicate date, amount and payee fields, checks that optional U amounts agree with T, and warns when cleared-state, category, split or address details are omitted. Unsupported record codes are rejected rather than silently skipped.",
+    "detail": "Read QIF D/T/P/M/N bank fields, review the result and export. QIF split categories and investment records are not reproduced. The reader rejects duplicate date, amount and payee fields, checks that optional U amounts agree with T, and warns when cleared-state, category, split or address details are omitted. Unsupported record codes are rejected rather than silently skipped. Legacy Mac-style CR-only line endings, Windows-style CRLF and LF/mixed records are supported in the local reader. Record counts and signed transaction values are never normalized or changed when reading line endings.",
     "faq": "Will unsupported QIF bank records or duplicate amount fields be silently ignored?",
     "answer": "No. Repeated D/T/P fields, mismatched U and T amounts, mixed account sections and unknown codes fail with an error. Category, split, address and cleared-state fields are warned about but are not reproduced.",
     "release": "read_only_tested"
@@ -54,7 +54,7 @@
     "kd": 3,
     "cpc": 0,
     "summary": "Make a readable Excel transaction sheet from a QIF bank export.",
-    "detail": "Convert basic QIF transactions to four consistent spreadsheet columns. Verify dates and signed amounts in the preview before downloading. The reader rejects duplicate date, amount and payee fields, checks that optional U amounts agree with T, and warns when cleared-state, category, split or address details are omitted. Unsupported record codes are rejected rather than silently skipped. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software.",
+    "detail": "Convert basic QIF transactions to four consistent spreadsheet columns. Verify dates and signed amounts in the preview before downloading. The reader rejects duplicate date, amount and payee fields, checks that optional U amounts agree with T, and warns when cleared-state, category, split or address details are omitted. Unsupported record codes are rejected rather than silently skipped. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software. Legacy Mac-style CR-only line endings, Windows-style CRLF and LF/mixed records are supported in the local reader. Record counts and signed transaction values are never normalized or changed when reading line endings.",
     "faq": "Will I lose split transaction detail?",
     "answer": "Yes. This release exports basic transaction rows only and clearly warns when split/category fields are encountered.",
     "release": "read_only_tested"
@@ -69,7 +69,7 @@
     "kd": 17,
     "cpc": 8.06,
     "summary": "Inspect complete, balanced IIF TRNS groups as a CSV summary; SPL accounting allocations are excluded.",
-    "detail": "The reader requires !TRNS and !SPL headers and checks each TRNS/SPL/ENDTRNS group balances exactly to zero. Only TRNS summary amounts are exported, not account-level splits, ledger entries or a bank statement.",
+    "detail": "The reader requires !TRNS and !SPL headers and checks each TRNS/SPL/ENDTRNS group balances exactly to zero. Only TRNS summary amounts are exported, not account-level splits, ledger entries or a bank statement. Legacy Mac-style CR-only line endings, Windows-style CRLF and LF/mixed records are supported in the local reader. Record counts and signed transaction values are never normalized or changed when reading line endings.",
     "faq": "Does this validate my IIF ledger or make it ready for importing?",
     "answer": "No. It checks whether each supported transaction group balances and exports a TRNS summary. It does not audit accounts, reconstruct SPL allocations or certify QuickBooks import.",
     "release": "read_only_tested"
@@ -84,7 +84,7 @@
     "kd": 3,
     "cpc": 0,
     "summary": "Inspect balanced IIF TRNS summaries in Excel; every supported source transaction group is checked before export.",
-    "detail": "Read complete IIF transaction groups, verify that TRNS and SPL amounts sum to zero, and export only TRNS date, amount, memo and reference. Any incomplete or unbalanced group blocks conversion. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software.",
+    "detail": "Read complete IIF transaction groups, verify that TRNS and SPL amounts sum to zero, and export only TRNS date, amount, memo and reference. Any incomplete or unbalanced group blocks conversion. Excel date cells are real sortable dates displayed as yyyy-mm-dd (1900 date system). Signed amounts are validated to integer cents and written as numeric two-decimal cells; references including leading zeros stay text. This does not certify imports into finance software. Legacy Mac-style CR-only line endings, Windows-style CRLF and LF/mixed records are supported in the local reader. Record counts and signed transaction values are never normalized or changed when reading line endings.",
     "faq": "Are SPL allocations or a full accounting ledger included?",
     "answer": "No. Account allocations are not exported. The generated workbook is a read-only TRNS summary, not an accounting migration or QuickBooks import file.",
     "release": "read_only_tested"
