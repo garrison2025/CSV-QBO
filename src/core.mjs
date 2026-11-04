@@ -295,46 +295,82 @@ function ofxViews(source){
   if(structure.includes(']]>'))fail('Malformed OFX CDATA terminator.');
   return {clean,structure};
 }
-function decodeEntities(s){
-  return s.replace(/&(?:(amp|lt|gt|quot|apos)|#(x[0-9a-f]+|[0-9]+));/gi,(raw,named,numeric)=>{
+// XML entity resolution is strict only for XML-declared OFX 2.x. Legacy
+// OFX 1.x SGML often contains literal ampersands in NAME/MEMO.
+function xmlCharacter(codePoint){
+  return codePoint===9||codePoint===10||codePoint===13||
+    (codePoint>=32&&codePoint<=0xD7FF)||
+    (codePoint>=0xE000&&codePoint<=0xFFFD)||
+    (codePoint>=0x10000&&codePoint<=0x10FFFF);
+}
+function decodeEntities(value,xml=false){
+  const s=String(value);
+  if(xml){
+    // Unknown, incomplete, or bare ampersands are invalid XML text, not
+    // harmless literal payee characters. Never silently export them.
+    if(/&(?!(?:amp|lt|gt|quot|apos|#(?:x[0-9a-fA-F]+|[0-9]+));)/.test(s))
+      fail('Malformed or unsupported OFX XML character entity.');
+    for(const character of s)if(!xmlCharacter(character.codePointAt(0)))
+      fail('Invalid XML character in OFX transaction field.');
+  }
+  return s.replace(/&(?:(amp|lt|gt|quot|apos)|#(x[0-9a-f]+|[0-9]+));/gi,(_raw,named,numeric)=>{
     if(named)return {amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"}[named.toLowerCase()];
     const num=numeric[0].toLowerCase()==='x'?parseInt(numeric.slice(1),16):parseInt(numeric,10);
-    if(!Number.isSafeInteger(num)||num<1||num>0x10ffff||(num>=0xd800&&num<=0xdfff))fail('Invalid OFX character entity.');
+    if(!Number.isSafeInteger(num)||num<1||num>0x10ffff||
+       (num>=0xd800&&num<=0xdfff)||(xml&&!xmlCharacter(num)))
+      fail('Invalid OFX character entity.');
     return String.fromCodePoint(num);
   });
+}
+/**
+ * XML leaf fields may contain normal entity-escaped text, CDATA and comments
+ * in any order. Concatenate text segments and CDATA literally, but remove
+ * comments. Otherwise the extracted payee/memo may silently lose content.
+ */
+function ofxTextSegments(fragment,xml=false){
+  let content='',cursor=0;
+  while(cursor<fragment.length){
+    const comment=fragment.indexOf('<!--',cursor),cdata=fragment.indexOf('<![CDATA[',cursor);
+    const isComment=comment>=0&&(cdata<0||comment<cdata);
+    const begin=isComment?comment:cdata;
+    const stop=begin<0?fragment.length:begin;
+    const plain=fragment.slice(cursor,stop);
+    if(plain.includes('<'))fail('Unexpected markup inside OFX leaf field.');
+    content+=decodeEntities(plain,xml);
+    if(begin<0)break;
+    const opener=isComment?'<!--':'<![CDATA[',closer=isComment?'-->':']]>';
+    const ending=fragment.indexOf(closer,begin+opener.length);
+    if(ending<0)fail('Unclosed OFX XML comment or CDATA section.');
+    if(!isComment){
+      const literal=fragment.slice(begin+opener.length,ending);
+      if(xml)for(const character of literal)if(!xmlCharacter(character.codePointAt(0)))
+        fail('Invalid XML character in OFX CDATA field.');
+      content+=literal;
+    }
+    cursor=ending+closer.length;
+  }
+  return content.trim();
 }
 function ofxField(block,key,xml=false){
   const source=String(block),structure=ofxViews(source).structure;
   const matches=[...structure.matchAll(new RegExp('<'+key+'\\b[^>]*>','gi'))];
   if(matches.length>1)fail('Duplicate OFX '+key+' fields in one record.');
   if(!matches.length)return '';
-  const match=matches[0],offset=match.index+match[0].length,rest=source.slice(offset);
-  const trimmed=rest.trimStart();
-  if(trimmed.startsWith('<![CDATA[')){
-    const close=trimmed.indexOf(']]>');
-    if(close<0)fail('Unclosed OFX CDATA in '+key+'.');
-    const after=trimmed.slice(close+3).trimStart();
-    const next=after.match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
-    if(next&&next[1].toUpperCase()!==key.toUpperCase())fail('Malformed OFX CDATA field '+key+'.');
-    if(xml&&(!next||next[1].toUpperCase()!==key.toUpperCase()))
-      fail('Missing XML closing tag for OFX '+key+'.');
-    return trimmed.slice(9,close).trim();
-  }
-  // Find the next actual tag in the markup view (not a tag-looking string in
-  // CDATA or a comment); text returned to callers is taken from the source.
-  const markupRest=structure.slice(offset);
-  const end=markupRest.indexOf('<');
-  const value=(end<0?rest:rest.slice(0,end)).trim();
-  const next=end<0?null:markupRest.slice(end).match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
-  if(next&&next[1].toUpperCase()!==key.toUpperCase())
+  const match=matches[0],offset=match.index+match[0].length;
+  // The structural view masks comments and CDATA at identical offsets, so
+  // only a real tag can terminate a leaf and mixed text is not discarded.
+  const rest=structure.slice(offset),end=rest.indexOf('<');
+  const next=end<0?null:rest.slice(end).match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
+  if(next&&next[1].toUpperCase()!==key.toUpperCase()&&!xml)
     fail('Malformed OFX '+key+' closing tag.');
   if(xml&&(!next||next[1].toUpperCase()!==key.toUpperCase()))
     fail('Missing XML closing tag for OFX '+key+'.');
-  return decodeEntities(value);
+  const raw=source.slice(offset,end<0?source.length:offset+end);
+  return ofxTextSegments(raw,xml);
 }
 export function parseOFX(text) {
   const original=String(text);
-  const {clean:raw,structure}=ofxViews(original);
+  const {structure}=ofxViews(original);
   // Comments/CDATA are data, not XML/OFX elements. For safety checks and
   // aggregate boundaries, inspect only actual markup at matching offsets.
   if(/<!DOCTYPE|<!ENTITY|<script\b/i.test(structure))fail('Unsupported or unsafe XML declarations.');
@@ -357,7 +393,7 @@ export function parseOFX(text) {
     const opening=listTags[0],closing=listTags[1];
     const begin=opening.index+opening[0].length,end=closing.index;
     if(begin>end)fail('Invalid BANKTRANLIST boundaries.');
-    bankList=raw.slice(begin,end);
+    bankList=original.slice(begin,end);
     bankBounds={begin,end};
     const beginRaw=ofxField(bankList,'DTSTART',xml),endRaw=ofxField(bankList,'DTEND',xml);
     if(beginRaw)reportedStartDate=isoDate(beginRaw);
@@ -374,7 +410,7 @@ export function parseOFX(text) {
       continue;
     }
     if(!activeStatus)fail('Unexpected closing STATUS in OFX bank response.');
-    const body=raw.slice(activeStatus.index+activeStatus[0].length,token.index);
+    const body=original.slice(activeStatus.index+activeStatus[0].length,token.index);
     const code=ofxField(body,'CODE',xml),severity=ofxField(body,'SEVERITY',xml);
     if(!code)fail('OFX bank STATUS is missing a required CODE; no transactions were exported.');
     if(!/^0+$/.test(code)||/^ERROR$/i.test(severity))
@@ -404,7 +440,7 @@ export function parseOFX(text) {
     const openTag=m[0].match(/^<STMTTRN\b[^>]*>/i)?.[0];
     const closeTag=m[0].match(/<\/STMTTRN\s*>$/i)?.[0];
     if(!openTag||!closeTag)fail('Invalid OFX transaction boundary.');
-    const b=raw.slice(m.index+openTag.length,m.index+m[0].length-closeTag.length);
+    const b=original.slice(m.index+openTag.length,m.index+m[0].length-closeTag.length);
     try{
       const date=ofxField(b,'DTPOSTED',xml),amount=ofxField(b,'TRNAMT',xml);
       const description=ofxField(b,'NAME',xml)||ofxField(b,'MEMO',xml);

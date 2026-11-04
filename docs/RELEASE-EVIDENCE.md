@@ -199,3 +199,12 @@
 - Added Node parity tests against LF, mixed and CR-only for two-to-three financial records, UTF-16LE QIF BOM, and malformed CR-only no-terminator/unbalanced cases. Chrome E2E uploads CR-only QIF and IIF and checks real XLSX downloads.
 - Four relevant tool pages disclose limited newline support. This is not a real-bank compatibility certificate or proof of QuickBooks app import acceptance; `noindex` remains in place.
 - Verify GitHub CI and Cloudflare release checks after merge.
+
+## V2.2 — OFX XML entity and mixed-content financial field integrity (2026-11-05)
+
+- Corrected OFX/QFX/QBO XML leaf extraction to concatenate escaped normal text, literal CDATA, and comment-separated fragments without silently dropping post-CDATA text or copying comment contents into payees/references.
+- OFX XML entity resolution now rejects unknown/case-invalid named entities, incomplete/bare ampersands, numeric references to invalid XML code points (including control chars, surrogates and U+FFFE/U+FFFF), and direct illegal XML characters, without echoing private bank transaction values in UI errors.
+- Classic OFX 1.x SGML remains permissive of literal ampersands in merchant fields; no new dependencies, network fetches or DTD resolution.
+- Added regression tests for exact Unicode/CDATA/escaped text reconstruction, XML entity errors, source-to-CSV consistency and Chrome valid/invalid OFX uploads.
+- Six OFX/QFX/QBO converter pages disclose limitations; no real-bank acceptance or QuickBooks import certification has been performed. Preview remains noindex.
+- GitHub/Cloudflare release evidence must be verified after merge.
