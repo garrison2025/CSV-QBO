@@ -38,7 +38,7 @@ const sampleOFX='<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>'+
 const sampleFiles={
   csv:'Date,Description,Amount,Reference\r\n11/04/2026,Sample bookstore,-12.50,DEMO-001\r\n11/05/2026,Sample refund,120.00,DEMO-002\r\n',
   qif:'!Type:Bank\r\nD11/04/2026\r\nT-12.50\r\nPSample bookstore\r\nNDEMO-001\r\n^\r\nD11/05/2026\r\nT120.00\r\nPSample refund\r\nNDEMO-002\r\n^\r\n',
-  iif:'!TRNS\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM\r\nTRNS\tCHECK\t11/04/2026\tSynthetic Cash\t-12.50\tSample bookstore\tDEMO-001\r\nENDTRNS\r\nTRNS\tDEPOSIT\t11/05/2026\tSynthetic Cash\t120.00\tSample refund\tDEMO-002\r\nENDTRNS\r\n',
+  iif:"!TRNS\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM\r\n!SPL\tTRNSTYPE\tDATE\tACCNT\tAMOUNT\tMEMO\tDOCNUM\r\n!ENDTRNS\r\nTRNS\tCHECK\t11/04/2026\tSynthetic Cash\t-12.50\tSample bookstore\tDEMO-001\r\nSPL\tCHECK\t11/04/2026\tSynthetic Expense\t12.50\tSample bookstore\tDEMO-001\r\nENDTRNS\r\nTRNS\tDEPOSIT\t11/05/2026\tSynthetic Cash\t120.00\tSample refund\tDEMO-002\r\nSPL\tDEPOSIT\t11/05/2026\tSynthetic Income\t-120.00\tSample refund\tDEMO-002\r\nENDTRNS\r\n",
   ofx:sampleOFX, qbo:sampleOFX, qfx:sampleOFX
 };
 fs.mkdirSync(path.join(dist,'samples'),{recursive:true});
