@@ -9,7 +9,7 @@
     "kd": 2,
     "cpc": 5.05,
     "summary": "Extract transaction rows from a QBO bank feed file into a clean CSV you can inspect or edit.",
-    "detail": "Read bank STMTTRN entries, preserve dates, amounts, payee descriptions and available transaction IDs. This is a read-only export; bank configuration metadata is not recreated.",
+    "detail": "Read bank STMTTRN entries, preserve dates, amounts, payee descriptions and available transaction IDs. This is a read-only export; bank configuration metadata is not recreated. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
     "faq": "Does this change the original bank file?",
     "answer": "No. Your original QBO file is read locally and never modified or uploaded.",
     "release": "read_only_tested"
@@ -24,7 +24,7 @@
     "kd": 2,
     "cpc": 8.63,
     "summary": "Turn QBO bank feed transactions into an editable Excel spreadsheet, entirely in your browser.",
-    "detail": "Export a proper .xlsx workbook with date, description, signed amount and reference columns. Investment feeds and accounting splits are outside this reader's scope.",
+    "detail": "Export a proper .xlsx workbook with date, description, signed amount and reference columns. Investment feeds and accounting splits are outside this reader's scope. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
     "faq": "Is the download a real Excel workbook?",
     "answer": "Yes. The application generates an .xlsx workbook locally. It is not just a CSV renamed with an Excel extension.",
     "release": "read_only_tested"
@@ -99,9 +99,9 @@
     "kd": 0,
     "cpc": 15.27,
     "summary": "Read an OFX bank transaction file and download a clean CSV extract.",
-    "detail": "Supports common OFX 1.x and XML-style STMTTRN bank transaction blocks. Investment and unusual bank variants require further testing.",
-    "faq": "Does the converter contact my bank?",
-    "answer": "No. It reads a file you already have. No credentials or bank connections are requested.",
+    "detail": "Supports common OFX 1.x and XML-style STMTTRN bank transaction blocks. Investment and unusual bank variants require further testing. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
+    "faq": "Can this read OFX 1.x files exported with Windows-1252 text?",
+    "answer": "Supported examples with an explicit OFX CHARSET:1252 header are decoded locally. Use the synthetic XML and Windows-1252 downloads to test. Other bank variants may differ, and real bank import compatibility is not certified.",
     "release": "read_only_tested"
   },
   {
@@ -114,7 +114,7 @@
     "kd": 3,
     "cpc": 0,
     "summary": "Export OFX bank transactions to a structured Excel workbook.",
-    "detail": "For supported OFX bank feeds, exports posted date, payee name, signed amount and FITID transaction reference into .xlsx.",
+    "detail": "For supported OFX bank feeds, exports posted date, payee name, signed amount and FITID transaction reference into .xlsx. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
     "faq": "Can it read investment OFX files?",
     "answer": "Not in this release. It requires standard bank STMTTRN records.",
     "release": "read_only_tested"
@@ -129,7 +129,7 @@
     "kd": 0,
     "cpc": 0,
     "summary": "Extract QFX bank transaction data into a useful Excel spreadsheet.",
-    "detail": "Read the standard STMTTRN section of a Quicken QFX bank export. Financial institution identity and account metadata are not transferred to Excel.",
+    "detail": "Read the standard STMTTRN section of a Quicken QFX bank export. Financial institution identity and account metadata are not transferred to Excel. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
     "faq": "Does it alter my Quicken file?",
     "answer": "No. Your QFX stays unchanged in your browser. This is a read-only extraction.",
     "release": "read_only_tested"
@@ -144,7 +144,7 @@
     "kd": null,
     "cpc": null,
     "summary": "Export supported QFX bank feed transactions to a portable CSV format.",
-    "detail": "Only standard STMTTRN bank transaction records are supported. Search demand for this exact page has not been validated.",
+    "detail": "Only standard STMTTRN bank transaction records are supported. Search demand for this exact page has not been validated. This reader also handles supported OFX 1.x Windows-1252 and OFX XML UTF-8/UTF-16 variants locally, warns when required references are missing, and refuses ambiguous duplicate fields or failed bank statuses. Bank-specific compatibility is not certified.",
     "faq": "Is this an official Quicken converter?",
     "answer": "No. This is an independent file-reading utility, not affiliated with Quicken or Intuit.",
     "release": "read_only_unverified_keyword"
