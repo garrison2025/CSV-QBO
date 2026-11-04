@@ -4,7 +4,7 @@
 |---|---|---|
 | Source specification read | PASS | User-provided V3 including 250 keyword appendix |
 | Internal financial precision | PASS, synthetic cases | Integer-cent amounts, strict date parser, CSV/QIF/OFX/IIF limited readers |
-| Automated tests | PASS locally | 249 Node test cases on current working tree (including generated property cases) |
+| Automated tests | PASS locally | 250 Node test cases on current working tree (including generated property cases) |
 | XLSX structural sample | PASS locally | .xlsx opened with openpyxl; numeric values and strings checked |
 | SEO planned route gate | PASS locally | Preview noindex; blocked CSV->QBO route absent; 250 keywords retained |
 | Real QuickBooks Online/Desktop import | **NOT RUN / BLOCKER** | No user-provided target test account or FI metadata; do not label QBO write compatible |
@@ -17,7 +17,7 @@
 
 ## V0.3 incremental release — 2026-11-04
 
-- `npm test`: **249/249 PASS** locally; updated GitHub Actions run [41786960366](https://github.com/garrison2025/CSV-QBO/actions/runs/41786960366) completed **success**.
+- `npm test`: **250/250 PASS** locally; updated GitHub Actions run [41787228124](https://github.com/garrison2025/CSV-QBO/actions/runs/41787228124) completed **success**.
 - `npm run build`: **PASS** locally with 12 tool pages and preview noindex.
 - New deterministic checks: QuickBooks Online CSV headers/date order, split at 1,000 rows/350 KB, UTF-8 byte limits, conflicting debit/credit, duplicate audit, mixed CSV/XLSX ZIP generation.
 - Online user-visible checks: initial preview `csv-qbo.pages.dev` returned homepage and read-only tools with `noindex`; **V0.3 live deployment not yet confirmed when this note was written**.
@@ -25,3 +25,5 @@
 - Receiving QuickBooks/Quicken import: **NOT RUN**; no claims of certified compatibility.
 
 **Decision:** a demonstrable free browser-local prototype that can be deployed to preview. Production SEO and commercial launch require manual UI/UAT and actual receiving-software compatibility evidence.
+
+- **Large ZIP check:** fixed argument-spread overflow and added 350 KB ZIP regression; 250/250 tests pass.
