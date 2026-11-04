@@ -199,3 +199,54 @@ test('Only explicit USD amount and OFX statement currencies are accepted',()=>{
 test('XLSX refuses invalid XML control characters',()=>{
  assert.throws(()=>toXLSX([{date:'2026-11-04',description:'bad\u0001cell',amount:'1.00',id:'x'}]),/control character/);
 });
+
+
+// V0.7 fail-closed financial parser regression tests.
+test('money parser never silently collapses internal spaces or misplaced currency symbols',()=>{
+ assert.equal(toMinorUnits(' 1,234.50 '),123450n);
+ assert.equal(toMinorUnits('($1,234.50)'),-123450n);
+ assert.equal(toMinorUnits('-$10.01'),-1001n);
+ for(const bad of ['1 2.34','12 .34','1 234.56','$1 $2','1$2','1\t2','12.3 4']) {
+   assert.throws(()=>toMinorUnits(bad),/Invalid amount/);
+ }
+});
+test('compact OFX dates preserve posted calendar day but validate time and suffix',()=>{
+ assert.equal(isoDate('20261104'),'2026-11-04');
+ assert.equal(isoDate('20261104123456[-5:EST]'),'2026-11-04');
+ assert.equal(isoDate('20261104123456.000[0:GMT]'),'2026-11-04');
+ assert.equal(isoDate('202611041234'),'2026-11-04');
+ for(const bad of ['20261104250000','20261104126000','20261104125961','20261104120000garbage','202611041BAD','20261104123456[bogus]','20261104120000[-5:EST]junk']) {
+   assert.throws(()=>isoDate(bad));
+ }
+});
+test('OFX does not export truncated or nested STMTTRN records',()=>{
+ const entry='<STMTTRN><DTPOSTED>20261104<TRNAMT>-5.00<FITID>ABC<NAME>Valid';
+ assert.throws(()=>parseOFX('<OFX>'+entry+'</OFX>'),/Incomplete STMTTRN/);
+ assert.throws(()=>parseOFX('<OFX>'+entry+'<STMTTRN><DTPOSTED>20261105<TRNAMT>1.00<NAME>Nested</STMTTRN></STMTTRN></OFX>'),/Nested or unclosed/);
+ assert.throws(()=>parseOFX('<OFX></STMTTRN>'+entry+'</STMTTRN></OFX>'),/Unexpected closing/);
+ assert.equal(parseOFX('<OFX>'+entry+'</STMTTRN></OFX>').transactions.length,1);
+});
+test('OFX refuses missing payee descriptions rather than inventing transaction names',()=>{
+ const missing='<STMTTRN><DTPOSTED>20261104<TRNAMT>9.00<FITID>X1</STMTTRN>';
+ assert.throws(()=>parseOFX('<BANKTRANLIST>'+missing+'</BANKTRANLIST>'),/NAME and MEMO are both empty/);
+});
+test('QIF writer preserves transaction reference N and memo M separately',()=>{
+ const source=[{date:'2026-11-04',amount:'-12.50',description:'Sample',id:'REF-123',memo:'Paid locally'}];
+ const wire=toQIF(source);
+ assert.match(wire,/\r\nNREF-123\r\n/);
+ const back=parseQIF(wire);
+ assert.equal(back.transactions[0].id,'REF-123');
+ assert.equal(back.transactions[0].memo,'Paid locally');
+});
+test('QIF blocks non-bank, mixed-account and missing type files',()=>{
+ assert.throws(()=>parseQIF('D11/04/2026\nT-5\nPTest\n^\n'),/missing a supported/);
+ assert.throws(()=>parseQIF('!Type:Cat\nNFood\n^\n'),/Unsupported QIF section type/);
+ assert.throws(()=>parseQIF('!Account\nNPrivate Bank\n^\n!Type:Bank\nD11/04/2026\nT12\nPTest\n^\n'),/account-list sections/);
+ assert.throws(()=>parseQIF('!Type:Bank\nD11/04/2026\nT12\nPTest\n^\n!Type:CCard\nD11/05/2026\nT-1\nPCard\n^\n'),/Multiple QIF/);
+});
+test('QIF read-only export records loss of category allocations',()=>{
+ const bank='!Type:Bank\nD11/04/2026\nT-5\nPLunch\nLMeals\n^\n';
+ assert.match(parseQIF(bank).warnings.join(' '),/category\/split/);
+ const card='!Type:CCard\nD11/04/2026\nT-5\nPCard\n^\n';
+ assert.equal(parseQIF(card).transactions[0].amount,'-5.00');
+});
