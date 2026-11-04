@@ -45,3 +45,11 @@
 - Local headless Chromium **PASS (isolated in-memory HTML/module integration, not live-site navigation)**: 2 QIF files selected through the real input, separate ZIP generated with `converted-001.csv`, `converted-002.csv` and `batch-validation.json`; no page JavaScript errors; 390px viewport had no horizontal overflow.
 - Cloudflare page sampled after code commit: fetched HTML still lacked the batch section, so the V0.5 hosted deploy is **NOT VERIFIED**. Do not claim Cloudflare production or Preview passed V0.5 until the served HTML changes.
 - Actual QuickBooks Online/Desktop import UAT: **NOT RUN**. No `.qbo` writer is available.
+
+## V0.6 incremental improvement — 2026-11-04
+
+- CSV input row-width, quoting and ambiguous mapping reject unsafe conversions, with dedicated automated regression cases.
+- Downloadable synthetic CSV/QBO/QFX/OFX/QIF/IIF samples generated at build time and checked by parser tests.
+- Users can clear the single-file preview and source text in memory without refreshing; local batch files are a separate workspace and downloads persist on disk.
+- GitHub CI and target-software browser/UAT outcomes must be recorded separately; QBO/IIF import verification remains NOT RUN.
+- Remains preview/noindex; no production domain or verified checkout.
