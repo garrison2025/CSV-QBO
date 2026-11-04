@@ -1,6 +1,6 @@
 /** Dependency-free XLSX writer (Office Open XML, stored ZIP entries). */
 const utf8 = new TextEncoder();
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));}
+function esc(s){const text=String(s??'');if(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(text))throw new Error('Unsupported control character in Excel cell.');return text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));}
 function crc32(bytes){let crc=-1;for(const n of bytes){crc^=n;for(let i=0;i<8;i++)crc=(crc>>>1)^(0xEDB88320&-(crc&1));}return (crc^(-1))>>>0;}
 const put16=(a,v)=>{a.push(v&255,(v>>8)&255);};
 const put32=(a,v)=>{a.push(v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255);};

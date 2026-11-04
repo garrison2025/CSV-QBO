@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.6.1 — currency integrity, encoding and local state cleanup
+
+- Financial amounts are handled as USD cents: reject explicit EUR/GBP/JPY/INR symbols and non-USD OFX currency declarations. Undeclared OFX currencies show a warning; **no exchange-rate conversion** is performed.
+- Reject CSV null bytes and XLSX-invalid XML control characters instead of risking silent corruption.
+- Detect replacement characters in browser-read file text; users can re-export as UTF-8 rather than convert an already damaged description.
+- Prevent delayed single/batch file reads from overwriting a newer selection. **Clear workspace** now discards both single-file state and pending/generated batch ZIPs.
+- Retain all V0.6 synthetic fixtures, guarded mapping, and existing batch workflows. Actual QuickBooks import UAT remains **NOT RUN**.
+
 ## V0.6 — harden CSV input and provide safe interactive fixtures
 
 - Reject malformed CSV quoting or inconsistent row widths before any conversion; no silent field or amount shifts.

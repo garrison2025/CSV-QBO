@@ -10,7 +10,9 @@ function fail(message) { throw new Error(message); }
 
 /** Strict decimal to integer cents, avoiding floating point math. USD-only normalized model. */
 export function toMinorUnits(input) {
-  let s = String(input ?? '').trim().replace(/[$€£\s]/g, '');
+  const original = String(input ?? '').trim();
+  if (/[€£¥₹]/.test(original)) fail('Non-USD currency symbols are unsupported. Convert currencies outside this tool.');
+  let s = original.replace(/[$\s]/g, '');
   if (!s) fail('Amount is empty.');
   let negative = false;
   if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
@@ -43,6 +45,7 @@ export function isoDate(input, format='us') {
 
 export function parseCSV(text, delimiter) {
   const s = String(text ?? '').replace(/^\uFEFF/, '');
+  if(s.includes('\u0000'))fail('CSV contains null bytes or an unsupported text encoding.');
   if (delimiter == null) {
     // Count separators in the first logical record only, excluding quoted fields.
     const counts = {',': 0, ';': 0, '\t': 0};
@@ -186,6 +189,10 @@ function ofxField(block,key){ const m=block.match(new RegExp('<'+key+'\\b[^>]*>\
 export function parseOFX(text) {
   const raw=String(text);
   if(/<!DOCTYPE|<!ENTITY|<script/i.test(raw))fail('Unsupported or unsafe XML declarations.');
+  if(/<(?:CURRENCY|ORIGCURRENCY)\b/i.test(raw))fail('OFX per-transaction currency conversion is unsupported.');
+  const currencyTags=[...raw.matchAll(/<CURDEF\b[^>]*>\s*([^<\s]+)/gi)].map(m=>m[1].toUpperCase());
+  if(/<CURDEF\b/i.test(raw)&&!currencyTags.length)fail('Invalid OFX currency declaration.');
+  if(currencyTags.some(c=>c!=='USD'))fail('Only USD OFX statement currency is supported. No currency conversion is performed.');
   // One export may include multiple accounts. Do not merge them implicitly.
   const accountSections=[...raw.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
   if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
@@ -197,7 +204,10 @@ export function parseOFX(text) {
     try{return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),description:ofxField(b,'NAME')||ofxField(b,'MEMO')||'Transaction',memo:ofxField(b,'MEMO'),id:ofxField(b,'FITID')};}
     catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
-  return {transactions,source:'OFX / QBO / QFX',warnings:['Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.']};
+  return {transactions,source:'OFX / QBO / QFX',warnings:[
+    'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
+    ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[])
+  ]};
 }
 export function parseIIF(text,dateFormat='us'){
   const rows=String(text).replace(/^\uFEFF/,'').split(/\r?\n/).map(r=>r.split('\t'));

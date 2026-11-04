@@ -7,8 +7,8 @@ const drop=$('#drop-zone'), fileInput=$('#file-input'), formatPicker=$('#target-
 if(drop && fileInput){
   const source=drop.dataset.source||'any';
   const fixedOutput=drop.dataset.output||'csv';
-  let file=null,parsed=null,table=null,fileText="",fileExt="",audit=null;
-  let batchFiles=[],batchArchive=null,batchInfo=null,batchHasWarnings=false;
+  let file=null,parsed=null,table=null,fileText="",fileExt="",audit=null,selectionEpoch=0;
+  let batchFiles=[],batchArchive=null,batchInfo=null,batchHasWarnings=false,batchEpoch=0;
   const say=(msg,kind='info')=>{const box=$('#work-status');box.textContent=msg;box.dataset.state=kind;box.hidden=false;};
   function setButton(on){const btn=$('#export-button');btn.disabled=!on;btn.setAttribute('aria-disabled',String(!on));}
   function updateMapping(headers){
@@ -34,6 +34,7 @@ if(drop && fileInput){
     $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);setButton(true);say(audit.warnings.length?'Ready with duplicate warnings. Inspect them before downloading.':'Ready. Review the transaction preview, then download.', audit.warnings.length?'info':'success');
   }
   async function prepare(chosen){
+    const epoch=++selectionEpoch;
     file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#file-name').textContent='';
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
@@ -42,12 +43,15 @@ if(drop && fileInput){
     if(source!=='any' && source!==ext && !(source==='csv'&&ext==='tsv')){say('This tool expects a .'+source+' input. Choose a matching file or browse another converter.','error');return;}
     $('#file-name').textContent=file.name+' • '+Math.ceil(file.size/1024)+' KB';
     try{
-      const text=await file.text();fileText=text;fileExt=ext;
+      const text=await chosen.text();
+      if(epoch!==selectionEpoch)return; // A superseded async read must not restore old bank data.
+      if(text.includes('\uFFFD'))throw Error('This file contains undecodable text. Export as UTF-8 before continuing.');
+      fileText=text;fileExt=ext;
       if(ext==='csv'||ext==='tsv'){
         updateMapping(parseCSV(text,ext==='tsv'?'\t':undefined)[0]);
         say('Select column mappings, then choose Preview transactions.');
       }else{parsed=parseInput(text,ext,{dateFormat:$('#date-format').value});renderResult(parsed);}
-    }catch(err){say(err.message||'Could not read file.','error');}
+    }catch(err){if(epoch===selectionEpoch)say(err.message||'Could not read file.','error');}
   }
   const batchPicker=$('#batch-input'),batchSelect=$('#batch-choose'),batchExport=$('#batch-export');
   function batchReset(){
@@ -63,6 +67,7 @@ if(drop && fileInput){
   }
   batchSelect?.addEventListener('click',()=>{batchPicker.value='';batchPicker.click();});
   batchPicker?.addEventListener('change',async()=>{
+    const epoch=++batchEpoch;
     batchReset();
     batchFiles=Array.from(batchPicker.files||[]);
     const list=$('#batch-file-list');list.replaceChildren();
@@ -78,12 +83,14 @@ if(drop && fileInput){
     await Promise.resolve();
     try{
       const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,text:await selected.text()})));
+      if(epoch!==batchEpoch)return;
+      if(texts.some(item=>item.text.includes('\uFFFD')))throw Error('A batch file contains undecodable text. Export as UTF-8 before continuing.');
       batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
       batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
       batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s). No accounts merged.');
       if(batchHasWarnings){$('#batch-ack-label').hidden=false;batchExport.disabled=true;}
       else batchExport.disabled=false;
-    }catch(err){batchReset();batchSay(err.message||'Batch conversion failed; no files produced.',true);}
+    }catch(err){if(epoch===batchEpoch){batchReset();batchSay(err.message||'Batch conversion failed; no files produced.',true);}}
   });
   $('#batch-ack')?.addEventListener('change',event=>{if(batchExport)batchExport.disabled=!batchArchive||(batchHasWarnings&&!event.target.checked);});
   batchExport?.addEventListener('click',()=>{
@@ -93,12 +100,12 @@ if(drop && fileInput){
     batchSay('ZIP downloaded. Review each file and its validation report before import.');
   });
   formatPicker?.addEventListener('change',()=>{
-    if(batchFiles.length){batchReset();batchSay('Output format changed. Select batch files again to regenerate the results.');}
+    if(batchFiles.length){batchEpoch++;batchReset();batchFiles=[];if(batchPicker)batchPicker.value='';$('#batch-file-list').replaceChildren();batchSay('Output format changed. Select batch files again to regenerate results.');}
   });
   // Date ordering applies to QIF and IIF as well as CSV; changing it must
   // refresh the preview rather than silently leave the old interpretation.
   $('#date-format')?.addEventListener('change',()=>{
-    if(batchFiles.length){batchReset();batchSay('Date order changed. Select batch files again to avoid stale exports.');}
+    if(batchFiles.length){batchEpoch++;batchReset();batchFiles=[];if(batchPicker)batchPicker.value='';$('#batch-file-list').replaceChildren();batchSay('Date order changed. Select batch files again to avoid stale exports.');}
     if(!file||!fileText)return;
     if(fileExt==='csv'||fileExt==='tsv'){
       parsed=null;setButton(false);$('#preview-panel').hidden=true;
@@ -109,6 +116,11 @@ if(drop && fileInput){
     }
   });
   $('#clear-workspace')?.addEventListener('click',()=>{
+    selectionEpoch++;batchEpoch++;
+    batchFiles=[];batchReset();
+    if(batchPicker)batchPicker.value='';
+    if($('#batch-file-list'))$('#batch-file-list').replaceChildren();
+    batchSay('Batch files and generated ZIP cleared from the workspace.');
     file=null;parsed=null;audit=null;table=null;fileText='';fileExt='';
     fileInput.value='';
     $('#file-name').textContent='';
@@ -118,7 +130,7 @@ if(drop && fileInput){
     $('#preview-panel').hidden=true;
     $('#warning-box').hidden=true;
     setButton(false);
-    say('Workspace cleared. Source file and preview are no longer retained by this page. Already downloaded files remain on your device.','success');
+    say('Workspace cleared, including source files, batch ZIP and previews. Previously downloaded files and saved mappings remain on your device.','success');
   });
   fileInput.addEventListener('change',event=>prepare(event.target.files[0]));
   drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.add('is-dragging');});

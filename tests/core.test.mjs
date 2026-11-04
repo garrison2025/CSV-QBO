@@ -183,3 +183,19 @@ test('CSV refuses conflicting or duplicate mapping choices',()=>{
   assert.throws(()=>csvTransactions(simple,{amount:99}),/Invalid mapping/);
   assert.equal(csvTransactions(simple).transactions[0].amount,'-5.00');
 });
+
+test('CSV blocks null bytes without silently corrupting financial rows',()=>{
+ assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,Cafe\u0000,-2.00'),/null bytes/);
+});
+test('Only explicit USD amount and OFX statement currencies are accepted',()=>{
+ for(const n of ['€12.00','£12.00','¥12.00','₹12.00'])assert.throws(()=>toMinorUnits(n),/Non-USD/);
+ const tx='<STMTTRN><DTPOSTED>20261104<TRNAMT>12.00<FITID>1<NAME>Test</STMTTRN>';
+ const wrap=c=>'<OFX><CURDEF>'+c+'</CURDEF><BANKTRANLIST>'+tx+'</BANKTRANLIST></OFX>';
+ assert.throws(()=>parseOFX(wrap('EUR')),/Only USD/);
+ assert.equal(parseOFX(wrap('USD')).transactions[0].amount,'12.00');
+ assert.ok(parseOFX('<OFX>'+tx+'</OFX>').warnings.some(w=>w.includes('currency')));
+ assert.throws(()=>parseOFX('<OFX><CURRENCY><CURRATE>1.2</CURRENCY>'+tx+'</OFX>'),/currency conversion/);
+});
+test('XLSX refuses invalid XML control characters',()=>{
+ assert.throws(()=>toXLSX([{date:'2026-11-04',description:'bad\u0001cell',amount:'1.00',id:'x'}]),/control character/);
+});

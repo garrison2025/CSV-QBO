@@ -51,3 +51,13 @@ test('clear workspace control is available on every converter page',()=>{
  assert.match(read('index.html'),/id="clear-workspace"/);
  assert.match(read('tools/qbo-to-csv/index.html'),/id="clear-workspace"/);
 });
+
+test('Clear workspace covers batch state and asynchronous file-read guards',()=>{
+ const html=read('index.html');
+ assert.match(html,/id="clear-workspace" type="button">Clear workspace/);
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/selectionEpoch\+\+/);
+ assert.match(app,/batchEpoch\+\+/);
+ assert.match(app,/if\(epoch!==selectionEpoch\)return/);
+ assert.match(app,/if\(epoch!==batchEpoch\)return/);
+});
