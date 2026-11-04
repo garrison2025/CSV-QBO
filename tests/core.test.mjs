@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,decodeFinancialBytes,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals} from '../src/core.mjs';
+import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,decodeFinancialBytes,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,validateQuickBooksCSVParts,auditTransactions,totals} from '../src/core.mjs';
 import {toXLSX,toZIP} from '../src/xlsx.mjs';
 
 test('strict cents and signed amounts',()=>{
@@ -572,4 +572,64 @@ test('ZIP writer includes valid central file offsets and exact UTF-8 byte counts
  assert.equal(archive.readUInt32LE(position),0x06054b50);
  assert.equal(archive.readUInt32LE(position+16),centralStart);
  assert.equal(archive.readUInt32LE(position+12),position-centralStart);
+});
+
+
+test('QuickBooks v2 preflight checks exact serialized row identity and order, not only totals',()=>{
+ const tx=[
+  {date:'2026-11-04',description:'Original bookstore',amount:'10.00',id:'SECRET-ONE'},
+  {date:'2026-11-05',description:'Other bookstore',amount:'10.00',id:'SECRET-TWO'},
+  {date:'2026-11-06',description:'Coffee',amount:'-5.00',id:'SECRET-THREE'}
+ ];
+ const {parts,report}=quickBooksCSVExportPlan(tx,{maxRows:2});
+ assert.equal(parts.length,2);
+ assert.equal(report.reportType,'Finance File Lab QuickBooks CSV preflight v2');
+ assert.equal(report.orderedRowsReconciled,true);
+ assert.equal(report.sourceDescriptionsReconciled,true);
+ assert.equal(report.sourceAmountsReconciled,true);
+ assert.deepEqual(report.parts.map(p=>p.sourceRowRange),[{first:1,last:2},{first:3,last:3}]);
+ assert.ok(report.parts.every(p=>p.orderedRowsReconciled));
+ assert.deepEqual(validateQuickBooksCSVParts(tx,parts,{maxRows:2}).parts,report.parts);
+ const reportOnly=JSON.stringify(report);
+ for(const value of ['Original bookstore','Other bookstore','Coffee','SECRET-ONE','SECRET-TWO','SECRET-THREE'])
+  assert.ok(!reportOnly.includes(value),'privacy metadata leaked '+value);
+ const changedDesc=parts.map(p=>p.replace('Original bookstore','Completely changed payee'));
+ assert.throws(()=>validateQuickBooksCSVParts(tx,changedDesc,{maxRows:2}),/source-row mismatch in part 1, row 1/);
+ const changedDate=parts.map(p=>p.replace('11\/04\/2026','11/05/2026'));
+ assert.throws(()=>validateQuickBooksCSVParts(tx,changedDate,{maxRows:2}),/source-row mismatch/);
+ const reordered=parts.slice();
+ const lines=parseCSV(parts[0]);
+ reordered[0]='\uFEFF'+lines.map(a=>a.join(',')).slice(0,1).concat(lines.slice(1).reverse().map(a=>a.join(','))).join('\r\n')+'\r\n';
+ assert.throws(()=>validateQuickBooksCSVParts(tx,reordered,{maxRows:2}),/source-row mismatch/);
+ assert.throws(()=>validateQuickBooksCSVParts(tx,[parts[1],parts[0]],{maxRows:2}),/source-row mismatch/);
+});
+test('QuickBooks validator rejects dropped/additional rows even if arithmetic totals cancel',()=>{
+ const tx=[{date:'2026-11-04',description:'A',amount:'1.00'},
+           {date:'2026-11-05',description:'B',amount:'-1.00'}];
+ const {parts}=quickBooksCSVExportPlan(tx);
+ const lines=parts[0].split('\r\n');
+ assert.throws(()=>validateQuickBooksCSVParts(tx,[lines.slice(0,2).join('\r\n')+'\r\n']),/source and output totals or row counts differ/);
+ const extra=parts[0]+lines[1]+'\r\n';
+ assert.throws(()=>validateQuickBooksCSVParts(tx,[extra]),/more rows than the source/);
+});
+test('QuickBooks validator preserves formula-safe leading characters and UTF-8 multiline payees exactly',()=>{
+ const tx=[{date:'2026-11-04',description:'  =SECRET(),"café"\n上海',amount:'-0.01',id:'PRIVATE-REF'},
+           {date:'2026-11-05',description:'-not numeric',amount:'0.02',id:'PRIVATE-ID'}];
+ const {parts,report}=quickBooksCSVExportPlan(tx,{maxRows:1});
+ assert.equal(parts.length,2);
+ assert.equal(report.csvEscapedDescriptionCount,2);
+ assert.ok(parseCSV(parts[0])[1][1].startsWith("'  =SECRET"));
+ assert.ok(parseCSV(parts[1])[1][1].startsWith("'-"));
+ const tampered=parts.slice();
+ tampered[0]=tampered[0].replace("'  =SECRET","  =SECRET");
+ assert.throws(()=>validateQuickBooksCSVParts(tx,tampered,{maxRows:1}),/source-row mismatch/);
+ assert.equal(report.parts[0].rows,1);
+});
+test('QuickBooks validator rejects unsupported part size, headers and missing export parts',()=>{
+ const tx=[{date:'2026-11-04',description:'Valid',amount:'1.00'}];
+ const {parts}=quickBooksCSVExportPlan(tx);
+ assert.throws(()=>validateQuickBooksCSVParts(tx,[]),/one or more generated CSV parts/);
+ assert.throws(()=>validateQuickBooksCSVParts(tx,['Date,Wrong,Amount\r\n11/04/2026,Valid,1.00\r\n']),/header does not match/);
+ assert.throws(()=>validateQuickBooksCSVParts(tx,parts,{maxRows:0}),/Invalid QuickBooks CSV validation limits/);
+ assert.throws(()=>validateQuickBooksCSVParts(tx,parts,{maxBytes:64}),/exceeded its row or byte limit/);
 });
