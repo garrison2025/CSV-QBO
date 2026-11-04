@@ -99,7 +99,12 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
     const r=rows[i]; if(r.every(c=>!String(c??'').trim())) continue;
     const get=key=>map[key]>=0?String(r[map[key]]??'').trim():'';
     try {
-      const amount=map.amount>=0?toMinorUnits(get('amount')):toMinorUnits(get('credit')||'0')-toMinorUnits(get('debit')||'0');
+      const credit=map.credit>=0?toMinorUnits(get('credit')||'0'):0n;
+      const debit=map.debit>=0?toMinorUnits(get('debit')||'0'):0n;
+      if(map.amount<0&&(credit<0n||debit<0n))fail('Debit and Credit columns cannot contain negative values; choose a signed Amount column instead.');
+      if(map.amount<0&&credit!==0n&&debit!==0n)fail('Both Debit and Credit are nonzero in the same row.');
+      const amount=map.amount>=0?toMinorUnits(get('amount')):credit-debit;
+      if(!get('description'))fail('Description is empty.');
       transactions.push({date:isoDate(get('date'),dateFormat),description:get('description'),amount:fromMinorUnits(amount),id:get('id'),memo:''});
     } catch (e) { fail('CSV row '+(i+1)+': '+e.message); }
   }
@@ -174,7 +179,66 @@ export function toQIF(transactions){
     return 'D'+d+'\r\nT'+fromMinorUnits(toMinorUnits(t.amount))+'\r\nP'+String(t.description||'').replace(/[\r\n^]/g,' ')+'\r\n'+(t.memo?'M'+String(t.memo).replace(/[\r\n^]/g,' ')+'\r\n':'')+'^\r\n';
   }).join('');
 }
-export function toQuickBooksCSV(transactions){return toCSV(transactions,['date','description','amount']);}
+/** QuickBooks Online 3-column manual-upload CSV, not .qbo Web Connect. */
+export function toQuickBooksCSV(transactions){
+  if(!Array.isArray(transactions)||!transactions.length) fail('No transactions to export.');
+  const formatted=transactions.map((t,i)=>{
+    try {
+      const iso=isoDate(t.date);
+      const [year,month,day]=iso.split('-');
+      if(!String(t.description??'').trim())fail('Description is required.');
+      return {Date:`${month}/${day}/${year}`,Description:t.description,Amount:fromMinorUnits(toMinorUnits(t.amount))};
+    } catch(e){fail('QuickBooks CSV row '+(i+1)+': '+e.message);}
+  });
+  return toCSV(formatted,['Date','Description','Amount']);
+}
+/** Split QuickBooks Online CSVs by 1,000 rows / 350 KB on row boundaries. */
+export function quickBooksCSVParts(transactions,{maxRows=1000,maxBytes=350000}={}){
+  if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to export.');
+  if(!Number.isInteger(maxRows)||maxRows<1||maxRows>1000)fail('Invalid QuickBooks row limit.');
+  if(!Number.isInteger(maxBytes)||maxBytes<64||maxBytes>350000)fail('Invalid QuickBooks file-size limit.');
+  const parts=[];let batch=[];let usedBytes=0;
+  const size=s=>new TextEncoder().encode(s).length;
+  const headerSize=size(toQuickBooksCSV([{date:'2026-01-01',description:'x',amount:'1.00'}]).split('\r\n')[0]+'\r\n');
+  const fixedBytes=headerSize;
+  for(const tx of transactions){
+    const single=toQuickBooksCSV([tx]);
+    const rowText=single.slice(single.indexOf('\r\n')+2);
+    const rowBytes=size(rowText);
+    if(rowBytes+fixedBytes>maxBytes)fail('One transaction is too large for the selected QuickBooks CSV limit.');
+    if(batch.length&&(batch.length>=maxRows||usedBytes+rowBytes>maxBytes)){
+      parts.push(toQuickBooksCSV(batch));batch=[];usedBytes=0;
+    }
+    if(!batch.length)usedBytes=fixedBytes;
+    batch.push(tx);usedBytes+=rowBytes;
+  }
+  if(batch.length)parts.push(toQuickBooksCSV(batch));
+  return parts;
+}
+/** Duplicate checks warn; they never mutate or drop the user's records. */
+export function auditTransactions(transactions){
+  if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to audit.');
+  const idIndex=new Map(),fingerprints=new Map(),duplicateIds=[],possibleDuplicates=[];
+  const normalized=transactions.map((t,i)=>{
+    const date=isoDate(t.date),amount=fromMinorUnits(toMinorUnits(t.amount));
+    const description=String(t.description??'').trim();
+    if(!description)fail('Transaction '+(i+1)+' has no description.');
+    const id=String(t.id??'').trim();
+    if(id){
+      if(idIndex.has(id))duplicateIds.push({firstRow:idIndex.get(id)+1,row:i+1,reference:id});
+      else idIndex.set(id,i);
+    }
+    const key=[date,amount,description.toLowerCase().replace(/\s+/g,' ')].join('|');
+    if(fingerprints.has(key))possibleDuplicates.push({firstRow:fingerprints.get(key)+1,row:i+1});
+    else fingerprints.set(key,i);
+    return {date,amount,description,id};
+  });
+  const summary=totals(normalized);
+  const warnings=[];
+  if(duplicateIds.length)warnings.push(duplicateIds.length+' repeated transaction reference(s) found. Review before importing; no rows were deleted.');
+  if(possibleDuplicates.length)warnings.push(possibleDuplicates.length+' possible same-date, same-amount and same-description duplicate(s). Review; no rows were deleted.');
+  return {summary,duplicateIds,possibleDuplicates,warnings};
+}
 export function totals(transactions){
   let debit=0n,credit=0n;
   for(const row of transactions){const n=toMinorUnits(row.amount);if(n<0n)debit+=-n;else credit+=n;}
