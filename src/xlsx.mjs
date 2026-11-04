@@ -90,18 +90,15 @@ export function toXLSX(transactions){
   for(let i=0;i<transactions.length;i++){
     const t=transactions[i],row=i+2;
     let serial,amount;
-    try{
-      serial=excelDateSerial(t.date);
-      amount=exactExcelAmount(t.amount);
-    }catch(error){
-      // Never echo a sensitive source field into an export error.
-      throw new Error('Excel export transaction '+(i+1)+': invalid date or exact-cent amount.');
-    }
+    try{serial=excelDateSerial(t.date);}
+    catch{throw new Error('Excel export transaction '+(i+1)+': invalid transaction date.');}
+    try{amount=exactExcelAmount(t.amount);}
+    catch{throw new Error('Excel export transaction '+(i+1)+': invalid amount or unsupported cent precision.');}
     const description=String(t.description??''),reference=String(t.id??'');
     if(!description.trim())throw new Error('Excel export transaction '+(i+1)+': Description is empty.');
     const textCell=(column,value)=>{
       try{return '<c r="'+column+row+'" t="inlineStr"><is><t xml:space="preserve">'+esc(value)+'</t></is></c>';}
-      catch{throw new Error('Excel export transaction '+(i+1)+': unsupported text in '+(column==='B'?'Description':'Reference')+'.');}
+      catch{throw new Error('Excel export transaction '+(i+1)+': unsupported control character or invalid text in '+(column==='B'?'Description':'Reference')+'.');}
     };
     cells.push('<row r="'+row+'">'+
       '<c r="A'+row+'" s="2"><v>'+serial+'</v></c>'+
