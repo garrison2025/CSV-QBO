@@ -156,3 +156,14 @@ test('batch UI preserves original file sizes and reports cross-file overlaps wit
  assert.match(page,/unknown codes fail with an error/i);
  assert.match(page,/noindex,nofollow/);
 });
+
+
+test('OFX compatibility documentation describes structural CDATA and bank status guards',()=>{
+ const html=read('compatibility/index.html');
+ assert.match(html,/BANKTRANLIST\/STATUS boundaries checked/);
+ assert.match(html,/CDATA and comment text cannot create transactions or bypass status errors/);
+ assert.match(html,/noindex,nofollow/);
+ const core=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ assert.match(core,/function ofxViews\(source\)/);
+ assert.match(core,/Unclosed OFX bank STATUS/);
+});
