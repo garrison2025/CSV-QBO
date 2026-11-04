@@ -133,3 +133,12 @@
 - All source files in browser acceptance are synthetic. The CI runs against `dist/` served on localhost, **not** against a production QuickBooks tenant or real bank account. Production-domain user acceptance, Web Connect `.qbo` writing, QuickBooks acceptance and bank-specific validation remain **NOT RUN / NOT RELEASED**.
 - Browser tests are CI-only and install `playwright-core` transiently; the published site itself still has zero runtime npm dependencies and no paid API.
 - GitHub main merge SHA and Cloudflare Pages successful deployment: to be verified after release merge.
+
+## V1.5 — QuickBooks CSV exact ordered-row preflight (2026-11-04)
+
+- The previous preflight re-parsed outputs and checked row totals and USD cents, but could not independently detect altered transaction descriptions or reordered rows when totals stayed unchanged.
+- New `validateQuickBooksCSVParts(source,parts,limits)` checks exactly one serialized Date/Description/Amount triple for each original row in order, with explicit US date, cent value, Unicode/multiline description and spreadsheet-formula guard reconciliation.
+- Report v2 records safe ordinal source row ranges and whether ordered rows, descriptions and amount strings were reconciled. No account IDs, source filenames, payee text or transaction descriptions are included.
+- Tests cover swapped rows, altered payees, date changes, omitted/extra rows, modified formula prefixes, encoding and small row/byte limits; Chrome E2E checks real 1001-row split ZIP and JSON receipt.
+- This does not imply QuickBooks import UAT and does not create Web Connect `.qbo` files. Domain still absent; Cloudflare Pages remains noindex.
+- CI/Cloudflare results must be verified separately after merge.
