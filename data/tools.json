@@ -158,10 +158,10 @@
     "volume": null,
     "kd": null,
     "cpc": null,
-    "summary": "Clean and standardize a CSV transaction list into a three-column file for the QuickBooks Online manual CSV upload workflow.",
-    "detail": "Choose date, description and amount columns. Format and preview the data before saving a fresh CSV. This does not generate a QBO Web Connect file and is not proof of a successful QuickBooks import.",
-    "faq": "Does this create a .qbo file?",
-    "answer": "No. It creates a three-column CSV for manual upload and field mapping in QuickBooks Online. Import success depends on the receiving account.",
+    "summary": "Map bank CSV columns, preview duplicate and formula warnings, and export a validated QuickBooks Online 3-column manual-upload CSV.",
+    "detail": "Preserves exact signed cents, formats US dates and checks 1,000-row / 350 KB parts. Each part is reparsed and totals reconciled before download. Multiple parts include a privacy-minimized validation JSON. Spreadsheet-formula-like descriptions are prefixed for safety. This is not a .qbo Web Connect file and QuickBooks import has not been verified.",
+    "faq": "Does it guarantee a successful QuickBooks Online import?",
+    "answer": "No. It checks local CSV syntax, amount totals and file-size limits. You must review warnings, select the correct account, upload manually and verify imported transactions in QuickBooks Online.",
     "release": "syntax_only"
   },
   {
