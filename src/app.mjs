@@ -103,7 +103,7 @@ if(drop && fileInput){
         updateMapping(parseCSV(text,ext==='tsv'?'\t':undefined)[0]);
         say('Select column mappings, then choose Preview transactions.');
       }else{parsed=withEncodingWarning(parseInput(text,ext,{dateFormat:$('#date-format').value}),encoding);renderResult(parsed);}
-    }catch(err){if(epoch===selectionEpoch)say(err.message||'Could not read file.','error');}
+    }catch(err){if(epoch===selectionEpoch){invalidatePreview();say(err.message||'Could not read file.','error');}}
   }
   const batchPicker=$('#batch-input'),batchSelect=$('#batch-choose'),batchExport=$('#batch-export');
   function batchReset(){
