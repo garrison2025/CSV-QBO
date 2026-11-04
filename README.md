@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.8 — balanced IIF group validation and auditable file summaries
+
+- IIF read-only parsing now requires complete `!TRNS`/`!SPL`-typed journal groups closed by `ENDTRNS`; it verifies each TRNS amount plus its SPL legs sums to zero using integer cents. Orphan SPLs, incomplete groups and imbalanced entries block the entire conversion.
+- CSV and Excel exports contain **TRNS summary rows only**. SPL allocations, chart of accounts and ledger relationships are **not** exported or reconstructed. An IIF summary must never be presented as a certified bank feed, full accounting migration or QuickBooks-importable file.
+- Single-file and batch validation JSON now includes source-specific `parserIntegrity` counters for IIF, date coverage and explicit non-ledger scope; it does not include original filenames, accounts, memos or transaction descriptions.
+- Updated synthetic IIF test sample has two correctly balanced TRNS/SPL/ENDTRNS groups. New negative test fixtures verify rejection of malformed, missing and unbalanced groups.
+- Preview site remains `noindex`; no real QuickBooks Desktop/Online import UAT has been performed.
+
 ## V0.7 — safe OFX/QIF bank record boundaries
 
 - OFX/QBO/QFX reading now rejects truncated/nested `STMTTRN` aggregates and source rows without NAME or MEMO, rather than silently outputting misleading partial transactions.
