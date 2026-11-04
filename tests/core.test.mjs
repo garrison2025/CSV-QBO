@@ -700,3 +700,58 @@ test('OFX CDATA content may contain literal script-looking text without executin
  assert.equal(data.transactions.length,1);
  assert.equal(data.transactions[0].description,'Pay <script>alert(1)</script>');
 });
+
+
+test('QIF writer preserves literal carets, UTF-8 text, memo and reference without lossy replacement',()=>{
+ const tx=[
+  {date:'2026-11-04',description:'City ^ North café 😊',amount:'-12.34',id:'REF^A',memo:'Paid ^ Tuesday'},
+  {date:'2026-11-05',description:'上海 coffee ^ tea',amount:'12345.67',id:'',memo:'Café ^ 🍵'}
+ ];
+ const snapshot=JSON.stringify(tx);
+ const wire=toQIF(tx);
+ assert.match(wire,/PCity \^ North café 😊\r\n/);
+ assert.match(wire,/NREF\^A\r\n/);
+ assert.match(wire,/MPaid \^ Tuesday\r\n/);
+ assert.match(wire,/P上海 coffee \^ tea\r\n/);
+ const reloaded=parseQIF(wire,'us');
+ assert.deepEqual(reloaded.transactions.map(x=>({date:x.date,amount:x.amount,description:x.description,id:x.id,memo:x.memo})),tx);
+ assert.equal(JSON.stringify(tx),snapshot,'source bank data must not be changed by export');
+});
+test('QIF writer refuses multiline or control-character field content instead of silently changing it',()=>{
+ const original={date:'2026-11-04',description:'Bookstore',amount:'1.00',id:'A',memo:'Paid'};
+ for(const [field,value] of [
+  ['description','Shop\nBranch'],['description','Shop\rBranch'],
+  ['description','Shop\r\nBranch'],['description','Shop\tBranch'],
+  ['description','Shop\u0000Branch'],['description','Shop\u001fBranch'],
+  ['id','CHECK\n123'],['memo','memo\r\nsecond line'],['memo','memo\u007fend']
+ ]){
+  const record={...original,[field]:value};
+  assert.throws(()=>toQIF([record]),/QIF export row 1: .* contains a line break or control character/);
+  assert.equal(record[field],value,'rejecting invalid wire text must not mutate original');
+ }
+});
+test('QIF writer rejects empty merchant and invalid amount, without leaking payee or reference',()=>{
+ assert.throws(()=>toQIF([]),/No transactions/);
+ assert.throws(()=>toQIF([{date:'2026-11-04',description:' ',amount:'1.00'}]),/Description is empty/);
+ assert.throws(()=>toQIF([{date:'2026-11-04',description:'Pay',amount:'1.234'}]),/QIF export row 1: Invalid amount/);
+ assert.throws(()=>toQIF([{date:'invalid',description:'Pay',amount:'1.00'}]),/QIF export row 1:/);
+ try{toQIF([{date:'2026-11-04',description:'Secret customer\naddress',amount:'1.00',id:'REF-PRIVATE'}]);}
+ catch(error){
+  assert.ok(!error.message.includes('Secret customer'));
+  assert.ok(!error.message.includes('REF-PRIVATE'));
+ }
+});
+test('QIF writer round-trips all 1200 ordered rows and exact cent totals',()=>{
+ const tx=Array.from({length:1200},(_,i)=>({
+  date:'2026-11-'+String(i%28+1).padStart(2,'0'),
+  description:'Purchase '+i+' ^ café',
+  amount:fromMinorUnits(BigInt((i*1777)%500000-200000)),
+  id:'TX-'+i,
+  memo:i%3===0?'Memo ^ '+i:''
+ }));
+ const qif=toQIF(tx);
+ const checked=parseQIF(qif);
+ assert.equal(checked.transactions.length,tx.length);
+ assert.deepEqual(checked.transactions,tx.map(t=>({...t})));
+ assert.deepEqual(totals(checked.transactions),totals(tx));
+});
