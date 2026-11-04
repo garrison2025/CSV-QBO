@@ -9,6 +9,8 @@ if(drop && fileInput){
   const fixedOutput=drop.dataset.output||'csv';
   let file=null,parsed=null,table=null,fileText="",fileExt="",fileEncoding='utf-8',audit=null,selectionEpoch=0;
   let batchFiles=[],batchArchive=null,batchInfo=null,batchHasWarnings=false,batchEpoch=0;
+  const PREVIEW_PAGE_SIZE=25;
+  let previewPage=0,reviewCursor=0,reviewRows=[];
   const say=(msg,kind='info')=>{const box=$('#work-status');box.textContent=msg;box.dataset.state=kind;box.hidden=false;};
   function setButton(on){const btn=$('#export-button');btn.disabled=!on;btn.setAttribute('aria-disabled',String(!on));}
   function updateMapping(headers){
@@ -34,6 +36,12 @@ if(drop && fileInput){
     $('#warning-list').replaceChildren();
     $('#preview-body').replaceChildren();
     $('#preview-caption').textContent='';
+    previewPage=0;reviewCursor=0;reviewRows=[];
+    $('#preview-navigation').hidden=true;
+    $('#preview-page-status').textContent='';
+    $('#preview-previous').disabled=true;
+    $('#preview-next').disabled=true;
+    $('#preview-review').hidden=true;
     for(const key of ['count','net','debit','credit'])$('#summary-'+key).textContent='0';
     const statement=$('#statement-coverage');
     if(statement){statement.hidden=true;statement.textContent='';}
@@ -42,12 +50,71 @@ if(drop && fileInput){
     const report=$('#download-report');
     if(report)report.disabled=true;
   }
+  function renderPreviewPage(){
+    if(!parsed?.transactions?.length||!audit)return;
+    const records=parsed.transactions,total=records.length;
+    const pageCount=Math.ceil(total/PREVIEW_PAGE_SIZE);
+    previewPage=Math.max(0,Math.min(previewPage,pageCount-1));
+    const start=previewPage*PREVIEW_PAGE_SIZE,end=Math.min(start+PREVIEW_PAGE_SIZE,total);
+    const flagged=new Set(reviewRows);
+    const tbody=$('#preview-body');tbody.replaceChildren();
+    for(let i=start;i<end;i++){
+      const item=records[i],tr=document.createElement('tr'),rowNumber=i+1;
+      tr.setAttribute('data-row-number',String(rowNumber));
+      if(flagged.has(rowNumber))tr.className='is-review-row';
+      for(const key of ['date','description','amount','id']){
+        const td=document.createElement('td');
+        td.textContent=String(item[key]??'');
+        if(key==='amount')td.className=String(item.amount).startsWith('-')?'negative':'positive';
+        if(key==='description'&&flagged.has(rowNumber)){
+          const flag=document.createElement('span');
+          flag.className='row-flag';
+          flag.textContent='Possible duplicate';
+          td.appendChild(flag);
+        }
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    $('#preview-caption').textContent='Showing rows '+(start+1)+'–'+end+' of '+total+'. Preview only — downloads include all '+total+' transactions; no rows were removed.';
+    $('#preview-navigation').hidden=(pageCount===1&&!reviewRows.length);
+    $('#preview-previous').disabled=previewPage===0;
+    $('#preview-next').disabled=previewPage>=pageCount-1;
+    $('#preview-page-status').textContent='Page '+(previewPage+1)+' of '+pageCount;
+    $('#preview-review').hidden=reviewRows.length===0;
+    if(reviewRows.length)$('#preview-review').textContent='Next possible duplicate ('+reviewRows.length+' flagged rows)';
+  }
+  $('#preview-previous')?.addEventListener('click',()=>{
+    if(!parsed||previewPage<=0)return;
+    previewPage--;renderPreviewPage();
+  });
+  $('#preview-next')?.addEventListener('click',()=>{
+    if(!parsed||previewPage>=Math.ceil(parsed.transactions.length/PREVIEW_PAGE_SIZE)-1)return;
+    previewPage++;renderPreviewPage();
+  });
+  $('#preview-review')?.addEventListener('click',()=>{
+    if(!parsed||!reviewRows.length)return;
+    const row=reviewRows[reviewCursor%reviewRows.length];
+    reviewCursor++;
+    previewPage=Math.floor((row-1)/PREVIEW_PAGE_SIZE);
+    renderPreviewPage();
+    const target=Array.from($('#preview-body').children).find(x=>x.getAttribute?.('data-row-number')===String(row));
+    if(target){
+      target.className='is-review-row is-current-review-row';
+      target.scrollIntoView?.({block:'nearest',behavior:'smooth'});
+    }
+    $('#preview-page-status').textContent='Review row '+row+' of '+parsed.transactions.length+' · Page '+(previewPage+1)+' of '+Math.ceil(parsed.transactions.length/PREVIEW_PAGE_SIZE);
+  });
   function renderResult(data){
-    audit=auditTransactions(data.transactions);const t=audit.summary,tbody=$('#preview-body');tbody.replaceChildren();
-    data.transactions.slice(0,8).forEach(item=>{const tr=document.createElement('tr');for(const key of ['date','description','amount','id']){const td=document.createElement('td');td.textContent=String(item[key]??'');if(key==='amount')td.className=String(item.amount).startsWith('-')?'negative':'positive';tr.appendChild(td);}tbody.appendChild(tr);});
+    audit=auditTransactions(data.transactions);
+    const t=audit.summary;
+    previewPage=0;reviewCursor=0;
+    reviewRows=[...new Set([...audit.duplicateIds,...audit.possibleDuplicates]
+      .flatMap(pair=>[pair.firstRow,pair.row]))].sort((a,b)=>a-b);
+    renderPreviewPage();
     $('#preview-panel').hidden=false;$('#download-report').disabled=false;$('#summary-count').textContent=t.count.toLocaleString('en-US');$('#summary-net').textContent=t.net;$('#summary-debit').textContent=t.debit;
     $('#summary-credit').textContent=t.credit;
-    $('#preview-caption').textContent=data.transactions.length>8?'First 8 of '+data.transactions.length+' transactions are shown.':'All '+data.transactions.length+' transactions are shown.';
+
 
     const statement=$('#statement-coverage'),window=data.integrity?.statementRange;
     if(statement) {
