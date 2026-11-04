@@ -27,7 +27,7 @@ A **browser-local financial file conversion site** developed from the user-provi
 - Validate dates, descriptions and debit/credit conflicts; alert on duplicate transaction references and possible duplicate records **without changing or removing any row**.
 - Download an aggregate **validation-summary.json** containing transaction totals and row indices, never descriptions or account numbers.
 - Users may opt in to saving a local CSV column-mapping template; only column headers and positions are stored in that browser, not bank transactions.
-- Verified by **249 local automated tests** and [GitHub CI](https://github.com/garrison2025/CSV-QBO/actions). No actual receiving-software import tests have run.
+- Verified by **250 local automated tests** and [GitHub CI](https://github.com/garrison2025/CSV-QBO/actions). No actual receiving-software import tests have run.
 
 The project remains a technical preview on \`csv-qbo.pages.dev\` with \`noindex\` and blocked robots. These enhancements do **not** establish Desktop \`.qbo\` writer compatibility or paid SaaS readiness.
 
