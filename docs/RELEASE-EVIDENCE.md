@@ -85,3 +85,12 @@
 - Warned single-file exports now require an explicit user acknowledgement; duplicates are not removed. Warnings include CSV formula-looking payees that receive a protective apostrophe prefix.
 - This validation is NOT real QuickBooks import UAT or Web Connect `.qbo` creation. The site remains noindex; payment and production SEO remain gated.
 - CI pass and live Cloudflare verification to be confirmed at merge.
+
+## V1.0 — OFX / QBO / QFX bank-format variant integrity (2026-11-04)
+
+- In-browser byte decoding: UTF-8 strict, UTF-16 BOM, and OFX1.x declared Windows-1252, with no uploads. Unknown declarations, invalid text sequences, and null bytes cause explicit failure.
+- OFX SGML/XML transaction values: CDATA and numeric entities supported; malformed, duplicate or nested transaction fields and failed bank STATUS reports fail closed.
+- Verified bookkeeping semantics: signed TRNAMT is authoritative; TRNTYPE alone never flips debit/credit. Missing FITID/TRNTYPE count warnings but does not fabricate references.
+- Added separate synthetic XML and legacy 1252 fixtures with browser download links. No real banking data or bank-specific UAT used.
+- Source-level parserIntegrity counts are included in existing batch validation. Original filenames, account numbers and payee descriptions are excluded from validation reports.
+- CI test count and Cloudflare deployment verification pending; Pages preview still noindex and real QuickBooks import NOT RUN.
