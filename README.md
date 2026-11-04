@@ -20,6 +20,17 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.3 — browser-local data integrity workflow
+
+- Export **three-column QuickBooks Online CSV**, not Web Connect \`.qbo\`. Dates use explicit US \`MM/DD/YYYY\` and decimal amounts are verified with integer-cents.
+- Automatically split large CSV exports into parts of at most **1,000 transactions / 350 KB** each. Multi-part results are downloaded as a ZIP. Files are **not** uploaded to a server.
+- Validate dates, descriptions and debit/credit conflicts; alert on duplicate transaction references and possible duplicate records **without changing or removing any row**.
+- Download an aggregate **validation-summary.json** containing transaction totals and row indices, never descriptions or account numbers.
+- Users may opt in to saving a local CSV column-mapping template; only column headers and positions are stored in that browser, not bank transactions.
+- Verified by **249 local automated tests** and [GitHub CI](https://github.com/garrison2025/CSV-QBO/actions). No actual receiving-software import tests have run.
+
+The project remains a technical preview on \`csv-qbo.pages.dev\` with \`noindex\` and blocked robots. These enhancements do **not** establish Desktop \`.qbo\` writer compatibility or paid SaaS readiness.
+
 ## Run locally
 
 Node.js 20+ is required; no npm dependencies or paid API keys.
