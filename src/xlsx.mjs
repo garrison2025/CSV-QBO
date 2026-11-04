@@ -7,7 +7,7 @@ const put32=(a,v)=>{a.push(v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255);};
 function zip(files){
   const local=[],center=[];let offset=0;
   for(const [name,text] of Object.entries(files)){
-    const nam=utf8.encode(name),raw=utf8.encode(text),crc=crc32(raw),entry=[];
+    const nam=utf8.encode(name),raw=text instanceof Uint8Array?text:utf8.encode(text),crc=crc32(raw),entry=[];
     put32(entry,0x04034b50);put16(entry,20);put16(entry,0);put16(entry,0);put16(entry,0);put16(entry,0);put32(entry,crc);put32(entry,raw.length);put32(entry,raw.length);put16(entry,nam.length);put16(entry,0);entry.push(...nam,...raw);local.push(...entry);
     const c=[];put32(c,0x02014b50);put16(c,20);put16(c,20);put16(c,0);put16(c,0);put16(c,0);put16(c,0);put32(c,crc);put32(c,raw.length);put32(c,raw.length);put16(c,nam.length);put16(c,0);put16(c,0);put16(c,0);put16(c,0);put32(c,0);put32(c,offset);c.push(...nam);center.push(...c);
     offset+=entry.length;
@@ -32,5 +32,15 @@ export function toXLSX(transactions){
     'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" xfId="0"/><xf numFmtId="2" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>',
     'xl/worksheets/sheet1.xml':'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:D'+values.length+'"/><cols><col min="1" max="1" width="16" customWidth="1"/><col min="2" max="2" width="50" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="30" customWidth="1"/></cols><sheetData>'+cells+'</sheetData></worksheet>'
   };
+  return zip(files);
+}
+
+/** Bundle multiple locally generated outputs. Does not upload any data. */
+export function toZIP(files){
+  if(!files||Object.keys(files).length===0)throw new Error('No output files to archive.');
+  for(const [name,content] of Object.entries(files)){
+    if(!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,120}$/.test(name)||name.includes('..'))throw new Error('Unsafe ZIP filename.');
+    if(!(typeof content==='string'||content instanceof Uint8Array))throw new Error('Unsupported ZIP file contents.');
+  }
   return zip(files);
 }
