@@ -531,3 +531,45 @@ test('QIF unknown record codes, metadata-only groups and repeated sections fail 
 test('QIF missing payee and memo fails rather than exporting blank merchant fields',()=>{
  assert.throws(()=>parseQIF('!Type:Bank\nD11/04/2026\nT2.00\n^\n'),/no payee or memo/);
 });
+
+
+test('typed-array ZIP writer round-trips 10 MiB of bank CSV without boxed-array copies',()=>{
+ const payload='Date,Description,Amount\r\n'+'A'.repeat(10*1024*1024);
+ const archive=toZIP({'large-bank-export.csv':payload});
+ assert.ok(archive instanceof Uint8Array);
+ assert.ok(archive.byteLength>payload.length);
+ const bytes=Buffer.from(archive);
+ assert.equal(bytes.readUInt32LE(0),0x04034b50);
+ assert.equal(bytes.readUInt16LE(8),0); // no compression
+ const len=bytes.readUInt32LE(18),nameLen=bytes.readUInt16LE(26),extraLen=bytes.readUInt16LE(28);
+ assert.equal(len,new TextEncoder().encode(payload).length);
+ const start=30+nameLen+extraLen;
+ assert.equal(bytes.subarray(start,start+len).toString('utf8'),payload);
+ const end=bytes.byteLength-22;
+ assert.equal(bytes.readUInt32LE(end),0x06054b50);
+ assert.equal(bytes.readUInt16LE(end+10),1);
+ assert.equal(bytes.readUInt32LE(end+16),start+len);
+});
+test('ZIP writer includes valid central file offsets and exact UTF-8 byte counts',()=>{
+ const archive=Buffer.from(toZIP({'one.csv':'a,amount\ncafé,-0.01','two.csv':'name\n你好'}));
+ let position=0;
+ const names=[];
+ while(archive.readUInt32LE(position)===0x04034b50){
+  const size=archive.readUInt32LE(position+18),n=archive.readUInt16LE(position+26);
+  const extra=archive.readUInt16LE(position+28);
+  names.push(archive.subarray(position+30,position+30+n).toString('utf8'));
+  position+=30+n+extra+size;
+ }
+ assert.deepEqual(names,['one.csv','two.csv']);
+ const centralStart=position;
+ for(let i=0;i<names.length;i++){
+  assert.equal(archive.readUInt32LE(position),0x02014b50);
+  const n=archive.readUInt16LE(position+28),extra=archive.readUInt16LE(position+30),comment=archive.readUInt16LE(position+32);
+  const localOffset=archive.readUInt32LE(position+42);
+  assert.equal(archive.readUInt32LE(localOffset),0x04034b50);
+  position+=46+n+extra+comment;
+ }
+ assert.equal(archive.readUInt32LE(position),0x06054b50);
+ assert.equal(archive.readUInt32LE(position+16),centralStart);
+ assert.equal(archive.readUInt32LE(position+12),position-centralStart);
+});
