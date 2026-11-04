@@ -39,14 +39,18 @@ export function batchConvert(inputs,{target='csv',source='any',dateFormat='us'}=
     entries[name]=target==='xlsx'?toXLSX(parsed.transactions):toCSV(parsed.transactions);
     const duplicateFile=signatures.has(item.text)?signatures.get(item.text):null;
     if(!duplicateFile)signatures.set(item.text,i+1);
+    const dates=parsed.transactions.map(transaction=>transaction.date).sort();
+    const dateRange={first:dates[0],last:dates[dates.length-1]};
+    const parserIntegrity=parsed.integrity||null;
     const warnings=[...parsed.warnings,...audit.warnings];
     if(duplicateFile)warnings.push('File content duplicates batch item '+duplicateFile+'. No data was removed.');
     reports.push({index:i+1,inputType:ext,outputFile:name,rows:audit.summary.count,
       totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,
       duplicateReferenceCount:audit.duplicateIds.length,possibleDuplicateCount:audit.possibleDuplicates.length,
-      warnings});
+      dateRange,parserIntegrity,outputIsLedger:false,warnings});
   }
-  const report={format:'Finance File Lab batch validation v1',localOnly:true,
+  const report={format:'Finance File Lab batch validation v2',localOnly:true,
+    reportScope:'File-level transaction summary only. IIF journal allocations are not reconstructed.',
     autoMergedAccounts:false,autoDeletedTransactions:false,target,files:reports,
     totalFiles:inputs.length,totalTransactions:rows,
     sourceFileNamesIncluded:false,quickBooksImportTested:false};
