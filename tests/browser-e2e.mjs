@@ -145,6 +145,30 @@ try{
  assert.match(output.content.toString('utf8'),/D11\/04\/2026\r\nT-12\.50\r\nPSample bookstore/);
  console.log('PASS browser CSV -> experimental QIF syntax download');
 
+ // QIF fields are line-oriented; source payee newlines must fail rather than
+ // silently changing the transaction and serving a corrupt accounting file.
+ const caretCSV='Date,Description,Amount,Reference\n11/04/2026,Bookstore ^ café,-5.25,REF^A\n';
+ await page.locator('#file-input').setInputFiles(file('caret.csv',caretCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/PBookstore \^ café\r\nNREF\^A\r\n\^\r\n/);
+ console.log('PASS Chrome CSV-to-QIF preserves literal caret and UTF-8 reference without rewriting');
+
+ const multilineCSV='Date,Description,Amount,Reference\n11/04/2026,"Private merchant\nnorth floor",-5.25,CONFIDENTIAL-REF\n';
+ await page.locator('#file-input').setInputFiles(file('multiline.csv',multilineCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#preview-panel').isVisible(),true);
+ await page.locator('#export-button').click();
+ assert.equal(await page.locator('#work-status').getAttribute('data-state'),'error');
+ const errorText=await page.locator('#work-status').textContent();
+ assert.match(errorText,/QIF export row 1: Description contains a line break or control character/);
+ assert.ok(!errorText.includes('Private merchant'));
+ assert.ok(!errorText.includes('CONFIDENTIAL-REF'));
+ console.log('PASS Chrome blocks lossy newline QIF export without exposing source details in errors');
+
+
  // 1,001 unique bank rows must split into two real QuickBooks CSV files and a
  // privacy-minimized report. Check the browser-downloaded ZIP, not just a stub.
  await page.goto(base+'/tools/quickbooks-csv-formatter/');

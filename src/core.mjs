@@ -511,12 +511,56 @@ export function parseInput(text,format,opts={}) {
   if(f==='iif')return parseIIF(text,opts.dateFormat||'us');
   fail('Unsupported input format: '+f);
 }
+/**
+ * QIF has line-oriented D/T/P/N/M records and a bare ^ terminator.
+ * Newlines or control bytes within source fields cannot be represented
+ * losslessly. Reject them; never silently flatten payees or references.
+ * A literal caret inside a P/N/M value is safe (only a whole "^" line ends
+ * a transaction) and must not be removed from the original description.
+ */
 export function toQIF(transactions){
-  if(!transactions.length)fail('No transactions.');
-  return '!Type:Bank\r\n'+transactions.map(t=>{
-    const date=isoDate(t.date).split('-');const d=date[1]+'/'+date[2]+'/'+date[0];
-    return 'D'+d+'\r\nT'+fromMinorUnits(toMinorUnits(t.amount))+'\r\nP'+String(t.description||'').replace(/[\r\n^]/g,' ')+'\r\n'+(t.id?'N'+String(t.id).replace(/[\r\n^]/g,' ')+'\r\n':'')+(t.memo?'M'+String(t.memo).replace(/[\r\n^]/g,' ')+'\r\n':'')+'^\r\n';
-  }).join('');
+  if(!Array.isArray(transactions)||!transactions.length)fail('No transactions.');
+  const expected=[];
+  const output=transactions.map((t,i)=>{
+    const row=i+1;
+    const safeField=(value,key)=>{
+      const s=String(value??'');
+      if(/[\u0000-\u001f\u007f]/.test(s))
+        fail('QIF export row '+row+': '+key+' contains a line break or control character. QIF cannot preserve it exactly; change the source or choose CSV/XLSX.');
+      return s;
+    };
+    let date,amount;
+    try{
+      date=isoDate(t.date);
+      amount=fromMinorUnits(toMinorUnits(t.amount));
+    }catch(error){fail('QIF export row '+row+': '+error.message);}
+    const description=safeField(t.description,'Description'),
+      id=safeField(t.id,'Reference'),
+      memo=safeField(t.memo,'Memo');
+    if(!description.trim())fail('QIF export row '+row+': Description is empty.');
+    const [year,month,day]=date.split('-');
+    expected.push({date,amount,description,id,memo});
+    return 'D'+month+'/'+day+'/'+year+'\r\n'+
+      'T'+amount+'\r\n'+
+      'P'+description+'\r\n'+
+      (id?'N'+id+'\r\n':'')+
+      (memo?'M'+memo+'\r\n':'')+
+      '^\r\n';
+  });
+  const wire='!Type:Bank\r\n'+output.join('');
+  let check;
+  try{check=parseQIF(wire,'us');}
+  catch(error){fail('QIF export self-check failed: '+error.message);}
+  if(check.transactions.length!==expected.length)
+    fail('QIF export self-check failed: source and output transaction counts differ.');
+  for(let i=0;i<expected.length;i++){
+    const source=expected[i],record=check.transactions[i];
+    for(const key of ['date','amount','description','id','memo']){
+      if(record[key]!==source[key])
+        fail('QIF export self-check failed at row '+(i+1)+': '+key+' did not round-trip exactly.');
+    }
+  }
+  return wire;
 }
 /** QuickBooks Online 3-column manual-upload CSV, not .qbo Web Connect. */
 export function toQuickBooksCSV(transactions){

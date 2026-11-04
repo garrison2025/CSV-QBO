@@ -201,3 +201,17 @@ test('all twelve conversion tools expose browser-local preview search and duplic
  assert.match(app,/Preview only — downloads include all/);
  assert.match(app,/preview-search'\)\.value=''/);
 });
+
+
+test('CSV to QIF landing page discloses strict lossless fields and no target-app certification',()=>{
+ const html=read('tools/csv-to-qif/index.html');
+ assert.match(html,/QIF uses one physical line for each field/);
+ assert.match(html,/QIF Bank export is generated entirely in your browser/);
+ assert.match(html,/compatibility with specific accounting apps remains unverified/);
+ assert.match(html,/noindex,nofollow/);
+ const source=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ assert.match(source,/QIF export self-check failed/);
+ assert.match(source,/QIF cannot preserve it exactly/);
+ assert.ok(!source.includes("String(t.description||'').replace(/[\\r\\n^]/g,' ')"),
+  'QIF writer must never silently replace payee data');
+});
