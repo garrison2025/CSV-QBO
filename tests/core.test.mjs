@@ -445,3 +445,49 @@ test('UTF-16 BOM bank exports decode locally without changing transaction amount
  assert.equal(decoded.encoding,'utf-16le');
  assert.equal(parseOFX(decoded.text).transactions[0].amount,'15.05');
 });
+
+
+test('OFX BANKTRANLIST reads inclusive start and exclusive end dates as retrieval metadata',()=>{
+ const input='<OFX><CURDEF>USD<BANKTRANLIST><DTSTART>20261104000000<DTEND>20261106000000'+
+ '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261105<TRNAMT>-15.75<FITID>R-A<NAME>Purchase</STMTTRN>'+
+ '<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20261105<TRNAMT>20.00<FITID>R-B<NAME>Return</STMTTRN>'+
+ '</BANKTRANLIST></OFX>';
+ const data=parseOFX(input);
+ assert.equal(data.transactions.length,2);
+ assert.deepEqual(data.integrity.statementRange,{startInclusive:'2026-11-04',endExclusive:'2026-11-06'});
+ assert.equal(data.integrity.postedBeforeRangeCount,0);
+ assert.equal(data.integrity.postedAfterRangeCount,0);
+ assert.equal(totals(data.transactions).net,'4.25');
+});
+test('OFX warns about posted dates outside bank system-add retrieval window without dropping entries',()=>{
+ const input='<OFX><BANKTRANLIST><DTSTART>20261104000000<DTEND>20261106000000'+
+ '<STMTTRN><DTPOSTED>20261031<TRNAMT>-1.01<FITID>R1<NAME>Delayed post</STMTTRN>'+
+ '<STMTTRN><DTPOSTED>20261108<TRNAMT>10.03<FITID>R2<NAME>Future posted</STMTTRN>'+
+ '<STMTTRN><DTPOSTED>20261106<TRNAMT>-2.00<FITID>R3<NAME>End-date transaction</STMTTRN>'+
+ '</BANKTRANLIST></OFX>';
+ const data=parseOFX(input);
+ assert.equal(data.transactions.length,3);
+ assert.equal(data.integrity.postedBeforeRangeCount,1);
+ assert.equal(data.integrity.postedAfterRangeCount,1);
+ assert.ok(data.warnings.some(w=>w.includes('can be legitimate')));
+ assert.equal(totals(data.transactions).net,'7.02');
+});
+test('OFX refuses duplicated, unterminated or conflicting BANKTRANLIST ranges',()=>{
+ const tx='<STMTTRN><DTPOSTED>20261105<TRNAMT>1.00<FITID>R1<NAME>Test</STMTTRN>';
+ assert.throws(()=>parseOFX('<OFX><BANKTRANLIST>'+tx+'</OFX>'),/Multiple or incomplete BANKTRANLIST/);
+ assert.throws(()=>parseOFX('<OFX><BANKTRANLIST>'+tx+'</BANKTRANLIST><BANKTRANLIST>'+tx+'</BANKTRANLIST></OFX>'),/Multiple or incomplete BANKTRANLIST/);
+ assert.throws(()=>parseOFX('<OFX><BANKTRANLIST><DTSTART>20261107<DTEND>20261101'+tx+'</BANKTRANLIST></OFX>'),/DTSTART is after DTEND/);
+ assert.throws(()=>parseOFX('<OFX><BANKTRANLIST><DTSTART>not-a-date'+tx+'</BANKTRANLIST></OFX>'),/Unsupported date/);
+});
+test('OFX refuses transactions outside a declared BANKTRANLIST aggregate',()=>{
+ const tx='<STMTTRN><DTPOSTED>20261105<TRNAMT>1.00<FITID>R1<NAME>Test</STMTTRN>';
+ const withStray='<OFX><BANKTRANLIST><DTSTART>20261104<DTEND>20261106'+tx+'</BANKTRANLIST>'+tx+'</OFX>';
+ assert.throws(()=>parseOFX(withStray),/outside the declared BANKTRANLIST/);
+});
+test('OFX incomplete bank retrieval metadata is disclosed, never fabricated',()=>{
+ const tx='<STMTTRN><DTPOSTED>20261105<TRNAMT>1.00<FITID>R1<NAME>Test</STMTTRN>';
+ const data=parseOFX('<BANKTRANLIST><DTSTART>20261104'+tx+'</BANKTRANLIST>');
+ assert.equal(data.transactions.length,1);
+ assert.deepEqual(data.integrity.statementRange,{startInclusive:'2026-11-04',endExclusive:null});
+ assert.ok(data.warnings.some(x=>x.includes('incomplete DTSTART/DTEND')));
+});
