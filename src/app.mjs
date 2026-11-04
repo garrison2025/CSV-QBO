@@ -24,10 +24,28 @@ if(drop && fileInput){
     $('#mapping-panel').hidden=false;
   }
   function mapping(){return Object.fromEntries(['date','description','amount','debit','credit','id'].map(k=>[k,Number($('#map-'+k).value)]));}
+  // A preview is valid only for the file, date order and exact column
+  // mapping used to create it. Never leave previously reviewed bank data
+  // exportable after a user changes any of those inputs.
+  function invalidatePreview(){
+    parsed=null;audit=null;setButton(false);
+    $('#preview-panel').hidden=true;
+    $('#warning-box').hidden=true;
+    $('#warning-list').replaceChildren();
+    $('#preview-body').replaceChildren();
+    $('#preview-caption').textContent='';
+    for(const key of ['count','net','debit','credit'])$('#summary-'+key).textContent='0';
+    const statement=$('#statement-coverage');
+    if(statement){statement.hidden=true;statement.textContent='';}
+    $('#warning-ack-label').hidden=true;
+    $('#warning-ack').checked=false;
+    const report=$('#download-report');
+    if(report)report.disabled=true;
+  }
   function renderResult(data){
     audit=auditTransactions(data.transactions);const t=audit.summary,tbody=$('#preview-body');tbody.replaceChildren();
     data.transactions.slice(0,8).forEach(item=>{const tr=document.createElement('tr');for(const key of ['date','description','amount','id']){const td=document.createElement('td');td.textContent=String(item[key]??'');if(key==='amount')td.className=String(item.amount).startsWith('-')?'negative':'positive';tr.appendChild(td);}tbody.appendChild(tr);});
-    $('#preview-panel').hidden=false;$('#summary-count').textContent=t.count.toLocaleString('en-US');$('#summary-net').textContent=t.net;$('#summary-debit').textContent=t.debit;
+    $('#preview-panel').hidden=false;$('#download-report').disabled=false;$('#summary-count').textContent=t.count.toLocaleString('en-US');$('#summary-net').textContent=t.net;$('#summary-debit').textContent=t.debit;
     $('#summary-credit').textContent=t.credit;
     $('#preview-caption').textContent=data.transactions.length>8?'First 8 of '+data.transactions.length+' transactions are shown.':'All '+data.transactions.length+' transactions are shown.';
 
@@ -55,13 +73,21 @@ if(drop && fileInput){
     const warnings=parsed&&audit ? parsed.warnings.length+audit.warnings.length : 0;
     setButton(Boolean(parsed?.transactions?.length)&&(!warnings||$('#warning-ack').checked));
   });
+  for(const field of ['date','description','amount','debit','credit','id']){
+    $('#map-'+field)?.addEventListener('change',()=>{
+      if(!file||!['csv','tsv'].includes(fileExt))return;
+      invalidatePreview();
+      say('Column mapping changed. Preview transactions again before downloading; the previous results were cleared.');
+    });
+  }
   function withEncodingWarning(data,encoding){
     if(encoding!=='utf-8')data.warnings.unshift('The source file was decoded locally as '+encoding+'. Verify accented names and transaction details.');
     return data;
   }
   async function prepare(chosen){
     const epoch=++selectionEpoch;
-    file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';fileEncoding='utf-8';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#warning-ack-label').hidden=true;$('#warning-ack').checked=false;$('#file-name').textContent='';
+    invalidatePreview();
+    file=chosen;table=null;fileText='';fileExt='';fileEncoding='utf-8';$('#mapping-panel').hidden=true;$('#file-name').textContent='';
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
     const ext=(file.name.split('.').pop()||'').toLowerCase();
@@ -77,7 +103,7 @@ if(drop && fileInput){
         updateMapping(parseCSV(text,ext==='tsv'?'\t':undefined)[0]);
         say('Select column mappings, then choose Preview transactions.');
       }else{parsed=withEncodingWarning(parseInput(text,ext,{dateFormat:$('#date-format').value}),encoding);renderResult(parsed);}
-    }catch(err){if(epoch===selectionEpoch)say(err.message||'Could not read file.','error');}
+    }catch(err){if(epoch===selectionEpoch){invalidatePreview();say(err.message||'Could not read file.','error');}}
   }
   const batchPicker=$('#batch-input'),batchSelect=$('#batch-choose'),batchExport=$('#batch-export');
   function batchReset(){
@@ -135,12 +161,12 @@ if(drop && fileInput){
   $('#date-format')?.addEventListener('change',()=>{
     if(batchFiles.length){batchEpoch++;batchReset();batchFiles=[];if(batchPicker)batchPicker.value='';$('#batch-file-list').replaceChildren();batchSay('Date order changed. Select batch files again to avoid stale exports.');}
     if(!file||!fileText)return;
+    invalidatePreview();
     if(fileExt==='csv'||fileExt==='tsv'){
-      parsed=null;setButton(false);$('#preview-panel').hidden=true;
       say('Date order changed. Select Preview transactions to validate again.');
     }else{
       try{parsed=withEncodingWarning(parseInput(fileText,fileExt,{dateFormat:$('#date-format').value}),fileEncoding);renderResult(parsed);}
-      catch(err){parsed=null;setButton(false);$('#preview-panel').hidden=true;say(err.message||'Invalid date format.','error');}
+      catch(err){invalidatePreview();say(err.message||'Invalid date format.','error');}
     }
   });
   $('#clear-workspace')?.addEventListener('click',()=>{
@@ -149,17 +175,11 @@ if(drop && fileInput){
     if(batchPicker)batchPicker.value='';
     if($('#batch-file-list'))$('#batch-file-list').replaceChildren();
     batchSay('Batch files and generated ZIP cleared from the workspace.');
-    file=null;parsed=null;audit=null;table=null;fileText='';fileExt='';
+    invalidatePreview();
+    file=null;table=null;fileText='';fileExt='';fileEncoding='utf-8';
     fileInput.value='';
     $('#file-name').textContent='';
-    $('#preview-body').replaceChildren();
-    $('#warning-list').replaceChildren();
     $('#mapping-panel').hidden=true;
-    $('#preview-panel').hidden=true;
-    $('#warning-box').hidden=true;
-    $('#warning-ack-label').hidden=true;
-    $('#warning-ack').checked=false;
-    setButton(false);
     say('Workspace cleared, including source files, batch ZIP and previews. Previously downloaded files and saved mappings remain on your device.','success');
   });
   fileInput.addEventListener('change',event=>prepare(event.target.files[0]));
@@ -180,9 +200,16 @@ if(drop && fileInput){
     say('Validation summary downloaded (no account numbers or transaction descriptions).','success');
   });
   $('#preview-button')?.addEventListener('click',()=>{
-    if(!file)return;
-    try{parsed=parseInput(fileText,fileExt,{mapping:mapping(),dateFormat:$('#date-format').value});renderResult(parsed);}
-    catch(err){setButton(false);say(err.message,'error');}
+    if(!file||!fileText)return;
+    invalidatePreview();
+    try{
+      const next=parseInput(fileText,fileExt,{mapping:mapping(),dateFormat:$('#date-format').value});
+      parsed=next;
+      renderResult(next);
+    }catch(err){
+      invalidatePreview(); // Bad mapping must not retain the last successful audit.
+      say(err.message||'Preview validation failed.','error');
+    }
   });
   function saveBlob(blob,filename){
     const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=filename;document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);

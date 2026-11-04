@@ -103,3 +103,11 @@
 - Batch JSON and single file JSON inherit parser integrity fields; browser shows a separate bank retrieval period notice. Synthetic test samples and compatibility page are aligned.
 - Original OFX spec: https://www.financialdataexchange.org/common/Uploaded%20files/OFX%20files/OFX%202.2.pdf (section 3.2.7); bank import UAT NOT RUN; Cloudflare Pages preview noindex.
 - CI and Cloudflare deployment verification to be recorded after successful merge.
+
+## V1.2 — CSV mapping freshness and workspace review safety (2026-11-04)
+
+- CSV/TSV column mapping changes now atomically invalidate previously approved previews, duplicate audits, warning acknowledgements, validation reports and export button state.
+- Date-order changes and clearing the workspace use the same explicit invalidation path; failed previews cannot retain an earlier successful financial summary.
+- Added simulated DOM integration tests for click/change listeners, preview outcomes, duplicate warning acknowledgement and async file selection reset; these are NOT real QuickBooks or live-browser UAT.
+- Static build asserts download-report remains disabled before preview. Cloudflare Pages noindex release gate unchanged.
+- GitHub CI and Cloudflare deployment evidence recorded separately after merge.
