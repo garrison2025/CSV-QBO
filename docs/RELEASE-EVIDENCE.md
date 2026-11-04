@@ -170,3 +170,13 @@
 - Node simulated-DOM tests and real Chrome E2E cover 1,001-row search, zero matches while export remains available, and duplicate-only inspection of later source rows.
 - Real bank and QuickBooks acceptance still NOT RUN; production SEO launch blocked until the user has a custom domain and explicit approval.
 - GitHub CI and Cloudflare deployment status to be verified after code merge.
+
+## V1.9 — QIF Bank export lossless-field protection (2026-11-05)
+
+- The old QIF serializer silently flattened newlines and carets in descriptions, references and memo fields, even though the full value matters for finance reconciliation.
+- New writer preserves literal carets and UTF-8; rejects control chars/CR/LF in all QIF text fields with a source row index, without including sensitive original text in its error.
+- Preflight re-parses the generated QIF and compares each row's date, signed amount, description, reference and memo in original order; a mismatch fails the export atomically before browser download.
+- Node tests cover full 1200-row roundtrip, Unicode, caret preservation, invalid source values, private failure messages and source immutability. Chrome E2E exercises caret QIF download and multiline payee failure.
+- The generated CSV-to-QIF landing page explains what is and is not represented, and expressly excludes real finance application import certification.
+- This is not real QuickBooks UAT, a new `.qbo` writer or proof of universal QIF dialect support. Preview remains noindex.
+- CI, main merge and Cloudflare deployment evidence should be recorded separately after verification.
