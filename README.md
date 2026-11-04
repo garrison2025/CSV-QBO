@@ -20,6 +20,15 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V0.7 — fail-closed record parsing and complete privacy reset
+
+- Monetary inputs containing internal whitespace, stray currency symbols or malformed separators now fail explicitly instead of being reinterpreted as a different amount.
+- OFX/QBO/QFX parsing refuses truncated or nested STMTTRN records, invalid compact date time components and missing transaction descriptions. This remains a limited read-only reader, not a Web Connect writer.
+- QIF parser accepts explicit Bank, CCard and Cash single-type transaction sections. It refuses mixed types, account-list sections and unknown sections. Category/split details are not retained and trigger warnings.
+- QIF writer preserves available `N` reference/check-number strings and separate memo fields; target-software import is still not verified.
+- **Clear all files and previews** now purges single-file and batch selections/results from page state. In-flight asynchronous file reads are invalidated to prevent stale results reappearing after clear or another selection.
+- This is still a noindex technical preview. Automated/synthetic coverage is not a substitute for bank-specific fixtures or real QuickBooks import UAT.
+
 ## V0.6 — harden CSV input and provide safe interactive fixtures
 
 - Reject malformed CSV quoting or inconsistent row widths before any conversion; no silent field or amount shifts.
