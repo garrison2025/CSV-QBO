@@ -262,6 +262,31 @@ export function decodeFinancialBytes(input,format=''){
   if(text.includes('\u0000'))fail('Unsupported null byte in financial file.');
   return {text,encoding};
 }
+// Produce equal-length views so <STMTTRN>, <STATUS> and <BANKTRANLIST>
+// token searches cannot mistake tags inside XML comments or CDATA for real
+// OFX elements. Preserve CDATA verbatim for later decoding of NAME/MEMO text.
+function ofxViews(source){
+  const input=String(source);
+  let clean='',structure='',last=0,offset=0;
+  while(offset<input.length){
+    const comment=input.indexOf('<!--',offset),cdata=input.indexOf('<![CDATA[',offset);
+    if(comment<0&&cdata<0)break;
+    const isComment=comment>=0&&(cdata<0||comment<cdata);
+    const begin=isComment?comment:cdata;
+    const close=isComment?'-->':']]>';
+    const end=input.indexOf(close,begin+(isComment?4:9));
+    if(end<0)fail(isComment?'Unclosed OFX XML comment.':'Unclosed OFX CDATA section.');
+    const until=end+close.length,spaces=' '.repeat(until-begin);
+    clean+=input.slice(last,begin)+(isComment?spaces:input.slice(begin,until));
+    structure+=input.slice(last,begin)+spaces;
+    offset=until;last=until;
+  }
+  clean+=input.slice(last);
+  structure+=input.slice(last);
+  if(structure.includes('-->'))fail('Malformed OFX comment terminator.');
+  if(structure.includes(']]>'))fail('Malformed OFX CDATA terminator.');
+  return {clean,structure};
+}
 function decodeEntities(s){
   return s.replace(/&(?:(amp|lt|gt|quot|apos)|#(x[0-9a-f]+|[0-9]+));/gi,(raw,named,numeric)=>{
     if(named)return {amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"}[named.toLowerCase()];
@@ -270,26 +295,34 @@ function decodeEntities(s){
     return String.fromCodePoint(num);
   });
 }
-function ofxField(block,key){
-  const matches=[...block.matchAll(new RegExp('<'+key+'\\b[^>]*>','gi'))];
+function ofxField(block,key,xml=false){
+  const source=String(block),structure=ofxViews(source).structure;
+  const matches=[...structure.matchAll(new RegExp('<'+key+'\\b[^>]*>','gi'))];
   if(matches.length>1)fail('Duplicate OFX '+key+' fields in one record.');
   if(!matches.length)return '';
-  const match=matches[0],rest=block.slice(match.index+match[0].length);
+  const match=matches[0],offset=match.index+match[0].length,rest=source.slice(offset);
   const trimmed=rest.trimStart();
   if(trimmed.startsWith('<![CDATA[')){
     const close=trimmed.indexOf(']]>');
     if(close<0)fail('Unclosed OFX CDATA in '+key+'.');
     const after=trimmed.slice(close+3).trimStart();
-    if(after&&!new RegExp('^</'+key+'\\s*>','i').test(after))fail('Malformed OFX CDATA field '+key+'.');
+    const next=after.match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
+    if(next&&next[1].toUpperCase()!==key.toUpperCase())fail('Malformed OFX CDATA field '+key+'.');
+    if(xml&&(!next||next[1].toUpperCase()!==key.toUpperCase()))
+      fail('Missing XML closing tag for OFX '+key+'.');
     return trimmed.slice(9,close).trim();
   }
-  const end=rest.indexOf('<');
-  const raw=(end<0?rest:rest.slice(0,end)).trim();
-  if(end>=0){
-    const next=rest.slice(end).match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
-    if(next&&next[1].toUpperCase()!==key.toUpperCase())fail('Malformed OFX '+key+' closing tag.');
-  }
-  return decodeEntities(raw);
+  // Find the next actual tag in the markup view (not a tag-looking string in
+  // CDATA or a comment); text returned to callers is taken from the source.
+  const markupRest=structure.slice(offset);
+  const end=markupRest.indexOf('<');
+  const value=(end<0?rest:rest.slice(0,end)).trim();
+  const next=end<0?null:markupRest.slice(end).match(/^<\/([a-zA-Z][a-zA-Z0-9_.-]*)\s*>/);
+  if(next&&next[1].toUpperCase()!==key.toUpperCase())
+    fail('Malformed OFX '+key+' closing tag.');
+  if(xml&&(!next||next[1].toUpperCase()!==key.toUpperCase()))
+    fail('Missing XML closing tag for OFX '+key+'.');
+  return decodeEntities(value);
 }
 export function parseOFX(text) {
   const original=String(text);
