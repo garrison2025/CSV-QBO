@@ -156,3 +156,28 @@ test('QIF day-first dates explicitly selected by user are parsed correctly',()=>
   assert.equal(parseQIF(bank,'us').transactions[0].date,'2026-04-11');
   assert.equal(parseQIF(bank,'eu').transactions[0].date,'2026-11-04');
 });
+
+test('CSV handles quoted headers, quoted separators and CR-only records',()=>{
+ const rows=parseCSV('Date,"Description, details",Amount\r11/04/2026,"Coffee, store",-2.50\r');
+ assert.deepEqual(rows[0],['Date','Description, details','Amount']);
+ assert.equal(csvTransactions(rows).transactions[0].amount,'-2.50');
+ assert.deepEqual(parseCSV('Date;Description;Amount\n11/04/2026;"Cafe, shop";3.00')[1],['11/04/2026','Cafe, shop','3.00']);
+});
+test('Malformed CSV quoting and binary null bytes are rejected',()=>{
+ assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,"Cafe"oops,2.00'),/closing quote/);
+ assert.throws(()=>parseCSV('Date,Description,Amount\n11/04/2026,Ca"fe,2.00'),/Unexpected quote/);
+ assert.throws(()=>parseCSV('Date,Description\n11/04/2026,"Unterminated'),/Unclosed quote/);
+ assert.throws(()=>parseCSV('Date,Description\n11/04/2026,Test\u0000'),/null bytes/);
+});
+test('Explicitly non-USD currencies and OFX conversion blocks fail closed',()=>{
+ for(const n of ['€12.00','£12.00','¥12.00','₹12.00'])assert.throws(()=>toMinorUnits(n),/Non-USD/);
+ const tx='<STMTTRN><DTPOSTED>20261104<TRNAMT>12.00<FITID>1<NAME>Test</STMTTRN>';
+ const wrap=c=>'<OFX><CURDEF>'+c+'</CURDEF><BANKTRANLIST>'+tx+'</BANKTRANLIST></OFX>';
+ assert.throws(()=>parseOFX(wrap('EUR')),/Only USD/);
+ assert.equal(parseOFX(wrap('USD')).transactions[0].amount,'12.00');
+ assert.ok(parseOFX('<OFX>'+tx+'</OFX>').warnings.some(w=>w.includes('currency')));
+ assert.throws(()=>parseOFX('<OFX><CURRENCY><CURRATE>1.2</CURRENCY>'+tx+'</OFX>'),/currency conversion/);
+});
+test('XLSX refuses unsupported XML control characters',()=>{
+ assert.throws(()=>toXLSX([{date:'2026-11-04',description:'bad\u0001cell',amount:'1.00',id:'x'}]),/control character/);
+});
