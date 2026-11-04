@@ -631,5 +631,6 @@ test('QuickBooks validator rejects unsupported part size, headers and missing ex
  assert.throws(()=>validateQuickBooksCSVParts(tx,[]),/one or more generated CSV parts/);
  assert.throws(()=>validateQuickBooksCSVParts(tx,['Date,Wrong,Amount\r\n11/04/2026,Valid,1.00\r\n']),/header does not match/);
  assert.throws(()=>validateQuickBooksCSVParts(tx,parts,{maxRows:0}),/Invalid QuickBooks CSV validation limits/);
- assert.throws(()=>validateQuickBooksCSVParts(tx,parts,{maxBytes:64}),/exceeded its row or byte limit/);
+ const longTx=[{date:'2026-11-04',description:'A'.repeat(80),amount:'1.00'}];
+ assert.throws(()=>validateQuickBooksCSVParts(longTx,[toQuickBooksCSV(longTx)],{maxBytes:64}),/exceeded its row or byte limit/);
 });
