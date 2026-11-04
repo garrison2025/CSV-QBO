@@ -370,7 +370,7 @@ function ofxField(block,key,xml=false){
 }
 export function parseOFX(text) {
   const original=String(text);
-  const {clean:raw,structure}=ofxViews(original);
+  const {structure}=ofxViews(original);
   // Comments/CDATA are data, not XML/OFX elements. For safety checks and
   // aggregate boundaries, inspect only actual markup at matching offsets.
   if(/<!DOCTYPE|<!ENTITY|<script\b/i.test(structure))fail('Unsupported or unsafe XML declarations.');
@@ -393,7 +393,7 @@ export function parseOFX(text) {
     const opening=listTags[0],closing=listTags[1];
     const begin=opening.index+opening[0].length,end=closing.index;
     if(begin>end)fail('Invalid BANKTRANLIST boundaries.');
-    bankList=raw.slice(begin,end);
+    bankList=original.slice(begin,end);
     bankBounds={begin,end};
     const beginRaw=ofxField(bankList,'DTSTART',xml),endRaw=ofxField(bankList,'DTEND',xml);
     if(beginRaw)reportedStartDate=isoDate(beginRaw);
@@ -410,7 +410,7 @@ export function parseOFX(text) {
       continue;
     }
     if(!activeStatus)fail('Unexpected closing STATUS in OFX bank response.');
-    const body=raw.slice(activeStatus.index+activeStatus[0].length,token.index);
+    const body=original.slice(activeStatus.index+activeStatus[0].length,token.index);
     const code=ofxField(body,'CODE',xml),severity=ofxField(body,'SEVERITY',xml);
     if(!code)fail('OFX bank STATUS is missing a required CODE; no transactions were exported.');
     if(!/^0+$/.test(code)||/^ERROR$/i.test(severity))
@@ -440,7 +440,7 @@ export function parseOFX(text) {
     const openTag=m[0].match(/^<STMTTRN\b[^>]*>/i)?.[0];
     const closeTag=m[0].match(/<\/STMTTRN\s*>$/i)?.[0];
     if(!openTag||!closeTag)fail('Invalid OFX transaction boundary.');
-    const b=raw.slice(m.index+openTag.length,m.index+m[0].length-closeTag.length);
+    const b=original.slice(m.index+openTag.length,m.index+m[0].length-closeTag.length);
     try{
       const date=ofxField(b,'DTPOSTED',xml),amount=ofxField(b,'TRNAMT',xml);
       const description=ofxField(b,'NAME',xml)||ofxField(b,'MEMO',xml);
