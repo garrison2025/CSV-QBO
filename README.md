@@ -20,6 +20,15 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.3 — QIF field integrity and batch cross-file overlap review
+
+- QIF Bank/CCard/Cash reader now rejects duplicate date, signed amount, payee, memo or reference fields before they can overwrite transaction data. Repeated `!Type:` sections, unknown QIF record codes, and metadata-only or incomplete records fail closed.
+- For supported redundant QIF `U` amount fields, the value must match `T` in exact integer cents. Mismatches block conversion rather than changing balances. Cleared-state, flags, addresses, categories and splits that cannot be preserved in CSV/Excel summaries generate explicit lossy warnings.
+- Batch ZIP continues to export **one separate file per input**. It now identifies matching transaction IDs and matching date/amount/description fingerprints across *earlier files*, reporting only counts and earlier **file sequence numbers**. Different bank accounts may reuse reference IDs or transactions; matches are warnings, never automatic deduplication, merging or proof of fraud.
+- The batch parser now optionally accepts the source file's original byte length. Browser-local batch upload provides `File.size` so Windows-1252 decoded content is not miscounted as a larger UTF-8 source when enforcing 8 MB per file / 12 MB total.
+- JSON validation reports remain local and exclude original filenames, transaction descriptions and reference values. Source-file processing and ZIP generation require no paid APIs or accounts.
+- Added negative QIF parsing, cross-file overlap, missing data and original-byte tests; real QuickBooks import and external bank acceptance remain unverified. Pages preview remains noindex.
+
 ## V1.2 — current CSV mapping controls the only exportable preview
 
 - Fixed a potentially dangerous stale-data state: once a CSV/TSV mapping select changes, the previous transaction preview, audit, warning acknowledgement, validation summary and export readiness are invalidated together. Users must click **Preview transactions** again.

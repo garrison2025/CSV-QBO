@@ -491,3 +491,43 @@ test('OFX incomplete bank retrieval metadata is disclosed, never fabricated',()=
  assert.deepEqual(data.integrity.statementRange,{startInclusive:'2026-11-04',endExclusive:null});
  assert.ok(data.warnings.some(x=>x.includes('incomplete DTSTART/DTEND')));
 });
+
+
+test('QIF never silently overwrites repeated date, amount, payee or reference fields',()=>{
+ const base='!Type:Bank\n';
+ const parts=['D11/04/2026','T-5.00','PBookstore','NREF-1'];
+ for(const [key,duplicated] of [['D','D11/05/2026'],['T','T9999.00'],['P','POther payee'],['N','NREF-2']]){
+  const input=base+parts.join('\n')+'\n'+duplicated+'\n^\n';
+  assert.throws(()=>parseQIF(input),new RegExp('duplicate '+key+' field'));
+ }
+});
+test('QIF redundant U amount must match T exactly in integer cents',()=>{
+ const valid='!Type:Bank\nD11/04/2026\nT-5.55\nU-5.55\nPPayment\n^\n';
+ const out=parseQIF(valid);
+ assert.equal(out.transactions.length,1);
+ assert.equal(out.transactions[0].amount,'-5.55');
+ assert.equal(out.integrity.consistentRedundantAmounts,1);
+ assert.ok(out.warnings.some(w=>w.includes('redundant U')));
+ for(const bad of ['U-5.54','U100.00','U-5.55\nU-5.55']){
+  const input='!Type:Bank\nD11/04/2026\nT-5.55\n'+bad+'\nPPayment\n^\n';
+  assert.throws(()=>parseQIF(input),/amount fields disagree|duplicate U field/);
+ }
+});
+test('QIF reports discarded cleared-state, address and category/split metadata without account claims',()=>{
+ const qif='!Type:Bank\nD11/04/2026\nT-2.00\nPCoffee\nC*\nFflag\nAAddress\nLFood\nSCategory\nEPart\n$-2.00\n^\n';
+ const p=parseQIF(qif);
+ assert.equal(p.transactions.length,1);
+ assert.equal(p.integrity.ignoredMetadataFields,3);
+ assert.equal(p.integrity.ignoredCategorySplitFields,4);
+ assert.ok(p.warnings.some(w=>w.includes('cleared-state')));
+ assert.ok(p.warnings.some(w=>w.includes('category/split')));
+});
+test('QIF unknown record codes, metadata-only groups and repeated sections fail closed',()=>{
+ assert.throws(()=>parseQIF('!Type:Bank\nD11/04/2026\nT1.00\nPShop\nZunknown\n^\n'),/Unsupported QIF field/);
+ assert.throws(()=>parseQIF('!Type:Bank\nC*\n^\n'),/metadata but no D\/T/);
+ assert.throws(()=>parseQIF('!Type:Bank\nD11\/04\/2026\nT1.00\nPShop\n^\n!Type:Bank\nD11\/05\/2026\nT2.00\nPOther\n^\n'),/Repeated QIF transaction type header/);
+ assert.throws(()=>parseQIF('!Type:Bank\nD11/04/2026\nT1.00\nPShop\n^\nC*'),/lacks terminating/);
+});
+test('QIF missing payee and memo fails rather than exporting blank merchant fields',()=>{
+ assert.throws(()=>parseQIF('!Type:Bank\nD11/04/2026\nT2.00\n^\n'),/no payee or memo/);
+});

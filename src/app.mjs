@@ -134,14 +134,15 @@ if(drop && fileInput){
     batchSay('Checking '+batchFiles.length+' files locally. No transaction data is uploaded.');
     await Promise.resolve();
     try{
-      const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,...decodeFinancialBytes(new Uint8Array(await selected.arrayBuffer()),selected.name.split('.').pop().toLowerCase())})));
+      const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,byteLength:selected.size,...decodeFinancialBytes(new Uint8Array(await selected.arrayBuffer()),selected.name.split('.').pop().toLowerCase())})));
       if(epoch!==batchEpoch)return;
       batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
       batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
       const iifGroups=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.balancedGroups||0),0);
       const statementWindows=batchInfo.report.files.filter(item=>item.parserIntegrity?.statementRange).length;
       const dateExceptions=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.postedBeforeRangeCount||0)+(item.parserIntegrity?.postedAfterRangeCount||0),0);
-      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s).'+(iifGroups?' '+iifGroups+' balanced IIF group(s) checked.':'')+(statementWindows?' '+statementWindows+' OFX retrieval window(s) noted; '+dateExceptions+' posted-date exceptions (no rows removed).':'')+' No accounts merged.');
+      const overlaps=batchInfo.report.crossFileReferenceMatches+batchInfo.report.crossFileFingerprintMatches;
+      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s).'+(iifGroups?' '+iifGroups+' balanced IIF group(s) checked.':'')+(statementWindows?' '+statementWindows+' OFX retrieval window(s) noted; '+dateExceptions+' posted-date exceptions (no rows removed).':'')+(overlaps?' '+overlaps+' cross-file possible match(es) flagged for review.':'')+' No accounts merged.');
       if(batchHasWarnings){$('#batch-ack-label').hidden=false;batchExport.disabled=true;}
       else batchExport.disabled=false;
     }catch(err){if(epoch===batchEpoch){batchReset();batchSay(err.message||'Batch conversion failed; no files produced.',true);}}

@@ -171,42 +171,71 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
 
 export function parseQIF(text, dateFormat='us') {
   const lines=String(text).replace(/^\uFEFF/,'').split(/\r?\n/);
-  const transactions=[];let entry={},kind='',splits=0,categories=0;
+  const transactions=[];
+  let entry={},kind='',splits=0,categories=0,ignoredMetadata=0,redundantAmounts=0;
+  let recordLine=0,recordSeen=false;
   const commit=()=>{
-    if(!Object.keys(entry).length)return;
-    if(!entry.date||!entry.amount)fail('QIF transaction missing D or T value.');
-    transactions.push({date:isoDate(entry.date,dateFormat),description:entry.description||entry.memo||'',amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''});
-    entry={};
+    if(!Object.keys(entry).length){
+      if(recordSeen)fail('QIF transaction has metadata but no D/T financial values.');
+      return;
+    }
+    if(!entry.date||!entry.amount)fail('QIF transaction near line '+recordLine+' missing D or T value.');
+    if(entry.uAmount!=null){
+      if(toMinorUnits(entry.amount)!==toMinorUnits(entry.uAmount))
+        fail('QIF transaction near line '+recordLine+': T and U amount fields disagree.');
+      redundantAmounts++;
+    }
+    const description=entry.description||entry.memo||'';
+    if(!description.trim())fail('QIF transaction near line '+recordLine+' has no payee or memo.');
+    transactions.push({date:isoDate(entry.date,dateFormat),description,
+      amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''});
+    entry={};recordLine=0;recordSeen=false;
   };
-  for(const line of lines) {
+  const fieldName={D:'date',T:'amount',U:'uAmount',P:'description',M:'memo',N:'id'};
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i],lineNumber=i+1;
     if(!line)continue;
-    if(line.startsWith('!Type:')) {
+    if(line.startsWith('!Type:')){
       if(Object.keys(entry).length)fail('QIF section changed before a terminating ^.');
       const next=line.slice(6).trim();
       if(/^Invst$/i.test(next))fail('Investment QIF transactions are unsupported. No transactions were exported.');
       if(!/^(Bank|CCard|Cash)$/i.test(next))fail('Unsupported QIF section type '+next+'. Only Bank, CCard and Cash transactions are supported.');
       if(kind&&kind.toLowerCase()!==next.toLowerCase())fail('Multiple QIF transaction section types found. Export one account/type at a time.');
-      kind=next;
-      continue;
+      if(kind)fail('Repeated QIF transaction type header could contain multiple accounts. Export one account at a time.');
+      kind=next;continue;
     }
     if(line.startsWith('!Account'))fail('QIF account-list sections are not supported. Export transactions for one account at a time.');
     if(line.startsWith('!'))fail('Unsupported QIF directive. Export a single Bank, CCard or Cash transaction section.');
     if(!kind)fail('QIF file is missing a supported !Type:Bank, !Type:CCard or !Type:Cash header.');
     if(line==='^'){commit();continue;}
     const k=line[0],v=line.slice(1);
-    if(k==='D')entry.date=v;
-    else if(k==='T')entry.amount=v;
-    else if(k==='P')entry.description=v;
-    else if(k==='M')entry.memo=v;
-    else if(k==='N')entry.id=v;
-    else if(k==='L')categories++;
-    else if(k==='S'||k==='E'||k==='$')splits++;
+    recordSeen=true;
+    if(k in fieldName){
+      const key=fieldName[k];
+      if(Object.hasOwn(entry,key))fail('QIF line '+lineNumber+': duplicate '+k+' field would overwrite financial data.');
+      if(!recordLine)recordLine=lineNumber;
+      entry[key]=v;
+    }else if(k==='L'){
+      categories++;
+    }else if(k==='S'||k==='E'||k==='$'){
+      splits++;
+    }else if(k==='C'||k==='F'||k==='A'){
+      ignoredMetadata++;
+    }else{
+      fail('Unsupported QIF field '+JSON.stringify(k)+' at line '+lineNumber+'. No rows were exported.');
+    }
   }
-  if(Object.keys(entry).length)fail('QIF final transaction lacks terminating ^.');
+  if(recordSeen)fail('QIF final transaction lacks terminating ^.');
   if(!transactions.length)fail('No QIF transactions found.');
   const warnings=[];
   if(splits||categories)warnings.push('QIF category/split allocations are not preserved in this transaction export.');
-  return {transactions,source:'QIF',warnings};
+  if(ignoredMetadata)warnings.push(ignoredMetadata+' QIF cleared-state, flag or address metadata field(s) were not preserved in the transaction summary.');
+  if(redundantAmounts)warnings.push(redundantAmounts+' QIF redundant U amount field(s) agreed with T and were not duplicated.');
+  return {transactions,source:'QIF',
+    integrity:{check:'qif_bank_records',status:'passed',recordCount:transactions.length,
+      ignoredCategorySplitFields:splits+categories,ignoredMetadataFields:ignoredMetadata,
+      consistentRedundantAmounts:redundantAmounts},
+    warnings};
 }
 
 /** Decode bank files locally. OFX 1.x frequently declares the Windows-1252 code page. */

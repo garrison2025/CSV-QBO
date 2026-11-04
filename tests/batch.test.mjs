@@ -129,3 +129,64 @@ test('batch refuses an incomplete bank list and does not create partial ZIP outp
  const bad='<OFX><BANKTRANLIST><STMTTRN><DTPOSTED>20261105<TRNAMT>1.00<NAME>Truncated</STMTTRN></OFX>';
  assert.throws(()=>batchConvert([{name:'good.ofx',text:good},{name:'bad.ofx',text:bad}]),/Batch file 2: Multiple or incomplete BANKTRANLIST/);
 });
+
+
+test('batch flags repeated references and transaction fingerprints across different source files',()=>{
+ const a='!Type:Bank\nD11/04/2026\nT-3.25\nPLunch\nNAB-1\n^\n';
+ const b='!Type:Bank\nD11/04/2026\nT-3.25\nPLunch\nNAB-1\n^\n';
+ const result=batchConvert([{name:'first.qif',text:a},{name:'second.qif',text:b}]);
+ assert.equal(result.report.totalTransactions,2);
+ assert.equal(result.report.crossFileReferenceMatches,1);
+ assert.equal(result.report.crossFileFingerprintMatches,1);
+ assert.equal(result.report.crossFileMatchesAreWarningsOnly,true);
+ assert.equal(result.report.autoDeletedTransactions,false);
+ assert.deepEqual(result.report.files[1].matchedEarlierFileNumbers,[1]);
+ assert.equal(result.report.files[1].crossFileReferenceMatches,1);
+ assert.equal(result.report.files[1].crossFileFingerprintMatches,1);
+ assert.ok(result.report.files[1].warnings.some(w=>w.includes('against earlier batch files')));
+ assert.deepEqual(result.report.files.map(f=>f.outputFile),['converted-001.csv','converted-002.csv']);
+ const report=JSON.stringify(result.report);
+ assert.ok(!report.includes('AB-1'));
+ assert.ok(!report.includes('Lunch'));
+ assert.ok(!report.includes('first.qif'));
+});
+test('batch detects same transaction across files even with differing FITIDs, without claiming certainty',()=>{
+ const a='!Type:Bank\nD11/04/2026\nT10.00\nPShop\nNOLD-A\n^\n';
+ const b='!Type:Bank\nD11/04/2026\nT10.00\nPShop\nNNEW-B\n^\n';
+ const r=batchConvert([{name:'a.qif',text:a},{name:'b.qif',text:b}]);
+ assert.equal(r.report.crossFileReferenceMatches,0);
+ assert.equal(r.report.crossFileFingerprintMatches,1);
+ assert.ok(r.report.files[1].warnings.some(w=>w.includes('possible overlaps')));
+ assert.deepEqual(r.report.files[1].matchedEarlierFileNumbers,[1]);
+});
+test('batch never treats repeated rows within one source as cross-file duplicates',()=>{
+ const data='!Type:Bank\nD11/04/2026\nT-3.00\nPCoffee\nNREPEAT\n^\nD11/04/2026\nT-3.00\nPCoffee\nNREPEAT\n^\n';
+ const r=batchConvert([{name:'one.qif',text:data}]);
+ assert.equal(r.report.crossFileReferenceMatches,0);
+ assert.equal(r.report.crossFileFingerprintMatches,0);
+ assert.equal(r.report.files[0].duplicateReferenceCount,1);
+ assert.equal(r.report.files[0].possibleDuplicateCount,1);
+});
+test('batch duplicate references reused by different accounts are warnings, never deleted',()=>{
+ const accountA='!Type:Bank\nD11/04/2026\nT-3.00\nPCoffee\nNCHK-123\n^\n';
+ const accountB='!Type:Bank\nD11/05/2026\nT-100.00\nPRent\nNCHK-123\n^\n';
+ const r=batchConvert([{name:'checking.qif',text:accountA},{name:'savings.qif',text:accountB}]);
+ assert.equal(r.report.crossFileReferenceMatches,1);
+ assert.equal(r.report.crossFileFingerprintMatches,0);
+ assert.equal(r.report.totalTransactions,2);
+ assert.match(r.report.files[1].warnings.join(' '),/Different bank accounts may legitimately reuse references/);
+});
+test('batch original-byte accounting supports non-UTF8 encoding sizes without output truncation',()=>{
+ const latin='!Type:Bank\nD11/04/2026\nT-12.00\nPCafé\n^\n';
+ const size=new TextEncoder().encode(latin).length;
+ const r=batchConvert([{name:'legacy.qif',text:latin,encoding:'windows-1252',byteLength:size-1}]);
+ assert.equal(r.report.totalTransactions,1);
+ assert.ok(r.report.files[0].warnings.some(x=>x.includes('windows-1252')));
+ assert.throws(()=>batchConvert([{name:'bad.qif',text:latin,byteLength:-1}]),/invalid source byte length/);
+ assert.throws(()=>batchConvert([{name:'bad.qif',text:latin,byteLength:8*1024*1024+1}]),/8 MB/);
+});
+test('batch fails atomically for QIF contradictory U/T amounts, even after a valid first file',()=>{
+ const good='!Type:Bank\nD11/04/2026\nT1.00\nPValid\n^\n';
+ const broken='!Type:Bank\nD11/04/2026\nT1.00\nU2.00\nPWrong amount\n^\n';
+ assert.throws(()=>batchConvert([{name:'ok.qif',text:good},{name:'broken.qif',text:broken}]),/Batch file 2.*T and U amount fields disagree/);
+});

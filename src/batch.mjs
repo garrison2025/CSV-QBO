@@ -18,13 +18,18 @@ export function batchConvert(inputs,{target='csv',source='any',dateFormat='us'}=
   let bytes=0,rows=0;
   const entries={},reports=[];
   const signatures=new Map();
+  const seenReferences=new Map(),seenFingerprints=new Map();
+  let batchReferenceMatches=0,batchFingerprintMatches=0;
   for(let i=0;i<inputs.length;i++){
     const item=inputs[i];
     if(!item||typeof item.name!=='string'||typeof item.text!=='string')throw Error('Batch file '+(i+1)+' is not readable.');
     const ext=item.name.split('.').pop().toLowerCase();
     if(!formats.has(ext))throw Error('Batch file '+(i+1)+': select QBO, QFX, OFX, QIF or IIF. CSV requires manual column mapping.');
     if(source!=='any'&&source!==ext)throw Error('Batch file '+(i+1)+': expected .'+source+' input.');
-    const countBytes=encoder.encode(item.text).length;
+    if(item.byteLength!==undefined&&(!Number.isSafeInteger(item.byteLength)||item.byteLength<0))throw Error('Batch file '+(i+1)+': invalid source byte length.');
+    // Prefer original file bytes; re-encoding a Windows-1252 source as UTF-8
+    // changes its size and can reject a valid file near the input limit.
+    const countBytes=item.byteLength??encoder.encode(item.text).length;
     if(countBytes>MAX_FILE_BYTES)throw Error('Batch file '+(i+1)+' exceeds the 8 MB single-file limit.');
     bytes+=countBytes;
     if(bytes>MAX_BATCH_BYTES)throw Error('Batch exceeds the 12 MB total input limit.');
@@ -43,17 +48,42 @@ export function batchConvert(inputs,{target='csv',source='any',dateFormat='us'}=
     const dateRange={first:dates[0],last:dates[dates.length-1]};
     const parserIntegrity=parsed.integrity||null;
     const warnings=[...parsed.warnings,...audit.warnings];
+    let crossFileReferenceMatches=0,crossFileFingerprintMatches=0;
+    const matchedEarlierFileNumbers=new Set();
+    const ownReferences=new Set(),ownFingerprints=new Set();
+    for(const tx of parsed.transactions){
+      const id=String(tx.id??'').trim();
+      const fingerprint=[tx.date,tx.amount,String(tx.description??'').trim().toLowerCase().replace(/\s+/g,' ')].join('|');
+      if(id){
+        const earlier=seenReferences.get(id);
+        if(earlier){crossFileReferenceMatches++;matchedEarlierFileNumbers.add(earlier);}
+        ownReferences.add(id);
+      }
+      const earlier=seenFingerprints.get(fingerprint);
+      if(earlier){crossFileFingerprintMatches++;matchedEarlierFileNumbers.add(earlier);}
+      ownFingerprints.add(fingerprint);
+    }
+    // Keep the first file occurrence; never compare a file to itself.
+    for(const key of ownReferences)if(!seenReferences.has(key))seenReferences.set(key,i+1);
+    for(const key of ownFingerprints)if(!seenFingerprints.has(key))seenFingerprints.set(key,i+1);
+    batchReferenceMatches+=crossFileReferenceMatches;
+    batchFingerprintMatches+=crossFileFingerprintMatches;
+    if(crossFileReferenceMatches)warnings.push(crossFileReferenceMatches+' transaction reference match(es) against earlier batch files. Different bank accounts may legitimately reuse references; compare files before importing. No rows removed.');
+    if(crossFileFingerprintMatches)warnings.push(crossFileFingerprintMatches+' same-date, same-amount and same-description match(es) against earlier batch files. These are possible overlaps, not confirmed duplicates. No rows removed.');
     if(item.encoding&&item.encoding!=='utf-8')warnings.push('Bank file decoded locally as '+item.encoding+'. Verify source text before importing.');
     if(duplicateFile)warnings.push('File content duplicates batch item '+duplicateFile+'. No data was removed.');
     reports.push({index:i+1,inputType:ext,outputFile:name,rows:audit.summary.count,
       totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,
       duplicateReferenceCount:audit.duplicateIds.length,possibleDuplicateCount:audit.possibleDuplicates.length,
+      crossFileReferenceMatches,crossFileFingerprintMatches,matchedEarlierFileNumbers:[...matchedEarlierFileNumbers].sort((a,b)=>a-b),
       dateRange,parserIntegrity,outputIsLedger:false,warnings});
   }
   const report={format:'Finance File Lab batch validation v2',localOnly:true,
     reportScope:'File-level transaction summary only. IIF journal allocations are not reconstructed.',
     autoMergedAccounts:false,autoDeletedTransactions:false,target,files:reports,
     totalFiles:inputs.length,totalTransactions:rows,
+    crossFileReferenceMatches:batchReferenceMatches,crossFileFingerprintMatches:batchFingerprintMatches,
+    crossFileMatchesAreWarningsOnly:true,
     sourceFileNamesIncluded:false,quickBooksImportTested:false};
   entries['batch-validation.json']=JSON.stringify(report,null,2);
   return {archive:toZIP(entries),report,warningCount:reports.reduce((n,x)=>n+x.warnings.length,0)};
