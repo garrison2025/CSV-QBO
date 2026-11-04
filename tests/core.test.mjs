@@ -128,3 +128,11 @@ test('ZIP archive handles real XLSX bytes and multiple CSV parts',()=>{
  assert.throws(()=>toZIP({'../secret.csv':'malicious'}),/Unsafe/);
  assert.throws(()=>toZIP({}),/No output/);
 });
+
+
+test('ZIP writer handles a 350 KB standalone CSV without argument spread overflow',()=>{
+ const content='header\r\n'+'A'.repeat(349000)+'\r\n';
+ const archive=toZIP({'large.csv':content});
+ assert.ok(archive.length>349000);
+ assert.equal(String.fromCharCode(...archive.slice(0,2)),'PK');
+});
