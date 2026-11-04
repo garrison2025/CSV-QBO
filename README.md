@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V1.2 — current CSV mapping controls the only exportable preview
+
+- Fixed a potentially dangerous stale-data state: once a CSV/TSV mapping select changes, the previous transaction preview, audit, warning acknowledgement, validation summary and export readiness are invalidated together. Users must click **Preview transactions** again.
+- Changing date interpretation or clearing the workspace invalidates those same controls. A mapping that fails validation cannot leave the last successful summary available for download.
+- Validation JSON is disabled until a fresh, current preview passes; the on-screen transaction table and prior totals are cleared when the source interpretation changes.
+- Added dependency-free simulated-DOM event tests (not a claim of manual live-browser UAT) for valid/invalid remapping, changing date order, duplicate warning acknowledgement resets and clearing an in-progress file read.
+- Import into QuickBooks and real-bank compatibility remain unverified. All files stay local, previews stay noindex, and no paid dependencies or APIs were added.
+
 ## V1.1 — OFX bank retrieval boundaries and posting-date transparency
 
 - `BANKTRANLIST` aggregates are checked for exactly one complete, non-repeated bank statement period; truncated, repeated or reversed `DTSTART`/`DTEND` sources fail clearly instead of merging entries.
