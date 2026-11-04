@@ -379,6 +379,68 @@ export function quickBooksCSVParts(transactions,{maxRows=1000,maxBytes=350000}={
   if(batch.length)parts.push(toQuickBooksCSV(batch));
   return parts;
 }
+/**
+ * Reparse every QuickBooks-compatible CSV part and reconcile exact integer
+ * cents and row counts before allowing a download. This verifies the exported
+ * CSV syntax and totals, NOT acceptance by QuickBooks Online.
+ */
+export function quickBooksCSVExportPlan(transactions,limits={}){
+  const parts=quickBooksCSVParts(transactions,limits);
+  const sourceAudit=auditTransactions(transactions);
+  const summaries=[];
+  let totalCount=0,totalIn=0n,totalOut=0n;
+  const encoder=new TextEncoder();
+  for(let i=0;i<parts.length;i++){
+    const csv=parts[i],rows=parseCSV(csv);
+    if(rows[0].join(',')!=='Date,Description,Amount')fail('QuickBooks CSV export header does not match the expected 3-column format.');
+    const records=rows.slice(1);
+    if(!records.length)fail('QuickBooks CSV export contains an empty part.');
+    const dates=[];
+    let inCents=0n,outCents=0n;
+    for(const record of records){
+      const date=isoDate(record[0],'us'),amount=toMinorUnits(record[2]);
+      if(!record[1].trim())fail('QuickBooks CSV export contains an empty Description.');
+      dates.push(date);
+      if(amount>=0n)inCents+=amount;else outCents-=amount;
+    }
+    dates.sort();
+    const bytes=encoder.encode(csv).length;
+    if(records.length>(limits.maxRows??1000)||bytes>(limits.maxBytes??350000)){
+      fail('QuickBooks CSV export exceeded its row or byte limit after serialization.');
+    }
+    totalCount+=records.length;totalIn+=inCents;totalOut+=outCents;
+    summaries.push({file:'quickbooks-online-part-'+String(i+1).padStart(3,'0')+'.csv',
+      rows:records.length,bytes,
+      dateRange:{first:dates[0],last:dates[dates.length-1]},
+      totalIn:fromMinorUnits(inCents),totalOut:fromMinorUnits(outCents),net:fromMinorUnits(inCents-outCents)});
+  }
+  if(totalCount!==sourceAudit.summary.count||
+    fromMinorUnits(totalIn)!==sourceAudit.summary.credit||
+    fromMinorUnits(totalOut)!==sourceAudit.summary.debit){
+    fail('QuickBooks CSV export reconciliation failed: source and output totals differ.');
+  }
+  const warnings=[
+    'This is QuickBooks Online manual-upload CSV, NOT a .qbo Web Connect file; actual software import has not been tested.',
+    'The three-column QuickBooks CSV omits transaction reference IDs; review duplicates before any import.'
+  ];
+  if(sourceAudit.duplicateIds.length||sourceAudit.possibleDuplicates.length){
+    warnings.push('Potential duplicates were detected in the source; no transactions have been deleted.');
+  }
+  return {parts,report:{
+    reportType:'Finance File Lab QuickBooks CSV preflight v1',
+    outputFormat:'QuickBooks Online manual-upload 3-column CSV',
+    localOnly:true,quickBooksImportTested:false,isQBOWebConnect:false,
+    generatedCSVReparsed:true,totalsReconciled:true,
+    autoDeletedTransactions:false,containsTransactionDescriptions:false,
+    containsTransactionReferences:false,sourceFileNamesIncluded:false,
+    sourceRows:sourceAudit.summary.count,
+    sourceTotals:sourceAudit.summary,
+    duplicateReferenceCount:sourceAudit.duplicateIds.length,
+    possibleDuplicateCount:sourceAudit.possibleDuplicates.length,
+    partCount:summaries.length,parts:summaries,warnings
+  }};
+}
+
 /** Duplicate checks warn; they never mutate or drop the user's records. */
 export function auditTransactions(transactions){
   if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to audit.');
