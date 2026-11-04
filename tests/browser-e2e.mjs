@@ -63,6 +63,7 @@ try{
 
  const dupe='Date,Description,Amount,Reference\n11/04/2026,Coffee,-3.00,REF-1\n11/04/2026,Coffee,-3.00,REF-1\n';
  await page.locator('#file-input').setInputFiles(file('duplicates.csv',dupe));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
  await page.locator('#preview-button').click();
  assert.equal(await page.locator('#export-button').isDisabled(),true);
  await page.locator('#warning-ack').check();
