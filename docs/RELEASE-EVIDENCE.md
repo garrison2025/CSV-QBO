@@ -94,3 +94,12 @@
 - Added separate synthetic XML and legacy 1252 fixtures with browser download links. No real banking data or bank-specific UAT used.
 - Source-level parserIntegrity counts are included in existing batch validation. Original filenames, account numbers and payee descriptions are excluded from validation reports.
 - CI test count and Cloudflare deployment verification pending; Pages preview still noindex and real QuickBooks import NOT RUN.
+
+## V1.1 — statement retrieval-window integrity (2026-11-04)
+
+- OFX BANKTRANLIST is enforced as one complete statement aggregate; malformed/incomplete, duplicated or reversed date-range definitions block conversion.
+- DTSTART/DTEND express bank system-search window (exclusive end), not guaranteed DTSTART<=DTPOSTED<DTEND; posted dates outside retrieval dates are counted and WARNED without dropping rows.
+- Parser integrity metadata records the date-only start and end (inclusive/exclusive), missing reference counts and posted-date exceptions, without account IDs or user transaction labels.
+- Batch JSON and single file JSON inherit parser integrity fields; browser shows a separate bank retrieval period notice. Synthetic test samples and compatibility page are aligned.
+- Original OFX spec: https://www.financialdataexchange.org/common/Uploaded%20files/OFX%20files/OFX%202.2.pdf (section 3.2.7); bank import UAT NOT RUN; Cloudflare Pages preview noindex.
+- CI and Cloudflare deployment verification to be recorded after successful merge.
