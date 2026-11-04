@@ -28,3 +28,9 @@
 @media(max-width:540px){.batch-top button{width:100%}.batch-download{width:100%}}
 
 .batch-ack[hidden]{display:none}
+
+/* Financial-file lifecycle: allow immediate in-memory discard. */
+.file-controls{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0 0;flex-wrap:wrap}
+.file-controls .file-name{margin:0;min-width:0;flex:1}
+.clear-file-btn{font-size:12px;padding:7px 11px}
+@media(max-width:540px){.file-controls .file-name{flex-basis:100%}}
