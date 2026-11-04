@@ -31,7 +31,7 @@ function workspace(source='any',output='csv',id='workspace'){
 function tile(tool){return '<a class="tool-tile" href="/tools/'+tool.slug+'/" aria-label="'+esc(tool.label)+'"><div class="tile-top"><span class="tile-code">'+esc(tool.input.toUpperCase())+' → '+esc(tool.output==='xlsx'?'XLSX':tool.output.toUpperCase())+'</span><span class="tile-arrow" aria-hidden="true">↗</span></div><strong>'+esc(tool.label)+'</strong><p>'+esc(tool.summary)+'</p><span class="tile-note">'+(tool.release==='read_only_tested'?'Read-only conversion':tool.release==='syntax_only'?'Experimental syntax output':'Keyword demand unverified')+'</span></a>';}
 function toolsSection(current){const list=tools.filter(t=>t.release==='read_only_tested'&&t.slug!==current);return '<section id="tools" class="section alt"><div class="container"><div class="section-intro"><span class="section-label">FINANCIAL CONVERTERS</span><h2>Choose the format you actually need.</h2><p>Each available tool runs a real local parser and downloadable output. Unsupported QBO writing directions are deliberately not published as converters.</p></div><div class="tools-grid">'+list.map(tile).join('')+'</div></div></section>';}
 // Fixtures are intentionally synthetic, never from a real bank; QBO/QFX files only test the local STMTTRN reader.
-const sampleOFX='<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>'+
+const sampleOFX='<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST><DTSTART>20261104000000<DTEND>20261106000000'+
   '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261104000000<TRNAMT>-12.50<FITID>DEMO-001<NAME>Sample bookstore</STMTTRN>'+
   '<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20261105000000<TRNAMT>120.00<FITID>DEMO-002<NAME>Sample refund</STMTTRN>'+
   '</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>\n';
@@ -45,14 +45,14 @@ fs.mkdirSync(path.join(dist,'samples'),{recursive:true});
 for(const [ext,content] of Object.entries(sampleFiles)) fs.writeFileSync(path.join(dist,'samples',ext+'-synthetic.'+ext),content);
 
 const xmlSyntheticOFX='<?xml version="1.0" encoding="UTF-8"?>\n'+
-  '<OFX><CURDEF>USD</CURDEF><BANKTRANLIST>'+
+  '<OFX><CURDEF>USD</CURDEF><BANKTRANLIST><DTSTART>20261104000000</DTSTART><DTEND>20261106000000</DTEND>'+
   '<STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20261104000000[-5:EST]</DTPOSTED><TRNAMT>-12.50</TRNAMT><FITID>DEMO-001</FITID><NAME><![CDATA[Sample café & bookstore]]></NAME></STMTTRN>'+
   '<STMTTRN><TRNTYPE>CREDIT</TRNTYPE><DTPOSTED>20261105</DTPOSTED><TRNAMT>120.00</TRNAMT><FITID>DEMO-002</FITID><NAME>Sample refund &#233;lite</NAME></STMTTRN>'+
   '</BANKTRANLIST></OFX>\n';
 fs.writeFileSync(path.join(dist,'samples','ofx-xml-synthetic.ofx'),xmlSyntheticOFX);
 // Synthetic OFX 1.x example: actual Windows-1252 byte 0xE9, not a UTF-8 replacement.
 const legacyHead='OFXHEADER:100\r\nDATA:OFXSGML\r\nVERSION:102\r\nSECURITY:NONE\r\nENCODING:USASCII\r\nCHARSET:1252\r\nCOMPRESSION:NONE\r\n\r\n';
-const legacyBefore=legacyHead+'<OFX><CURDEF>USD<BANKTRANLIST>'+
+const legacyBefore=legacyHead+'<OFX><CURDEF>USD<BANKTRANLIST><DTSTART>20261104000000<DTEND>20261106000000'+
   '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261104<TRNAMT>-12.50<FITID>DEMO-001<NAME>Sample caf';
 const legacyAfter='</STMTTRN><STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20261105<TRNAMT>120.00<FITID>DEMO-002<NAME>Sample refund</STMTTRN></BANKTRANLIST></OFX>';
 fs.writeFileSync(path.join(dist,'samples','ofx-win1252-synthetic.ofx'),
