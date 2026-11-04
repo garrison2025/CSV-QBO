@@ -142,3 +142,12 @@
 - Tests cover swapped rows, altered payees, date changes, omitted/extra rows, modified formula prefixes, encoding and small row/byte limits; Chrome E2E checks real 1001-row split ZIP and JSON receipt.
 - This does not imply QuickBooks import UAT and does not create Web Connect `.qbo` files. Domain still absent; Cloudflare Pages remains noindex.
 - CI/Cloudflare results must be verified separately after merge.
+
+## V1.6 — OFX structural comment, CDATA and STATUS boundary validation (2026-11-04)
+
+- New equal-length markup-only view keeps XML comments and CDATA content from manufacturing bank STMTTRN records, account sections or server status blocks, without losing genuine CDATA transaction descriptions.
+- STATUS blocks require paired open/close delimiters and a numeric zero CODE; missing or nonzero codes block export. XML-declared feeds reject missing leaf-tag closers for date, amount, description, memo, reference and related extracted fields; OFX SGML legacy bare leaves remain supported.
+- Security regression tests cover CDATA fake transaction amounts, comment fake bank errors/multiple accounts, truncated XML fields, missing/nested/stray STATUS blocks, and safe text-only rendering of script-looking literals.
+- Real Chrome E2E exercises synthetic adversarial OFX XML file selection, transaction preview and actual CSV download. No genuine customer/bank data used.
+- QuickBooks import UAT remains NOT RUN; production SEO remains blocked until a custom domain and explicit release.
+- CI/Cloudflare release evidence to be verified after merge.
