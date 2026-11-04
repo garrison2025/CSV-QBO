@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,parseIIF,parseInput,toQIF,toQuickBooksCSV,totals} from '../src/core.mjs';
-import {toXLSX} from '../src/xlsx.mjs';
+import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,auditTransactions,totals} from '../src/core.mjs';
+import {toXLSX,toZIP} from '../src/xlsx.mjs';
 
 test('strict cents and signed amounts',()=>{
  assert.equal(toMinorUnits('1,234.56'),123456n);
@@ -51,7 +51,7 @@ test('IIF only TRNS summary, split warning',()=>{
 test('real XLSX ZIP output and QuickBooks formatter CSV output',()=>{
  const records=[{date:'2026-11-04',description:'Refund',amount:'12.30',id:'X'}];
  const x=toXLSX(records);assert.equal(String.fromCharCode(...x.slice(0,2)),'PK');assert.ok(x.length>1000);
- assert.match(toQuickBooksCSV(records),/date,description,amount/);
+ assert.match(toQuickBooksCSV(records),/Date,Description,Amount\r\n11\/04\/2026,Refund,12.30/);
  assert.throws(()=>toXLSX([]));
 });
 test('privacy-sensitive invalid input fails loudly',()=>{
@@ -81,3 +81,50 @@ for(let i=0;i<70;i++){
    assert.equal(read.transactions[0].description,record[0].description);
  });
 }
+
+// Release gates for the QuickBooks Online CSV workflow.
+test('QuickBooks CSV is 3-column format with US date, no QBO impersonation',()=>{
+ const actual=toQuickBooksCSV([{date:'2026-11-04',description:'Opening balance',amount:'1234.56'}]);
+ assert.equal(actual,'\uFEFFDate,Description,Amount\r\n11/04/2026,Opening balance,1234.56\r\n');
+ assert.throws(()=>toQuickBooksCSV([{date:'2026-11-04',description:'',amount:'1.00'}]),/Description/);
+ assert.throws(()=>toQuickBooksCSV([]),/No transactions/);
+});
+test('QuickBooks CSV auto-splits at 1000 transactions and does not drop rows',()=>{
+ const data=Array.from({length:2301},(_,i)=>({date:'2026-11-04',description:'Entry '+i,amount:i%2?'-0.01':'0.02',id:'T'+i}));
+ const parts=quickBooksCSVParts(data);
+ assert.equal(parts.length,3);
+ assert.deepEqual(parts.map(x=>parseCSV(x).length-1),[1000,1000,301]);
+ assert.equal(parts.reduce((n,x)=>n+parseCSV(x).length-1,0),2301);
+ for(const p of parts)assert.ok(new TextEncoder().encode(p).length<=350000);
+});
+test('QuickBooks CSV splits at byte limits including UTF-8, with BOM and headers',()=>{
+ const data=Array.from({length:6},(_,i)=>({date:'2026-11-04',description:'上海 '+i+' 😊',amount:'5.00',id:'R'+i}));
+ const parts=quickBooksCSVParts(data,{maxRows:1000,maxBytes:135});
+ assert.ok(parts.length>1);
+ assert.equal(parts.reduce((n,p)=>n+parseCSV(p).length-1,0),6);
+ assert.ok(parts.every(p=>new TextEncoder().encode(p).length<=135));
+ assert.throws(()=>quickBooksCSVParts([{date:'2026-11-04',description:'Long '.repeat(100),amount:'10.00'}],{maxBytes:140}),/too large/);
+});
+test('audit duplicate references and fingerprints without deleting rows',()=>{
+ const tx=[{date:'2026-11-04',description:' Market  ',amount:'-1.25',id:'ABC'},{date:'2026-11-04',description:'market',amount:'-1.25',id:'ABC'},{date:'2026-11-05',description:'market',amount:'1.25',id:'XYZ'}];
+ const audit=auditTransactions(tx);
+ assert.equal(audit.summary.count,3);
+ assert.equal(audit.duplicateIds.length,1);
+ assert.equal(audit.possibleDuplicates.length,1);
+ assert.equal(tx.length,3);
+ assert.ok(audit.warnings.some(x=>x.includes('no rows were deleted')));
+});
+test('CSV debit and credit must not conflict in one row',()=>{
+ assert.throws(()=>csvTransactions('Date,Description,Debit,Credit\n11/04/2026,Conflict,10.00,10.00'),/Both Debit and Credit/);
+ assert.throws(()=>csvTransactions('Date,Description,Debit,Credit\n11/04/2026,Conflict,-10.00,0'),/cannot contain negative/);
+ assert.throws(()=>csvTransactions('Date,Description,Amount\n11/04/2026,,10.00'),/Description is empty/);
+});
+test('ZIP archive handles real XLSX bytes and multiple CSV parts',()=>{
+ const transactions=[{date:'2026-11-04',description:'Test',amount:'10.01',id:'A'}];
+ const xlsx=toXLSX(transactions),csv=toQuickBooksCSV(transactions);
+ const result=toZIP({'export.xlsx':xlsx,'quickbooks.csv':csv});
+ assert.equal(String.fromCharCode(...result.slice(0,2)),'PK');
+ assert.ok(result.length>xlsx.length);
+ assert.throws(()=>toZIP({'../secret.csv':'malicious'}),/Unsafe/);
+ assert.throws(()=>toZIP({}),/No output/);
+});
