@@ -167,3 +167,20 @@ test('OFX compatibility documentation describes structural CDATA and bank status
  assert.match(core,/function ofxViews\(source\)/);
  assert.match(core,/Unclosed OFX bank STATUS/);
 });
+
+
+test('all conversion pages provide working paginated preview and suspicious-row navigation controls',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ for(const t of tools){
+  const html=read('tools/'+t.slug+'/index.html');
+  for(const control of ['preview-navigation','preview-previous','preview-next','preview-page-status','preview-review']){
+   assert.ok(html.includes('id="'+control+'"'),t.slug+' must include '+control);
+  }
+  assert.match(html,/noindex,nofollow/);
+ }
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/const PREVIEW_PAGE_SIZE=25/);
+ assert.match(app,/function renderPreviewPage\(\)/);
+ assert.match(app,/reviewRows=\[\.\.\.new Set/);
+ assert.match(app,/Preview only — downloads include all/);
+});
