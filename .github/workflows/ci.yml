@@ -18,6 +18,20 @@ jobs:
           grep -q 'noindex,nofollow' dist/index.html
           grep -q 'Disallow: /' dist/robots.txt
           test ! -f dist/sitemap.xml
+      - name: Independently validate synthetic XLSX with Python OOXML reader
+        run: |
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          import {toXLSX} from './src/xlsx.mjs';
+          const synthetic=[
+            {date:'2026-11-04',description:'=SUM(1,2) & <tag>\r\nsecond',amount:'-0.01',id:'000123'},
+            {date:'1900-02-28',description:'Older bank',amount:'9999999999999.99',id:'Z'},
+            {date:'1900-03-01',description:'Next day',amount:'0.01',id:''}
+          ];
+          writeFileSync('/tmp/csv-qbo-synthetic.xlsx',toXLSX(synthetic));
+          NODE
+          python3 tests/verify_xlsx_ooxml.py /tmp/csv-qbo-synthetic.xlsx
+          rm /tmp/csv-qbo-synthetic.xlsx
       - name: Run real Chrome browser file-upload and download acceptance
         run: |
           command -v google-chrome
