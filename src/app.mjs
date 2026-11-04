@@ -1,5 +1,6 @@
 import {MAX_FILE_BYTES,parseCSV,guessMapping,parseInput,toCSV,toQIF,toQuickBooksCSV,quickBooksCSVParts,auditTransactions,totals,escapeHtml} from './core.mjs';
 import {toXLSX,toZIP} from './xlsx.mjs';
+import {batchConvert,MAX_BATCH_FILES,MAX_BATCH_BYTES} from './batch.mjs';
 
 const $ = s => document.querySelector(s);
 const drop=$('#drop-zone'), fileInput=$('#file-input'), formatPicker=$('#target-format');
@@ -7,6 +8,7 @@ if(drop && fileInput){
   const source=drop.dataset.source||'any';
   const fixedOutput=drop.dataset.output||'csv';
   let file=null,parsed=null,table=null,fileText="",fileExt="",audit=null;
+  let batchFiles=[],batchArchive=null,batchInfo=null,batchHasWarnings=false;
   const say=(msg,kind='info')=>{const box=$('#work-status');box.textContent=msg;box.dataset.state=kind;box.hidden=false;};
   function setButton(on){const btn=$('#export-button');btn.disabled=!on;btn.setAttribute('aria-disabled',String(!on));}
   function updateMapping(headers){
@@ -47,8 +49,56 @@ if(drop && fileInput){
       }else{parsed=parseInput(text,ext,{dateFormat:$('#date-format').value});renderResult(parsed);}
     }catch(err){say(err.message||'Could not read file.','error');}
   }
-  // Date ordering also matters for QIF and IIF.
+  const batchPicker=$('#batch-input'),batchSelect=$('#batch-choose'),batchExport=$('#batch-export');
+  function batchReset(){
+    batchArchive=null;batchInfo=null;batchHasWarnings=false;
+    if(batchExport)batchExport.disabled=true;
+    if($('#batch-ack'))$('#batch-ack').checked=false;
+    if($('#batch-ack-label'))$('#batch-ack-label').hidden=true;
+  }
+  function batchSay(message,isError=false){
+    if(!$('#batch-status'))return;
+    $('#batch-status').textContent=message;
+    $('#batch-status').dataset.state=isError?'error':'info';
+  }
+  batchSelect?.addEventListener('click',()=>{batchPicker.value='';batchPicker.click();});
+  batchPicker?.addEventListener('change',async()=>{
+    batchReset();
+    batchFiles=Array.from(batchPicker.files||[]);
+    const list=$('#batch-file-list');list.replaceChildren();
+    batchFiles.forEach((selected,i)=>{const li=document.createElement('li');li.textContent=(i+1)+'. '+selected.name+' ('+Math.ceil(selected.size/1024)+' KB)';list.appendChild(li);});
+    if(!batchFiles.length)return batchSay('No batch files selected.');
+    if(batchFiles.length>MAX_BATCH_FILES)return batchSay('Select at most '+MAX_BATCH_FILES+' files.',true);
+    const bytes=batchFiles.reduce((sum,selected)=>sum+selected.size,0);
+    if(bytes>MAX_BATCH_BYTES)return batchSay('The batch exceeds the 12 MB input limit.',true);
+    if(batchFiles.some(selected=>selected.size>MAX_FILE_BYTES))return batchSay('One of your files exceeds the 8 MB file limit.',true);
+    const target=formatPicker?formatPicker.value:fixedOutput;
+    if(!['csv','xlsx'].includes(target))return batchSay('Batch mode supports CSV/Excel output only. Use single-file conversion for this format.',true);
+    batchSay('Checking '+batchFiles.length+' files locally. No transaction data is uploaded.');
+    await Promise.resolve();
+    try{
+      const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,text:await selected.text()})));
+      batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
+      batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
+      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s). No accounts merged.');
+      if(batchHasWarnings){$('#batch-ack-label').hidden=false;batchExport.disabled=true;}
+      else batchExport.disabled=false;
+    }catch(err){batchReset();batchSay(err.message||'Batch conversion failed; no files produced.',true);}
+  });
+  $('#batch-ack')?.addEventListener('change',event=>{if(batchExport)batchExport.disabled=!batchArchive||(batchHasWarnings&&!event.target.checked);});
+  batchExport?.addEventListener('click',()=>{
+    if(!batchArchive)return batchSay('Choose a valid batch first.',true);
+    if(batchHasWarnings&&!$('#batch-ack').checked)return batchSay('Acknowledge the warnings before downloading.',true);
+    saveBlob(new Blob([batchArchive],{type:'application/zip'}),'finance-file-lab-separate-conversions.zip');
+    batchSay('ZIP downloaded. Review each file and its validation report before import.');
+  });
+  formatPicker?.addEventListener('change',()=>{
+    if(batchFiles.length){batchReset();batchSay('Output format changed. Select batch files again to regenerate the results.');}
+  });
+  // Date ordering applies to QIF and IIF as well as CSV; changing it must
+  // refresh the preview rather than silently leave the old interpretation.
   $('#date-format')?.addEventListener('change',()=>{
+    if(batchFiles.length){batchReset();batchSay('Date order changed. Select batch files again to avoid stale exports.');}
     if(!file||!fileText)return;
     if(fileExt==='csv'||fileExt==='tsv'){
       parsed=null;setButton(false);$('#preview-panel').hidden=true;

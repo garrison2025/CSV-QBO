@@ -20,23 +20,24 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
-## V0.4 — source integrity and date format controls
+## V0.5 — separate browser-local batch export
 
-- Refuse OFX files containing multiple bank/card statement sections instead of silently merging accounts.
-- Explicitly reject unsupported investment QIF and OFX feeds rather than exporting misleading partial records.
-- Expose source date order for QIF and IIF as well as CSV; changing it invalidates or refreshes the transaction preview.
-- Local tests: **254/254 PASS**. QuickBooks target-software imports remain **NOT RUN**.
+- Select up to **10 independent QBO/QFX/OFX/QIF/IIF bank files** (12 MB aggregate), and download a ZIP with a separately converted CSV or XLSX per input plus a validation report.
+- Refuse to merge accounts, drop failed source records or silently delete duplicate transactions. Any invalid source blocks the entire ZIP.
+- ZIP file names and the validation report do not include original bank filenames or account identifiers. The report includes financial totals and remains local.
+- CSV batch import requires individual field mapping and is deliberately unsupported here. QBO Web Connect writing is not implemented.
+- Warnings require explicit review acknowledgment before download. Real QuickBooks imports are still unverified.
 
-## V0.3 — browser-local data integrity workflow
+## V0.4 correctness improvements
 
-- Export **three-column QuickBooks Online CSV**, not Web Connect \`.qbo\`. Dates use explicit US \`MM/DD/YYYY\` and decimal amounts are verified with integer-cents.
-- Automatically split large CSV exports into parts of at most **1,000 transactions / 350 KB** each. Multi-part results are downloaded as a ZIP. Files are **not** uploaded to a server.
-- Validate dates, descriptions and debit/credit conflicts; alert on duplicate transaction references and possible duplicate records **without changing or removing any row**.
-- Download an aggregate **validation-summary.json** containing transaction totals and row indices, never descriptions or account numbers.
-- Users may opt in to saving a local CSV column-mapping template; only column headers and positions are stored in that browser, not bank transactions.
-- Verified by **250 local automated tests** and [GitHub CI](https://github.com/garrison2025/CSV-QBO/actions). No actual receiving-software import tests have run.
+- OFX multi-account files are rejected instead of mixing transactions across bank/card accounts.
+- Investment OFX/QIF inputs are explicitly rejected; this is a bank-transaction reader only.
+- A visible source date-order control for CSV, QIF and IIF permits deliberate US/day-first selection and revalidates the preview when changed.
+- 254 deterministic tests passed locally; no target-software import validation claimed.
 
-The project remains a technical preview on \`csv-qbo.pages.dev\` with \`noindex\` and blocked robots. These enhancements do **not** establish Desktop \`.qbo\` writer compatibility or paid SaaS readiness.
+## V0.3 workflow extension
+
+Includes auto-batched QuickBooks Online CSV (not QBO), duplicate auditing, opt-in local column templates and anonymized validation reports. 254 deterministic checks pass. Real application import compatibility remains unverified.
 
 ## Run locally
 

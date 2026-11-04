@@ -15,24 +15,27 @@
 | Stripe or subscriptions | NOT IMPLEMENTED | No merchant credentials; no paid CTA |
 | Custom domain and GSC | NOT CONFIGURED | User has not purchased a domain |
 
-## V0.3 incremental release — 2026-11-04
-
-- `npm test`: **250/250 PASS** locally; updated GitHub Actions run [41787228124](https://github.com/garrison2025/CSV-QBO/actions/runs/41787228124) completed **success**.
-- `npm run build`: **PASS** locally with 12 tool pages and preview noindex.
-- New deterministic checks: QuickBooks Online CSV headers/date order, split at 1,000 rows/350 KB, UTF-8 byte limits, conflicting debit/credit, duplicate audit, mixed CSV/XLSX ZIP generation.
-- Online user-visible checks: initial preview `csv-qbo.pages.dev` returned homepage and read-only tools with `noindex`; **V0.3 live deployment not yet confirmed when this note was written**.
-- Interactive/browser smoke of V0.3: **NOT RUN** in this environment because Chromium navigation was blocked by runtime policy. V0.2 browser smoke evidence above does not automatically validate V0.3.
-- Receiving QuickBooks/Quicken import: **NOT RUN**; no claims of certified compatibility.
-
 **Decision:** a demonstrable free browser-local prototype that can be deployed to preview. Production SEO and commercial launch require manual UI/UAT and actual receiving-software compatibility evidence.
 
-- **Large ZIP check:** fixed argument-spread overflow and added 350 KB ZIP regression; 250/250 tests pass.
+## V0.3 — data-integrity extension
 
-## V0.4 incremental release — 2026-11-04
+- 250/250 deterministic checks PASS; GitHub Actions run 41787228124 SUCCESS.
+- Added three-column QuickBooks Online CSV format, safe 1,000-row and 350 KB splitting, large ZIP regression, duplicate warnings, optional local mapping template and anonymous audit report.
+- New browser interaction and real QuickBooks import tests NOT RUN. Preview stays noindex.
+
+## V0.4 (2026-11-04)
 
 - LOCAL PASS: 254 unit/property/build tests and preview-noindex build.
-- LOCAL PASS: OFX multiple account sections and investment files now fail closed.
-- LOCAL PASS: QIF/IIF source date order is visible and changes trigger reparsing.
-- Browser smoke for V0.4: NOT RUN in this environment; Chromium local navigation was blocked.
-- QuickBooks target import: NOT RUN; do not claim compatibility.
-- GitHub CI / Cloudflare deployment: check separately after commit.
+- LOCAL PASS: multi-account OFX import now fails closed, investment OFX and QIF refuse unsupported records.
+- LOCAL PASS: QIF/IIF source date order appears outside CSV mapping controls and changes trigger reparsing.
+- Browser interaction check: NOT RUN for V0.4 until newly deployed preview can be exercised; previous V0.3 checks do not automatically validate changes.
+- QuickBooks Online/Desktop real import: NOT RUN; bank identity and target-account version remain unverified.
+- Cloudflare deployment: NOT VERIFIED for V0.4 until GitHub CI and Pages run complete.
+
+## V0.5 — separate bank-export batch processing (2026-11-04)
+
+- LOCAL PASS: 262 deterministic Node tests and preview-noindex build.
+- Source-account isolation: separate per-file parsing; invalid file aborts entire batch, no automatic merges or deduplication.
+- Manifest includes sensitive aggregates, counts, formats and warnings, but not source filenames or transaction descriptions. Stays local.
+- QuickBooks import: NOT RUN. Real Web Connect `.qbo` writing: NOT IMPLEMENTED.
+- Browser smoke and Cloudflare deployment: NOT VERIFIED until validated separately.
