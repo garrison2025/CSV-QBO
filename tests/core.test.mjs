@@ -927,7 +927,7 @@ test('OFX XML unescaped or unknown named entities reject conversion before bank 
  const front='<?xml version="1.0"?><OFX><STMTTRN><DTPOSTED>20261104</DTPOSTED><TRNAMT>1.00</TRNAMT>';
  const rear='</STMTTRN></OFX>';
  for(const payee of ['A & B','A &bogus; B','A &amp B','A &#abc; B','A &#x; B',
-                      'A &AMPB; B','A &#0; B','A &#1; B','A &#xFFFF; B',
+                      'A &AMPB; B','A &AMP; B','A &#0; B','A &#1; B','A &#xFFFF; B',
                       'A &#xD800; B','A &#x110000; B']){
   assert.throws(()=>parseOFX(front+'<NAME>'+payee+'</NAME>'+rear),
     /Malformed or unsupported OFX XML character entity|Invalid OFX character entity/);
