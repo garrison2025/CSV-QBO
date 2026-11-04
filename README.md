@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V2.2 — correct OFX 2.x XML mixed-content and entity validation
+
+- Fixed real source-to-export text-integrity hazards in OFX/QBO/QFX: XML leaf fields can contain **ordinary XML text, `<![CDATA[...]]>` segments, and XML comments in arbitrary order**. The old extractor could silently drop text after CDATA or leave comment markup inside a payee/memo. The new reader concatenates literal text and CDATA, omits comments and preserves the resulting merchant/reference/memo string without rewriting amounts or record order.
+- OFX 2.x XML mode now fails closed on **unknown named references, case-invalid XML entity names, missing semicolons, bare ampersands, disallowed control codes, surrogates and illegal numeric character references**. Only supported named/numeric entities are decoded once; escaped ampersands stay literal after decoding. An invalid XML source blocks preview/export with an error that never echoes the original private transaction text.
+- **Legacy OFX 1.x SGML is not forced through strict XML entity rules:** descriptions such as `Smith & Sons` still load, and SGML comment/CDATA segments are extracted without loss. No network XML resolver, DTD expansion or external parser is used.
+- Node tests exercise mixed XML entity/CDATA/comment fragments, Unicode, invalid code points, lossless payee reconstruction, SGML raw ampersands and malformed markup. Real Chrome E2E uploads both a valid mixed XML feed (then downloads CSV) and an invalid XML entity feed (must not expose stale data or permit downloads).
+- Six OFX/QFX/QBO conversion pages disclose the behavior. This proves only synthetic browser-local parsing; no real bank variant or QuickBooks import certification. Technical preview stays `noindex,nofollow` with zero paid APIs.
+
 ## V2.1 — old Mac CR-only QIF/IIF reader compatibility
 
 - Fixed a verified parser boundary limitation: QIF and IIF read logic formerly split records only on `LF` and `CRLF`; classic Mac or old finance exports with **bare CR** separators would be rejected or combine independent financial records.
