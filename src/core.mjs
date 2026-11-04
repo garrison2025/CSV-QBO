@@ -36,7 +36,10 @@ export function isoDate(input, format='us') {
   const v = String(input ?? '').trim();
   let y, m, d, match;
   if ((match = v.match(/^(\d{4})-(\d{2})-(\d{2})$/))) { [,y,m,d] = match; }
-  else if ((match = v.match(/^(\d{4})(\d{2})(\d{2})(?:\d.*)?$/))) { [,y,m,d] = match; }
+  else if ((match = v.match(/^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2})?)?(?:\.\d{1,3})?(?:\[[+-]?\d{1,2}(?::[A-Za-z0-9_.+-]+)?\])?$/))) {
+    [,y,m,d] = match;
+    if (match[4] != null && (Number(match[4]) > 23 || Number(match[5]) > 59 || (match[6] != null && Number(match[6]) > 59))) fail('Invalid OFX clock time: ' + v);
+  }
   else if ((match = v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) {
     y = match[3]; m = format === 'eu' ? match[2] : match[1]; d = format === 'eu' ? match[1] : match[2];
   } else fail('Unsupported date: ' + v + '. Select the correct US or day-first format.');
