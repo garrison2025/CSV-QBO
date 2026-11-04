@@ -200,6 +200,38 @@ try{
  assert.ok(!output.content.toString('utf8').includes('900.00'));
  console.log('PASS Chrome OFX XML CDATA/comment tag isolation and escaped preview');
 
+ // XML 2.x leaf fields can contain entity-escaped text, comments and
+ // multiple CDATA segments. The browser must not silently drop any segment.
+ const mixedXML='<?xml version="1.0"?><OFX><CURDEF>USD</CURDEF><STMTTRN>'+
+ '<DTPOSTED>20261104</DTPOSTED><TRNAMT>-8.05</TRNAMT>'+
+ '<NAME>Local &amp; <!-- internal only --><![CDATA[Café ^]]> &#x4E2D;&#25991;</NAME>'+
+ '<MEMO>Memo<![CDATA[ &original; ]]>end</MEMO><FITID>000099</FITID>'+
+ '</STMTTRN></OFX>';
+ await page.locator('#file-input').setInputFiles(file('mixed-bank.xml.ofx',mixedXML));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-8.05');
+ assert.match(await page.locator('#preview-body').textContent(),/Local & Café \^ 中文/);
+ assert.ok(!(await page.locator('#preview-body').textContent()).includes('internal only'));
+ await page.locator('#warning-ack').check();
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/Local & Café \^ 中文/);
+ assert.match(output.content.toString('utf8'),/000099/);
+ assert.ok(!output.content.toString('utf8').includes('internal only'));
+ console.log('PASS Chrome OFX mixed XML entities/CDATAs preserve exact payee without copying XML comments');
+
+ const badXML=mixedXML.replace('Local &amp; ', 'Private merchant &unsupported; ');
+ await page.locator('#file-input').setInputFiles(file('invalid-entity.ofx',badXML));
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#work-status').getAttribute('data-state'),'error');
+ const entityStatus=await page.locator('#work-status').textContent();
+ assert.match(entityStatus,/Malformed or unsupported OFX XML character entity/);
+ assert.ok(!entityStatus.includes('Private merchant'));
+ assert.ok(!entityStatus.includes('000099'));
+ console.log('PASS Chrome invalid XML entity fails closed with privacy-safe error and no downloadable stale preview');
+
+
 
  // Verify the CSV -> experimental QIF workflow is an actual downloaded file.
  await page.goto(base+'/tools/csv-to-qif/');
