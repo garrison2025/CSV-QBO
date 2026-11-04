@@ -100,6 +100,36 @@ try{
  assert.equal(r.crossFileFingerprintMatches,1);assert.equal(r.autoMergedAccounts,false);
  assert.equal(r.autoDeletedTransactions,false);assert.ok(!JSON.stringify(r).includes('REF-1'));
  console.log('PASS real batch ZIP output, separate files and privacy-safe validation');
+
+ // Old OFX 1.x source must decode Windows-1252 on the real browser upload path.
+ await page.goto(base+'/tools/ofx-to-csv/');
+ const legacy=await readFile(path.join(dist,'samples/ofx-win1252-synthetic.ofx'));
+ await page.locator('#file-input').setInputFiles({name:'legacy.ofx',mimeType:'application/octet-stream',buffer:legacy});
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-net').textContent(),'107.50');
+ assert.equal(await page.locator('#preview-body tr').first().locator('td').nth(1).textContent(),'Sample café');
+ await page.locator('#warning-ack').check();
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/Sample café/);
+ console.log('PASS Windows-1252 OFX browser decode and CSV download');
+
+ // Verify the CSV -> experimental QIF workflow is an actual downloaded file.
+ await page.goto(base+'/tools/csv-to-qif/');
+ await page.locator('#file-input').setInputFiles(file('convert.csv',csv));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ output=await dl('#export-button');
+ assert.ok(output.name.endsWith('.qif'));
+ assert.match(output.content.toString('utf8'),/^!Type:Bank\r\n/);
+ assert.match(output.content.toString('utf8'),/D11\/04\/2026\r\nT-12\.50\r\nPSample bookstore/);
+ console.log('PASS browser CSV -> experimental QIF syntax download');
+
+ // Responsive smoke check: functionality remains usable at a typical phone width.
+ await page.setViewportSize({width:390,height:844});
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
+ assert.ok(overflow<=2,'mobile page must not overflow horizontally by '+overflow+'px');
+ console.log('PASS 390px mobile layout without horizontal overflow');
  assert.deepEqual(errors,[]);
  console.log('PASS zero uncaught page JavaScript errors');
 }catch(e){
