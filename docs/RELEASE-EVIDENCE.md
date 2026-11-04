@@ -53,3 +53,11 @@
 - Users can clear the single-file preview and source text in memory without refreshing; local batch files are a separate workspace and downloads persist on disk.
 - GitHub CI and target-software browser/UAT outcomes must be recorded separately; QBO/IIF import verification remains NOT RUN.
 - Remains preview/noindex; no production domain or verified checkout.
+
+## V0.7 incremental quality release — 2026-11-04
+
+- Fail-closed parsing: internal amount spaces rejected; OFX STMTTRN aggregate boundaries checked; invalid compact timestamps rejected; empty OFX transaction descriptions rejected.
+- QIF import scope limited to a single explicit Bank/CCard/Cash transaction section; category/split presence warned and exported transaction `N` references preserved.
+- Browser cleanup now resets local batch/single-file selections and invalidates outstanding async reads to avoid stale reappearance.
+- Synthetic regression tests added. CI result and exact case count should be attached after a successful GitHub Actions run.
+- No QuickBooks/QIF downstream application import UAT, browser end-to-end matrix, live banking fixtures or production SEO eligibility is claimed.
