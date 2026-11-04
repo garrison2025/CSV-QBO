@@ -9,6 +9,7 @@ if(drop && fileInput){
   const fixedOutput=drop.dataset.output||'csv';
   let file=null,parsed=null,table=null,fileText="",fileExt="",audit=null;
   let batchFiles=[],batchArchive=null,batchInfo=null,batchHasWarnings=false;
+  let singleReadVersion=0,batchReadVersion=0;
   const say=(msg,kind='info')=>{const box=$('#work-status');box.textContent=msg;box.dataset.state=kind;box.hidden=false;};
   function setButton(on){const btn=$('#export-button');btn.disabled=!on;btn.setAttribute('aria-disabled',String(!on));}
   function updateMapping(headers){
@@ -34,6 +35,7 @@ if(drop && fileInput){
     $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);setButton(true);say(audit.warnings.length?'Ready with duplicate warnings. Inspect them before downloading.':'Ready. Review the transaction preview, then download.', audit.warnings.length?'info':'success');
   }
   async function prepare(chosen){
+    const version=++singleReadVersion;
     file=chosen;parsed=null;audit=null;table=null;fileText='';fileExt='';setButton(false);$('#preview-panel').hidden=true;$('#mapping-panel').hidden=true;$('#file-name').textContent='';
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
@@ -42,7 +44,9 @@ if(drop && fileInput){
     if(source!=='any' && source!==ext && !(source==='csv'&&ext==='tsv')){say('This tool expects a .'+source+' input. Choose a matching file or browse another converter.','error');return;}
     $('#file-name').textContent=file.name+' • '+Math.ceil(file.size/1024)+' KB';
     try{
-      const text=await file.text();fileText=text;fileExt=ext;
+      const text=await file.text();
+      if(version!==singleReadVersion)return; // A newer file or Clear has invalidated this read.
+      fileText=text;fileExt=ext;
       if(ext==='csv'||ext==='tsv'){
         updateMapping(parseCSV(text,ext==='tsv'?'\t':undefined)[0]);
         say('Select column mappings, then choose Preview transactions.');
@@ -51,6 +55,7 @@ if(drop && fileInput){
   }
   const batchPicker=$('#batch-input'),batchSelect=$('#batch-choose'),batchExport=$('#batch-export');
   function batchReset(){
+    batchReadVersion++; // Invalidate in-flight reads before clearing a previous ZIP.
     batchArchive=null;batchInfo=null;batchHasWarnings=false;
     if(batchExport)batchExport.disabled=true;
     if($('#batch-ack'))$('#batch-ack').checked=false;
@@ -64,6 +69,7 @@ if(drop && fileInput){
   batchSelect?.addEventListener('click',()=>{batchPicker.value='';batchPicker.click();});
   batchPicker?.addEventListener('change',async()=>{
     batchReset();
+    const version=batchReadVersion;
     batchFiles=Array.from(batchPicker.files||[]);
     const list=$('#batch-file-list');list.replaceChildren();
     batchFiles.forEach((selected,i)=>{const li=document.createElement('li');li.textContent=(i+1)+'. '+selected.name+' ('+Math.ceil(selected.size/1024)+' KB)';list.appendChild(li);});
@@ -78,6 +84,7 @@ if(drop && fileInput){
     await Promise.resolve();
     try{
       const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,text:await selected.text()})));
+      if(version!==batchReadVersion)return; // Discard stale results after another selection/clear/date change.
       batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
       batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
       batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s). No accounts merged.');
@@ -109,6 +116,11 @@ if(drop && fileInput){
     }
   });
   $('#clear-workspace')?.addEventListener('click',()=>{
+    singleReadVersion++; // Prevent a previous asynchronous file read from restoring cleared data.
+    batchFiles=[];batchReset();
+    if(batchPicker)batchPicker.value='';
+    $('#batch-file-list')?.replaceChildren();
+    batchSay('Batch workspace cleared.');
     file=null;parsed=null;audit=null;table=null;fileText='';fileExt='';
     fileInput.value='';
     $('#file-name').textContent='';
@@ -118,7 +130,7 @@ if(drop && fileInput){
     $('#preview-panel').hidden=true;
     $('#warning-box').hidden=true;
     setButton(false);
-    say('Workspace cleared. Source file and preview are no longer retained by this page. Already downloaded files remain on your device.','success');
+    say('All selected files, pending conversions and previews cleared from this page. Downloaded files and saved column templates remain on your device.','success');
   });
   fileInput.addEventListener('change',event=>prepare(event.target.files[0]));
   drop.addEventListener('dragover',event=>{event.preventDefault();drop.classList.add('is-dragging');});
