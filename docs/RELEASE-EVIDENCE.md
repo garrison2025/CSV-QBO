@@ -151,3 +151,13 @@
 - Real Chrome E2E exercises synthetic adversarial OFX XML file selection, transaction preview and actual CSV download. No genuine customer/bank data used.
 - QuickBooks import UAT remains NOT RUN; production SEO remains blocked until a custom domain and explicit release.
 - CI/Cloudflare release evidence to be verified after merge.
+
+## V1.7 — all-rows transaction preview and cross-page duplicate review (2026-11-05)
+
+- Replaced the former first-8-rows preview with read-only 25-row pagination for all single-file converter pages. The visible range and page count are explicit and the entire source count is preserved.
+- Users can advance through possible duplicate rows by original source row number (both first-seen and later match). Flagged rows are highlighted but no transaction is deleted and export covers every original row.
+- CSV mapping/date changes, source replacement and clear-workspace reset preview page, navigation, flagged-row focus and export readiness together.
+- Node simulated DOM tests cover pages 1-3, the final partial page, duplicate rows located on later pages, reset, and small files without unnecessary navigation.
+- Chrome E2E uses a 1,001-row sample across 41 pages, verifies row 1001 visually, then downloads the full two-file QuickBooks ZIP; another 52-row sample tests duplicate jump row 2/51 and warning acknowledgement.
+- No change to file conversion logic or QuickBooks import certification. Preview remains noindex and browser local.
+- Verify CI and Cloudflare deployment results separately after merge.
