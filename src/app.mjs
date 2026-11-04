@@ -83,6 +83,7 @@ if(drop && fileInput){
     for(const index of matches.slice(start,end)){
       const item=records[index],tr=document.createElement('tr'),rowNumber=index+1;
       tr.setAttribute('data-row-number',String(rowNumber));
+      tr.setAttribute('aria-label','Original source row '+rowNumber);
       if(flagged.has(rowNumber))tr.className='is-review-row';
       for(const key of ['date','description','amount','id']){
         const td=document.createElement('td');
@@ -104,7 +105,7 @@ if(drop && fileInput){
       :'All '+total+' transactions available for review.';
     $('#preview-caption').textContent=matchedTotal
       ?(filtered?'Matching rows ':'Showing rows ')+(start+1)+'–'+end+' of '+matchedTotal+
-        (filtered?' (original source row numbers retained).':'')+
+        (filtered?' (filtered preview; source rows are unchanged).':'')+
         '. Preview only — downloads include all '+total+' transactions; no rows were removed.'
       :'No matching transactions. Clear the search or duplicate-only filter to review the full source. Downloads still include all '+total+' transactions.';
     $('#preview-navigation').hidden=(pageCount===1&&!activeFlags.length);
@@ -144,7 +145,7 @@ if(drop && fileInput){
       target.className='is-review-row is-current-review-row';
       target.scrollIntoView?.({block:'nearest',behavior:'smooth'});
     }
-    $('#preview-page-status').textContent='Review source row '+row+' of '+parsed.transactions.length+
+    $('#preview-page-status').textContent='Review row '+row+' of '+parsed.transactions.length+
       ' · Filtered page '+(previewPage+1)+' of '+Math.max(1,Math.ceil(matches.length/PREVIEW_PAGE_SIZE));
   });
   function renderResult(data){
