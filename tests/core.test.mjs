@@ -410,7 +410,7 @@ test('OFX comments do not generate ghost transactions or transaction status',()=
  const r=parseOFX('<OFX>'+ghost+real+'</OFX>');
  assert.equal(r.transactions.length,1);
  assert.equal(r.transactions[0].description,'Real');
- assert.throws(()=>parseOFX('<OFX><!-- invalid '+real+'</OFX>'),/Malformed OFX comment/);
+ assert.throws(()=>parseOFX('<OFX><!-- invalid '+real+'</OFX>'),/Unclosed OFX XML comment/);
 });
 test('missing FITID and TRNTYPE are disclosed as warnings without inventing identifiers',()=>{
  const t='<STMTTRN><DTPOSTED>20261104<TRNAMT>-1.00<NAME>Unsupported bank variant</STMTTRN>';
