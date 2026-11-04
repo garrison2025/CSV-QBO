@@ -160,7 +160,7 @@ test('QIF day-first dates explicitly selected by user are parsed correctly',()=>
 test('CSV handles quoted headers, quoted separators and CR-only records',()=>{
  const rows=parseCSV('Date,"Description, details",Amount\r11/04/2026,"Coffee, store",-2.50\r');
  assert.deepEqual(rows[0],['Date','Description, details','Amount']);
- assert.equal(csvTransactions(rows).transactions[0].amount,'-2.50');
+ assert.equal(csvTransactions(rows,{date:0,description:1,amount:2}).transactions[0].amount,'-2.50');
  assert.deepEqual(parseCSV('Date;Description;Amount\n11/04/2026;"Cafe, shop";3.00')[1],['11/04/2026','Cafe, shop','3.00']);
 });
 test('Malformed CSV quoting and binary null bytes are rejected',()=>{
