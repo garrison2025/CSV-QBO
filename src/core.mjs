@@ -104,11 +104,15 @@ export function parseCSV(text, delimiter) {
   }
   return records.map(record => record.fields);
 }
+function needsCsvFormulaGuard(value) {
+  const s=String(value ?? '');
+  return /^[\s]*[=+@\t\r]/.test(s) || (/^[\s]*-/.test(s) && !/^-?\d+(\.\d+)?$/.test(s.trim()));
+}
 export function toCSV(rows, keys=['date','description','amount','id']) {
   function safe(value) {
     let s=String(value ?? '');
-    // Prevent spreadsheet formula injection in text cells without altering exact amount values.
-    if (/^[\s]*[=+@\t\r]/.test(s) || (/^[\s]*-/.test(s) && !/^-?\d+(\.\d+)?$/.test(s.trim()))) s="'"+s;
+    // Prefix spreadsheet-formula-like text without modifying validated numeric amount cells.
+    if (needsCsvFormulaGuard(s)) s="'"+s;
     return /[",\n\r]/.test(s) ? '"'+s.replaceAll('"','""')+'"' : s;
   }
   return '\uFEFF' + keys.join(',') + '\r\n' + rows.map(row => keys.map(key => safe(row[key])).join(',')).join('\r\n') + '\r\n';
@@ -437,6 +441,7 @@ export function quickBooksCSVExportPlan(transactions,limits={}){
     sourceTotals:sourceAudit.summary,
     duplicateReferenceCount:sourceAudit.duplicateIds.length,
     possibleDuplicateCount:sourceAudit.possibleDuplicates.length,
+    csvEscapedDescriptionCount:sourceAudit.csvFormulaGuardCount,
     partCount:summaries.length,parts:summaries,warnings
   }};
 }
@@ -445,10 +450,12 @@ export function quickBooksCSVExportPlan(transactions,limits={}){
 export function auditTransactions(transactions){
   if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to audit.');
   const idIndex=new Map(),fingerprints=new Map(),duplicateIds=[],possibleDuplicates=[];
+  let csvFormulaGuardCount=0;
   const normalized=transactions.map((t,i)=>{
     const date=isoDate(t.date),amount=fromMinorUnits(toMinorUnits(t.amount));
     const description=String(t.description??'').trim();
     if(!description)fail('Transaction '+(i+1)+' has no description.');
+    if(needsCsvFormulaGuard(description))csvFormulaGuardCount++;
     const id=String(t.id??'').trim();
     if(id){
       if(idIndex.has(id))duplicateIds.push({firstRow:idIndex.get(id)+1,row:i+1,reference:id});
@@ -463,7 +470,8 @@ export function auditTransactions(transactions){
   const warnings=[];
   if(duplicateIds.length)warnings.push(duplicateIds.length+' repeated transaction reference(s) found. Review before importing; no rows were deleted.');
   if(possibleDuplicates.length)warnings.push(possibleDuplicates.length+' possible same-date, same-amount and same-description duplicate(s). Review; no rows were deleted.');
-  return {summary,duplicateIds,possibleDuplicates,warnings};
+  if(csvFormulaGuardCount)warnings.push(csvFormulaGuardCount+' spreadsheet formula-like description(s) will be prefixed with an apostrophe in CSV exports. Review the descriptions before import.');
+  return {summary,duplicateIds,possibleDuplicates,csvFormulaGuardCount,warnings};
 }
 export function totals(transactions){
   let debit=0n,credit=0n;
