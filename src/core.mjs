@@ -10,7 +10,9 @@ function fail(message) { throw new Error(message); }
 
 /** Strict decimal to integer cents, avoiding floating point math. USD-only normalized model. */
 export function toMinorUnits(input) {
-  let s = String(input ?? '').trim().replace(/[$€£\s]/g, '');
+  const original = String(input ?? '').trim();
+  if (/[€£¥₹]/.test(original)) fail('Non-USD currency symbols are unsupported. Convert currencies outside this tool.');
+  let s = original.replace(/[$\s]/g, '');
   if (!s) fail('Amount is empty.');
   let negative = false;
   if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
@@ -43,26 +45,39 @@ export function isoDate(input, format='us') {
 
 export function parseCSV(text, delimiter) {
   const s = String(text ?? '').replace(/^\uFEFF/, '');
+  if (s.includes('\u0000')) fail('CSV contains null bytes or an unsupported text encoding.');
   if (delimiter == null) {
-    const first = s.split(/\r?\n/,1)[0] || '';
-    delimiter = ['\t',';',','].sort((a,b) => first.split(b).length - first.split(a).length)[0];
+    // Count separators outside quoted cells in the first logical header.
+    const counts = {',':0,';':0,'\t':0};let inQuotes=false;
+    for(let i=0;i<s.length;i++){
+      const c=s[i];
+      if(c==='"'){if(inQuotes&&s[i+1]==='"'){i++;continue;}inQuotes=!inQuotes;continue;}
+      if(!inQuotes){
+        if(c==='\r'||c==='\n')break;
+        if(Object.hasOwn(counts,c))counts[c]++;
+      }
+    }
+    delimiter=[',',';','\t'].sort((a,b)=>counts[b]-counts[a])[0];
   }
-  if (![',',';','\t'].includes(delimiter)) fail('Unsupported CSV delimiter.');
-  const records = []; let row=[], cell='', quoted=false;
-  for (let i=0;i<s.length;i++) {
+  if(![',',';','\t'].includes(delimiter))fail('Unsupported CSV delimiter.');
+  const records=[];let row=[],cell='',quoted=false,afterQuote=false;
+  const appendCell=()=>{row.push(cell);cell='';afterQuote=false;};
+  const appendRow=()=>{appendCell();if(row.some(x=>x!==''))records.push(row);row=[];};
+  for(let i=0;i<s.length;i++){
     const c=s[i];
-    if (quoted) {
-      if (c==='"' && s[i+1]==='"') { cell+='"';i++; }
-      else if (c==='"') quoted=false;
+    if(quoted){
+      if(c==='"'&&s[i+1]==='"'){cell+='"';i++;}
+      else if(c==='"'){quoted=false;afterQuote=true;}
       else cell+=c;
-    } else if (c==='"' && cell==='') quoted=true;
-    else if (c===delimiter) { row.push(cell);cell=''; }
-    else if (c==='\n') { row.push(cell.replace(/\r$/,'')); if(row.some(x=>x!=='')) records.push(row); row=[];cell=''; }
+    }else if(c===delimiter)appendCell();
+    else if(c==='\r'||c==='\n'){if(c==='\r'&&s[i+1]==='\n')i++;appendRow();}
+    else if(afterQuote)fail('Unexpected text after a closing quote in CSV.');
+    else if(c==='"'){if(cell!=='')fail('Unexpected quote in an unquoted CSV field.');quoted=true;}
     else cell+=c;
   }
-  if (quoted) fail('Unclosed quote in CSV.');
-  if (cell!=='' || row.length) { row.push(cell.replace(/\r$/,'')); if(row.some(x=>x!=='')) records.push(row); }
-  if (!records.length) fail('This CSV is empty.');
+  if(quoted)fail('Unclosed quote in CSV.');
+  if(cell!==''||row.length||afterQuote)appendRow();
+  if(!records.length)fail('This CSV is empty.');
   return records;
 }
 export function toCSV(rows, keys=['date','description','amount','id']) {
@@ -142,6 +157,10 @@ function ofxField(block,key){ const m=block.match(new RegExp('<'+key+'\\b[^>]*>\
 export function parseOFX(text) {
   const raw=String(text);
   if(/<!DOCTYPE|<!ENTITY|<script/i.test(raw))fail('Unsupported or unsafe XML declarations.');
+  if(/<(?:CURRENCY|ORIGCURRENCY)\b/i.test(raw))fail('OFX per-transaction currency conversion is unsupported.');
+  const currencyTags=[...raw.matchAll(/<CURDEF\b[^>]*>\s*([^<\s]+)/gi)].map(m=>m[1].toUpperCase());
+  if(/<CURDEF\b/i.test(raw)&&!currencyTags.length)fail('Invalid OFX currency declaration.');
+  if(currencyTags.some(c=>c!=='USD'))fail('Only USD OFX statement currency is supported. No currency conversion is performed.');
   // One export may include multiple accounts. Do not merge them implicitly.
   const accountSections=[...raw.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
   if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
@@ -153,7 +172,10 @@ export function parseOFX(text) {
     try{return {date:isoDate(date),amount:fromMinorUnits(toMinorUnits(amount)),description:ofxField(b,'NAME')||ofxField(b,'MEMO')||'Transaction',memo:ofxField(b,'MEMO'),id:ofxField(b,'FITID')};}
     catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
-  return {transactions,source:'OFX / QBO / QFX',warnings:['Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.']};
+  return {transactions,source:'OFX / QBO / QFX',warnings:[
+    'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
+    ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using any exported amounts.']:[])
+  ]};
 }
 export function parseIIF(text,dateFormat='us'){
   const rows=String(text).replace(/^\uFEFF/,'').split(/\r?\n/).map(r=>r.split('\t'));
