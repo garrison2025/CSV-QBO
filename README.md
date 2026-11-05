@@ -1,3 +1,7 @@
+## Original competitor differential — 2026-11-05
+
+Original source competitors in the V3 plan are [AccountingConverter](https://accountingconverter.com/tools/csv-to-qbo) and [DocuClipper](https://www.docuclipper.com/solutions/convert-csv-to-qbo/), both advertising CSV→Web Connect **.qbo**. Our implemented QuickBooks output is a separate **three-column manual-upload CSV**. Two real GitHub Chrome attempts to submit a 2-row **fictional** CSV to AccountingConverter did not produce a downloadable .qbo; the second displayed **Forbidden**. Therefore **no cross-vendor file reconciliation was possible**, and neither vendor is a substitute for observed QuickBooks account import. Full [evidence and safeguards](docs/COMPETITOR-ACCOUNTINGCONVERTER-DIFFERENTIAL-20261105.md), run [41982899982](https://github.com/garrison2025/CSV-QBO/actions/runs/41982899982). Real bank originals **0**, actual QBO imports **0**; preview SEO restriction remains unchanged.
+
 ## External official-source verification — 2026-11-05
 
 A real Chrome browser attempted [Intuit public Test Drive](https://qbo.intuit.com/redir/testdrive) during [GitHub run 41979602693](https://github.com/garrison2025/CSV-QBO/actions/runs/41979602693). It reached the **QuickBooks Online Security Verification** human gate, but could not reach bank CSV upload without human verification; no bypass, account signup, payment, CSV upload or import took place. The one-time external test was removed from recurring CI.
