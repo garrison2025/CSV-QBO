@@ -776,6 +776,7 @@ try{
  assert.equal(repeatOutput.split('Bookstore,-12.50').length-1,2,'user-confirmed duplicate remains in CSV');
  const collisionSource=fitidWrap(fitidTx()+fitidTx('-12.51'));
  await page.locator('#file-input').setInputFiles(file('conflicting-fitid.qbo',collisionSource));
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('Conflicting repeated FITID'));
  assert.equal(await page.locator('#preview-panel').isHidden(),true);
  assert.equal(await page.locator('#export-button').isDisabled(),true);
  assert.equal(await page.locator('#download-report').isDisabled(),true);
@@ -788,6 +789,7 @@ try{
    fitidTx()).replace('<BANKTRANLIST>',
      '<CCACCTFROM><ACCTID>PRIVATE-ACCOUNT-02<BANKTRANLIST>');
  await page.locator('#file-input').setInputFiles(file('multiple-account-markers.qbo',multipleAccountSource));
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('Multiple bank/card account-from declarations'));
  assert.equal(await page.locator('#preview-panel').isHidden(),true);
  assert.equal(await page.locator('#export-button').isDisabled(),true);
  assert.match(await page.locator('#work-status').textContent(),/Multiple bank\/card account-from declarations/);
