@@ -43,7 +43,7 @@ for(const site of cases){
    const inputs=page.locator('input[type=file]');
    const count=await inputs.count();
    p.fileInputCount=count;
-   if(!count){p.status='no_file_input_in_public_page';results.competitors.push(p);continue;}
+   if(!count){p.status='no_file_input_in_public_page';continue;}
    await inputs.first().setInputFiles({name:'fictional-bank-compare.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
    await page.waitForTimeout(1400);
    const observed=await inputs.first().evaluate(e=>({
@@ -65,7 +65,7 @@ for(const site of cases){
    let body=await page.locator('body').innerText().catch(()=>'');
    p.humanGate=/verify you are human|security verification|captcha/i.test(body);
    p.forbidden=/\bForbidden\b/i.test(body);
-   if(p.humanGate||p.forbidden){p.status=p.forbidden?'external_forbidden':'human_verification_required';results.competitors.push(p);continue;}
+   if(p.humanGate||p.forbidden){p.status=p.forbidden?'external_forbidden':'human_verification_required';continue;}
    // Only click explicit convert/download controls; never login, pay, subscribe
    // or perform unrelated website actions.
    const btns=page.locator('button,input[type=submit],[role=button]');
