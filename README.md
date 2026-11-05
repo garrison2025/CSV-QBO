@@ -1,3 +1,11 @@
+## V2.12 — safer CSV field mapping and accurate signed-amount labels (2026-11-05)
+
+- The converter recognizes a specific high-risk bank CSV layout: selected Payee/Description is completely blank but Memo has a description on **every** populated transaction row. The site recommends an **explicit, one-click** Memo → Description mapping change, clears the duplicate Memo selection, and requires a new preview; it never silently changes transaction data or signs.
+- Multiple date headers (Transaction Date / Post Date) now trigger a visible date-column review note; additional common source header spellings are recognized, including `Trans. Date`, `Post Date` and `Check or Slip #`. Raw credit-card account-number columns are never mapped as transaction references.
+- Summary labels use **Negative total** / **Positive total** instead of implying that all positive transactions are cash inflows. Credit-card charge/payback polarity can differ from bank checking files; the converter preserves original signed cents and asks operators to verify their destination account before any import.
+- New external fictional bank-format regression tests and Chrome E2E cover the actual mapping suggestion, export inhibition until preview, dates, amounts and privacy-safe guidance.
+- No authentic bank issuer export or QuickBooks manual import is represented by these synthetic/externally authored fixtures; real bank/import UAT remains **0**, and site indexing stays off.
+
 ## V2.11 — complete offline output-file verification: XLSX and split QuickBooks CSV ZIP
 
 - The private cross-file checker now inspects the **actual XLSX bytes** for the five read-only Excel routes; an independent ZIP/XML inspector checks exact row order, native Excel date serials and styles, description, signed cents, reference IDs, optional Memo, worksheet metadata, and inert text.
