@@ -11,9 +11,11 @@ import {
   validateGenericCSVExport, validateQuickBooksCSVParts, toMinorUnits
 } from '../src/core.mjs';
 import {directions} from './uat-evidence.mjs';
+import {inspectExactXLSX,inspectQuickBooksZIP} from './uat-archive-inspect.mjs';
 
 const REPO_ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const CSV_READ=new Set(['qbo-to-csv','qif-to-csv','iif-to-csv','ofx-to-csv','qfx-to-csv']);
+const XLSX_READ=new Set(['qbo-to-excel','qif-to-excel','iif-to-excel','ofx-to-excel','qfx-to-excel']);
 const IMPORT=new Set(['quickbooks-csv-formatter','csv-to-qif']);
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 function assert(cond,why){if(!cond)throw Error(why);}
@@ -49,11 +51,11 @@ function explicitCSVMapping(mapping,header){
 export function reconcileLocalPair({route_slug,source_bytes,output_bytes,mapping,date_format='us',expected_rows=null,expected_net_cents=null}){
   const spec=directions[route_slug];
   assert(spec,'Unsupported UAT route');
-  assert(CSV_READ.has(route_slug)||IMPORT.has(route_slug),'Local preflight currently supports CSV or QIF outputs only; XLSX requires separate independent inspection');
+  assert(CSV_READ.has(route_slug)||XLSX_READ.has(route_slug)||IMPORT.has(route_slug),'Local checker does not support this route');
   assert(['us','eu'].includes(date_format),'Choose explicit source date order: us or eu');
   const input=Buffer.from(source_bytes??[]),output=Buffer.from(output_bytes??[]);
   assert(input.length&&input.length<=MAX_FILE_BYTES,'Source file size outside browser limits');
-  assert(output.length&&output.length<=MAX_FILE_BYTES,'Output file size outside browser limits');
+  assert(output.length&&output.length<=32*1024*1024,'Output file size outside local validation limits');
   const srcText=sourceDecode(input,spec[0]);
   if(spec[0]==='csv'){
     const data=parseCSV(srcText);
@@ -69,8 +71,16 @@ export function reconcileLocalPair({route_slug,source_bytes,output_bytes,mapping
     assert(expected_net_cents===inputNet,'Independent bank source signed-cent total mismatch');
   }
   let exported=[],limitation=null,notes=[];
-  const outputText=readUTF8(output);
-  if(CSV_READ.has(route_slug)){
+  if(XLSX_READ.has(route_slug)){
+    const checked=inspectExactXLSX(output,original);
+    assert(checked.netCents===inputNet,'XLSX exact signed-cent net differs from bank source');
+    exported=Array.from({length:checked.rows});
+    if(route_slug==='iif-to-excel'){
+      limitation='IIF TRNS summaries only: SPL account allocations not represented';
+      notes.push('IIF TRNS amount and payee checked, not a reconstructed accounting ledger');
+    }
+  }else if(CSV_READ.has(route_slug)){
+    const outputText=readUTF8(output);
     const header=parseCSV(outputText)[0];
     const memo=header.length===5;
     const checked=validateGenericCSVExport(original,outputText,{includeMemo:memo});
@@ -83,13 +93,22 @@ export function reconcileLocalPair({route_slug,source_bytes,output_bytes,mapping
       notes.push('IIF SPL account allocations are deliberately not exported; never infer an import-ready ledger');
     }
   }else if(route_slug==='quickbooks-csv-formatter'){
-    validateQuickBooksCSVParts(original,[outputText]);
-    const rows=parseCSV(outputText);
-    exported=rows.slice(1).map(r=>({date:r[0],description:r[1],amount:r[2]}));
-    assert(csvTotals(outputText,2)===inputNet,'QuickBooks CSV signed-cent sum mismatch');
+    if(output[0]===0x50&&output[1]===0x4b){
+      const checked=inspectQuickBooksZIP(output,original);
+      assert(checked.netCents===inputNet,'QuickBooks ZIP signed-cent net mismatch');
+      exported=Array.from({length:checked.rows});
+      notes.push('Compared '+checked.parts+' independent QuickBooks CSV files and the packaged validation manifest');
+    }else{
+      const outputText=readUTF8(output);
+      validateQuickBooksCSVParts(original,[outputText]);
+      const rows=parseCSV(outputText);
+      exported=rows.slice(1).map(r=>({date:r[0],description:r[1],amount:r[2]}));
+      assert(csvTotals(outputText,2)===inputNet,'QuickBooks CSV signed-cent sum mismatch');
+    }
     limitation='QuickBooks Online 3-column manual upload, NOT Web Connect .qbo';
     notes.push('Reference IDs/Memo are not represented in three-column QuickBooks CSV; check import behavior manually');
   }else{
+    const outputText=readUTF8(output);
     exported=compareQIF(original,outputText);
     assert(net(exported)===inputNet,'QIF signed-cent sum mismatch');
     limitation='QIF syntax only; target application import not observed';
