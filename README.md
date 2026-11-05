@@ -1,3 +1,11 @@
+## V2.14 — OFX/QFX/QBO corrections, sign consistency, time zone bounds (2026-11-05)
+
+- **Fail closed on correction instructions.** The OFX statement specification defines `CORRECTFITID` and `CORRECTACTION` (`REPLACE`/`DELETE`) as updates to a *previously sent transaction*. Since this local stateless CSV reader has no prior FITID/transaction history, it cannot safely apply a deletion or replacement. It now rejects the entire source if either correction element appears inside a real STMTTRN (including empty/unknown variants) instead of misrepresenting the corrected record as a fresh transaction. Error reports mention only the ordinal source row and syntax, **never** the corrected FITID.
+- Signed `TRNAMT` values remain exactly as the source provides. Explicit `TRNTYPE=DEBIT` with positive amounts or `CREDIT` with negative amounts get an aggregate warning and require acknowledgment. No automatic sign flip, deduplication or classification is performed.
+- OFX datetime GMT offsets are checked against the specification's ±12-hour bounds; known fractional offsets (e.g. `[-5.5:EST]`) are parsed. Output is still the bank's supplied local calendar posting date, not a guessed conversion to UTC or the user's computer time zone.
+- Synthetic OFX 1.x SGML and 2.x XML Node regression tests and Chrome upload/download tests cover corrections, CDATA/comment safety, signs, exact cents and offset edge cases.
+- This is a **local output correctness protection**, not authenticated real-bank source validation or QuickBooks import certification. Verified genuine bank UAT and actual QuickBooks manual uploads remain zero; Pages preview stays noindex.
+
 ## V2.13 — numeric date ambiguity and abnormal amount preflight (2026-11-05)
 
 - CSV numeric dates that are **valid calendar days in both MM/DD/YYYY and DD/MM/YYYY but yield different dates** now trigger an explicit warning and disable download until review. The current selected order (US/day-first) is preserved, never auto-guessed, and any date-order change clears the previous preview/download permission. Invalid calendar dates still fail.
