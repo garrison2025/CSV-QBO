@@ -13,6 +13,8 @@ jobs:
           node-version: 22
       - name: Run financial parsing and SEO safety gates
         run: npm run check
+      - name: Validate reviewed bank UAT public ledger (empty until real evidence)
+        run: npm run uat:check-public
       - name: Ensure preview build remains noindex
         run: |
           grep -q 'noindex,nofollow' dist/index.html
