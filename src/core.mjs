@@ -536,6 +536,12 @@ export function parseOFX(text) {
   if(currencyTags.some(c=>c!=='USD'))fail('Only USD OFX statement currency is supported. No currency conversion is performed.');
   const accountSections=[...structure.matchAll(/<(?:STMTRS|CCSTMTRS)\b/gi)].length;
   if(accountSections>1)fail('Multiple bank or card accounts detected in this OFX file. Export one account at a time to avoid mixing transactions.');
+  // One STMTRS wrapper does not guarantee one account if the source has
+  // duplicated or conflicting BANKACCTFROM / CCACCTFROM markers.
+  // Read markup only (not comments or CDATA); never disclose account IDs.
+  const accountFromCount=[...structure.matchAll(/<(?:BANKACCTFROM|CCACCTFROM)\b[^>]*>/gi)].length;
+  if(accountFromCount>1)
+    fail('Multiple bank/card account-from declarations in one OFX source. Export one complete account at a time; no transactions were exported.');
   if(/<INVSTMTMSGSRSV1\b|<INVSTMTRS\b/i.test(structure))fail('Investment OFX feeds are not supported. No transactions were exported.');
 
   // BANKTRANLIST is a single bank statement aggregate, not an arbitrary
@@ -591,7 +597,12 @@ export function parseOFX(text) {
   if(bankBounds&&blocks.some(block=>block.index<bankBounds.begin||block.index+block[0].length>bankBounds.end))
     fail('OFX contains transactions outside the declared BANKTRANLIST. No data was exported.');
   let missingReferenceCount=0,missingTypeCount=0,postedBeforeRangeCount=0,postedAfterRangeCount=0;
-  let inconsistentTypeSignCount=0;
+  let inconsistentTypeSignCount=0,repeatedFitidCount=0;
+  // FITID is scoped to an account. Exact repeated records may be duplicate
+  // downloads and should be reviewed, never silently removed. A repeated
+  // FITID with different transaction data is inconsistent financial input,
+  // so reject the WHOLE source rather than exporting contradictory rows.
+  const seenFitid=new Map();
   const transactions=blocks.map((m,i)=>{
     const openTag=m[0].match(/^<STMTTRN\b[^>]*>/i)?.[0];
     const closeTag=m[0].match(/<\/STMTTRN\s*>$/i)?.[0];
@@ -609,6 +620,7 @@ export function parseOFX(text) {
       const description=ofxField(b,'NAME',xml)||ofxField(b,'MEMO',xml);
       if(!description)fail('Transaction NAME and MEMO are both empty.');
       const id=ofxField(b,'FITID',xml),type=ofxField(b,'TRNTYPE',xml);
+      const memo=ofxField(b,'MEMO',xml);
       if(!id)missingReferenceCount++;
       if(!type)missingTypeCount++;
       const signedCents=toMinorUnits(amount);
@@ -619,13 +631,26 @@ export function parseOFX(text) {
       const postedDate=isoDate(date);
       if(reportedStartDate&&postedDate<reportedStartDate)postedBeforeRangeCount++;
       if(reportedEndDate&&postedDate>reportedEndDate)postedAfterRangeCount++;
+      const normalizedAmount=fromMinorUnits(signedCents);
+      if(id){
+        // Compare dates, signed cents, payee and memo exactly as they would
+        // be exported. A type disagreement is also suspicious even when
+        // other visible fields match. No FITID or source value in errors.
+        const record=[postedDate,normalizedAmount,description,memo,type.toUpperCase()];
+        const old=seenFitid.get(id);
+        if(old){
+          if(old.fields.some((field,j)=>field!==record[j]))
+            fail('Conflicting repeated FITID at rows '+old.row+' and '+(i+1)+': date, signed amount, description, memo or type differs. No transactions were exported.');
+          repeatedFitidCount++;
+        }else seenFitid.set(id,{row:i+1,fields:record});
+      }
       // OFX TRNAMT is already signed. TRNTYPE does not redefine its sign.
-      return {date:postedDate,amount:fromMinorUnits(signedCents),
-        description,memo:ofxField(b,'MEMO',xml),id};
+      return {date:postedDate,amount:normalizedAmount,
+        description,memo,id};
     }catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
   return {transactions,source:'OFX / QBO / QFX',
-    integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,inconsistentTypeSignCount,
+    integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,inconsistentTypeSignCount,repeatedFitidCount,
       declaredCurrency:currencyTags.length?'USD':null,
       statementRange:reportedStartDate||reportedEndDate?{startInclusive:reportedStartDate,endExclusive:reportedEndDate}:null,
       postedBeforeRangeCount,postedAfterRangeCount},
@@ -633,6 +658,7 @@ export function parseOFX(text) {
       'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
       ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[]),
       ...(missingReferenceCount?[missingReferenceCount+' OFX transaction(s) have no FITID; duplicate/reference checks may be incomplete.']:[]),
+      ...(repeatedFitidCount?[repeatedFitidCount+' repeated FITID occurrence(s) contain identical transaction data within this account. They are preserved, NOT automatically deleted. Review possible duplicate downloads before import.']:[]),
       ...(missingTypeCount?[missingTypeCount+' OFX transaction(s) have no TRNTYPE; signed amounts remain unchanged.']:[]),
       ...(inconsistentTypeSignCount?[inconsistentTypeSignCount+' OFX transaction(s) have DEBIT/CREDIT types that disagree with the signed TRNAMT amount. The amount was NOT inverted or discarded; verify the original bank statement before any import.']:[]),
       ...(bankList&&(reportedStartDate==null||reportedEndDate==null)?['BANKTRANLIST has incomplete DTSTART/DTEND date coverage metadata. Verify the selected statement period.']:[]),
