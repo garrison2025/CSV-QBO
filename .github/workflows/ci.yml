@@ -36,6 +36,11 @@ jobs:
           grep -q 'tools/qbo-to-excel/' dist/sitemap.xml
           if grep -q 'tools/quickbooks-csv-formatter/' dist/sitemap.xml; then exit 1; fi
           if grep -q 'tools/csv-to-qbo/' dist/sitemap.xml; then exit 1; fi
+          grep -q 'noindex,nofollow' dist/lab/csv-to-qbo/index.html
+          grep -q '/lab/csv-to-qbo/\*' dist/_headers
+          grep -q '/samples/sonomir-synthetic-reference-test-only.qbo' dist/_headers
+          grep -q 'X-Robots-Tag: noindex, nofollow, noarchive' dist/_headers
+          test -s dist/samples/sonomir-synthetic-reference-test-only.qbo
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const m=JSON.parse(fs.readFileSync('dist/build-manifest.json','utf8'));
