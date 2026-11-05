@@ -4,8 +4,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 
 export function writeQboLab(dist,root){
+  // An actual third-party generated QBO for fictional transactions, strictly test-only.
+  // Pin its bytes to the original downloaded fixture; do not substitute invented bank IDs.
+  const rawFixture=fs.readFileSync(path.join(root,'tests','fixtures','sonomir-synthetic-qbo-20261105.base64'),'utf8').trim();
+  const synthetic=Buffer.from(rawFixture,'base64');
+  const expectedSHA='00e5202de9a425ed3d0c4fba337271e54cfe8e48a87538c394c378ae95a74e69';
+  if(synthetic.length!==923||createHash('sha256').update(synthetic).digest('hex')!==expectedSHA)
+    throw Error('Downloaded fictional comparator QBO changed; refuse publishing synthetic test fixture.');
+  const sampleDir=path.join(dist,'samples');fs.mkdirSync(sampleDir,{recursive:true});
+  fs.writeFileSync(path.join(sampleDir,'sonomir-synthetic-reference-test-only.qbo'),synthetic);
   const assetDir=path.join(dist,'assets');
   fs.copyFileSync(path.join(root,'src','qbo-writer.mjs'),path.join(assetDir,'qbo-writer.mjs'));
   fs.copyFileSync(path.join(root,'src','qbo-writer-ui.mjs'),path.join(assetDir,'qbo-writer-ui.mjs'));
@@ -52,8 +62,8 @@ export function writeQboLab(dist,root){
 <section class="lab-stage"><h2>01 / Choose both source files</h2>
 <p class="lab-tip">No upload to our server. Your bank QBO reference is used only to copy the FI/BID and bank/account metadata locally. You must verify it belongs to the same bank/account as the CSV.</p>
 <div class="lab-grid"><label class="lab-field">Transactions CSV<input type="file" id="lab-csv" accept=".csv,.tsv" aria-label="Transactions CSV"></label>
-<label class="lab-field">Existing bank-issued QBO reference<input type="file" id="lab-reference" accept=".qbo" aria-label="Existing bank QBO reference"></label></div>
-<p class="lab-meta"><a class="lab-link" href="/samples/csv-synthetic.csv" download>Download synthetic CSV for testing</a>. The synthetic CSV is not bank-issued. An actual QBO reference is still required; this site does not provide or guess a bank BID.</p>
+<label class="lab-field">Same-account QBO reference (or fictional test sample)<input type="file" id="lab-reference" accept=".qbo" aria-label="Existing bank QBO reference"></label></div>
+<div class="lab-note"><strong>Test-only example (not for QuickBooks import):</strong> <a class="lab-link" href="/samples/sonomir-synthetic-reference-test-only.qbo" download>Download independently generated fictional QBO reference</a>. This 923-byte Sonomir output uses fictional bank and account identifiers; it is provided solely to test local CSV→QBO file creation. Do NOT use those identifiers for a real bank/account. For real data, use a QBO reference you are entitled to use from the same bank/account.</div><p class="lab-meta"><a class="lab-link" href="/samples/csv-synthetic.csv" download>Download synthetic CSV</a> (separate fictional transactions). You do not need to sign up for QuickBooks to run the syntax-only demo.</p>
 <div class="lab-options">
 <label class="lab-field">Source date order<select id="lab-date"><option value="us">US — MM/DD/YYYY</option><option value="eu">Day-first — DD/MM/YYYY</option></select></label>
 <label class="lab-field">CSV delimiter<select id="lab-delimiter"><option value="auto">Auto</option><option value="comma">Comma</option><option value="semicolon">Semicolon</option><option value="tab">Tab</option></select></label>

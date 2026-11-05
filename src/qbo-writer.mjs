@@ -46,6 +46,10 @@ export function readReferenceQBO(input){
     accountType:field(account,'ACCTTYPE',20).toUpperCase()
   };
   validateProfile(profile);
+  // A placeholder reference is suitable for a synthetic lab demo, not an FI
+  // or bank-account compatibility claim. Keep the detection local.
+  profile.referenceHasPlaceholderMetadata=
+    profile.bankId==='000000000'||profile.accountId==='0000';
   return Object.freeze(profile);
 }
 function validateProfile(profile){
@@ -77,6 +81,9 @@ export async function writeWebConnectQBO(transactions,profile,{serverTime}={}){
     fitids.add(fitid);rows.push({date,cents,name,memo,fitid});
   }
   const sorted=rows.map(r=>r.date).sort(),first=sorted[0],last=sorted.at(-1);
+  // The reader rejects dates after 2100. Fail closed instead of emitting an
+  // unparseable 2101-01-01 end-exclusive retrieval window.
+  if(last==='2100-12-31')fail('End-exclusive QBO statement window would exceed supported year 2100.');
   const endDate=new Date(Date.UTC(+last.slice(0,4),+last.slice(5,7)-1,+last.slice(8,10)+1));
   const end=[endDate.getUTCFullYear(),String(endDate.getUTCMonth()+1).padStart(2,'0'),String(endDate.getUTCDate()).padStart(2,'0')].join('');
   const timestamp=serverTime??new Date().toISOString().replace(/[-:T.Z]/g,'').slice(0,14);
@@ -116,6 +123,7 @@ export async function writeWebConnectQBO(transactions,profile,{serverTime}={}){
     outputFormat:'OFX 1.02 Web Connect QBO',referenceMetadataCopiedFromUserFile:true,
     transactionCount:rows.length,netCents:rows.reduce((s,r)=>s+r.cents,0n).toString(),
     firstPostedDate:first,lastPostedDate:last,stableUniqueFitids:true,orderedRowRoundTrip:true,
-    nonAsciiBankDescriptionsSupported:false,containsSourceAccountDetails:false
+    nonAsciiBankDescriptionsSupported:false,containsSourceAccountDetails:false,
+    referenceHasPlaceholderMetadata:profile.bankId==='000000000'||profile.accountId==='0000'
   }};
 }

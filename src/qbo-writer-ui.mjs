@@ -89,6 +89,8 @@ preview.addEventListener('click',async()=>{
    const notes=[...parsed.warnings,...audit.warnings,
      'QBO institution metadata was copied from your local reference; bank authenticity and account matching are NOT independently verified.',
      'No real QuickBooks Desktop/Online import test has been performed. Syntax-only output.'];
+   if(output.report.referenceHasPlaceholderMetadata)
+     notes.unshift('TEST REFERENCE DETECTED: this QBO contains a placeholder bank or account identifier. It is for structural testing ONLY; do not import it into a real QuickBooks company file.');
    el('lab-warnings').textContent=notes.join(' ');
    el('lab-ack').checked=false;
    el('lab-result').hidden=false;
