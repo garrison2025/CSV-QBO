@@ -923,6 +923,59 @@ try{
  assert.ok(!badStatus.includes('PRIVATE-INVALID-MONEY'));
  console.log('PASS Chrome identifies physical CSV source line and refuses stale download without exposing invalid source money');
 
+ // A legacy bank CSV must never be silently decoded as UTF-8.
+ // The user must select Windows-1252 and reconfirm the resulting preview.
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const oldCSVParts=['Date,Description,Amount,Reference\n11/04/2026,Caf',',-5.25,0000123\n'];
+ const oldCSVBytes=Buffer.concat([Buffer.from(oldCSVParts[0]),Buffer.from([0xe9]),Buffer.from(oldCSVParts[1])]);
+ assert.equal(await page.locator('#source-encoding').inputValue(),'auto');
+ await page.locator('#file-input').setInputFiles({name:'legacy-bank.csv',mimeType:'text/csv',buffer:oldCSVBytes});
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('Cannot decode utf-8'));
+ assert.equal(await page.locator('#mapping-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ assert.match(await page.locator('#work-status').textContent(),/choose that encoding manually/);
+ await page.locator('#source-encoding').selectOption('windows-1252');
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ assert.match(await page.locator('#work-status').textContent(),/Windows-1252 selected manually/);
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-5.25');
+ assert.equal(await page.locator('#preview-body tr').first().locator('td').nth(1).textContent(),'Café');
+ assert.match(await page.locator('#warning-list').textContent(),/decoded locally as windows-1252/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#warning-ack').check();
+ const oldCSVExport=(await dl('#export-button')).content.toString('utf8');
+ assert.match(oldCSVExport,/Café,-5\.25/);
+ assert.ok(!oldCSVExport.includes('Caf�'));
+ // Switching decoding after a successful download must clear the exact
+ // source mapping, accepted warning, summary, and export permission.
+ await page.locator('#source-encoding').selectOption('auto');
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('Cannot decode utf-8'));
+ assert.equal(await page.locator('#mapping-panel').isHidden(),true);
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ assert.equal(await page.locator('#warning-ack').isChecked(),false);
+ await page.locator('#source-encoding').selectOption('windows-1252');
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ // UTF BOM is authoritative even after manually selecting legacy encoding.
+ const utfBOM=Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),
+   Buffer.from('Date,Description,Amount\n11/04/2026,Café,-10.25\n','utf8')]);
+ await page.locator('#file-input').setInputFiles({name:'bom-bank.csv',mimeType:'text/csv',buffer:utfBOM});
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('explicit UTF byte-order mark'));
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#source-encoding').selectOption('auto');
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-net').textContent(),'-10.25');
+ assert.equal(await page.locator('#preview-body tr').first().locator('td').nth(1).textContent(),'Café');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ console.log('PASS Chrome manual Windows-1252 CSV import, exact accented text/cents, warning gate, BOM precedence and stale download reset');
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');

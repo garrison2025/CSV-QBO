@@ -67,3 +67,7 @@ Independent synthetic test variants now place `LEDGERBAL` before/after a closed 
 ## V2.18 — synthetic CSV header mapping and physical line validation
 
 New synthetic cases contain two money columns (`Amount` / `Transaction Amount`), two date columns (`Transaction Date` / `Posted Date`), duplicate source header names, multiline quoted merchant text and CR/LF/CRLF bank-style files. The parser reports numeric header ambiguity and correct physical source lines without changing selected signed cents or leaking invalid monetary field strings. The real Chrome suite verifies duplicate selector labels include column positions, warning acknowledgment resets after remapping, and actual CSV downloaded bytes reflect only the user's selected source column. These are technical local tests, not issuer-original or QuickBooks target import evidence.
+
+## V2.19 — Windows-1252 CSV and TSV synthetic byte fixtures
+
+A synthetic 0xE9 legacy payee is decoded only when Windows-1252 is explicitly chosen, while UTF-8 remains strict by default. UTF-8 and UTF-16 BOMs override unsupported manual interpretation by rejecting mismatch; undefined legacy control bytes, NUL, malformed financial rows and invalid signed amounts are rejected. A real Chrome fixture exercises explicit encoding selection, source-byte re-read, warning confirmation, exact payee/cents/leading-zero reference preservation, reset after changing encoding, and BOM conflict refusal. No real bank-issued sample or external QuickBooks import acceptance has been performed.
