@@ -1,3 +1,10 @@
+## V2.11 — complete offline output-file verification: XLSX and split QuickBooks CSV ZIP
+
+- The private cross-file checker now inspects the **actual XLSX bytes** for the five read-only Excel routes; an independent ZIP/XML inspector checks exact row order, native Excel date serials and styles, description, signed cents, reference IDs, optional Memo, worksheet metadata, and inert text.
+- QuickBooks ZIP output containing multiple three-column CSV parts is independently inspected and compared to the original source. Missing/extra/renamed parts, changed transactions or mismatched packaged validation JSON abort the audit. It remains a manual-upload CSV, never `.qbo`.
+- This is technical output integrity and **not** proof of genuine bank-file provenance or Excel/QuickBooks target-import acceptance. No actual bank originals or accounting apps were accessed, and public UAT remains 0.
+- New read-only script: [scripts/uat-archive-inspect.mjs](scripts/uat-archive-inspect.mjs); updated [real-file UAT instructions](docs/REAL-BANK-UAT.md).
+
 ## V2.10 — independent external bank-style sample checks (2026-11-05)
 
 - Added an independently authored, Apache-2.0 licensed fictional fixture dataset with 6 bank-shaped CSV files + 1 Quicken QIF; tests independently pin expected counts and signed totals and exercise real Chrome upload/preview/download.
