@@ -25,8 +25,8 @@ test('Intuit published US three-column example source passes byte-exact local pr
  assert.equal(totals(rows.transactions).net,'100.00');
  const {parts,report}=quickBooksCSVExportPlan(rows.transactions);
  assert.equal(parts.length,1);
- assert.equal(report.rowCount,2);
- assert.equal(validateQuickBooksCSVParts(rows.transactions,parts).signedAmountsReconciled,true);
+ assert.equal(report.sourceRows,2);
+ assert.equal(validateQuickBooksCSVParts(rows.transactions,parts).sourceAmountsReconciled,true);
  assert.match(parts[0],/Date,Description,Amount/);
  assert.match(parts[0],/01\/01\/2018,Example of a payment,-100.00/);
  assert.match(parts[0],/01\/01\/2018,Example of a deposit,200.00/);
