@@ -530,6 +530,34 @@ function ofxField(block,key,xml=false){
  * A valid balance is NOT proof of complete transaction history.
  */
 function inspectOFXBalanceMetadata(original,structure,xml){
+  // Optional balance aggregates belong to a single BANK/CREDIT-CARD
+  // statement response, not to the top-level OFX document or another
+  // response. Reject orphan metadata instead of claiming it belongs to
+  // the transactions being extracted.
+  const balanceTags=[...structure.matchAll(/<\/?(?:LEDGERBAL|AVAILBAL)\b[^>]*>/gi)];
+  let statementScoped=false;
+  if(balanceTags.length){
+    const scopes=[...structure.matchAll(/<\/?(?:STMTRS|CCSTMTRS)\b[^>]*>/gi)];
+    const isClosing=t=>/^<\//.test(t[0]);
+    if(scopes.length!==2||isClosing(scopes[0])||!isClosing(scopes[1])||
+       /^<\/?([A-Za-z][A-Za-z0-9]*)/.exec(scopes[0][0])?.[1].toUpperCase()!==
+       /^<\/?([A-Za-z][A-Za-z0-9]*)/.exec(scopes[1][0])?.[1].toUpperCase())
+      fail('OFX balance metadata requires one complete bank/card statement response. No transactions were exported.');
+    const begin=scopes[0].index+scopes[0][0].length,end=scopes[1].index;
+    if(begin>end||balanceTags.some(t=>t.index<begin||t.index+t[0].length>end))
+      fail('OFX balance metadata appears outside the declared bank/card statement response. No transactions were exported.');
+    const lists=[...structure.matchAll(/<\/?BANKTRANLIST\b[^>]*>/gi)];
+    if(lists.length!==2||isClosing(lists[0])||!isClosing(lists[1])||
+       lists[0].index<begin||lists[1].index+lists[1][0].length>end)
+      fail('OFX balance metadata requires a complete BANKTRANLIST in the same statement response. No transactions were exported.');
+    // Balance groups are siblings of BANKTRANLIST, not children of a
+    // transaction or of the list itself. A misplaced group must not be
+    // misattributed to this account.
+    const listBegin=lists[0].index,listEnd=lists[1].index+lists[1][0].length;
+    if(balanceTags.some(t=>t.index>=listBegin&&t.index<listEnd))
+      fail('OFX balance metadata is incorrectly nested inside BANKTRANLIST. No transactions were exported.');
+    statementScoped=true;
+  }
   const readBlock=name=>{
     const tokens=[...structure.matchAll(new RegExp('<\\/?'+name+'\\b[^>]*>','gi'))];
     if(!tokens.length)return {present:false,asOfDate:null};
@@ -558,7 +586,7 @@ function inspectOFXBalanceMetadata(original,structure,xml){
   return {
     ledgerBalancePresent:ledger.present,availableBalancePresent:available.present,
     ledgerAsOfDate:ledger.asOfDate,availableAsOfDate:available.asOfDate,
-    independentReconciliationPerformed:false
+    independentReconciliationPerformed:false,statementScoped
   };
 }
 export function parseOFX(text) {
@@ -688,16 +716,23 @@ export function parseOFX(text) {
         description,memo,id};
     }catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
+  // Balance "as of" is a point-in-time statement value, not an opening
+  // balance and not proof of all postings. Later posted dates only mean
+  // the source's time scopes need review; no rows are removed or summed
+  // into a fabricated ledger reconciliation.
+  const postedAfterLedgerAsOfCount=balanceReview.ledgerAsOfDate?
+    transactions.filter(t=>t.date>balanceReview.ledgerAsOfDate).length:0;
   return {transactions,source:'OFX / QBO / QFX',
     integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,inconsistentTypeSignCount,repeatedFitidCount,
       declaredCurrency:currencyTags.length?'USD':null,
       statementRange:reportedStartDate||reportedEndDate?{startInclusive:reportedStartDate,endExclusive:reportedEndDate}:null,
-      postedBeforeRangeCount,postedAfterRangeCount,balanceReview},
+      postedBeforeRangeCount,postedAfterRangeCount,postedAfterLedgerAsOfCount,balanceReview},
     warnings:[
       'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
       ...((balanceReview.ledgerBalancePresent||balanceReview.availableBalancePresent)?[
         'OFX bank-reported balance metadata was syntactically checked, NOT independently reconciled: no verified opening balance or complete bank posting history is available. The sum of extracted transactions is not a confirmed change in closing ledger balance.'
       ]:[]),
+      ...(postedAfterLedgerAsOfCount?[postedAfterLedgerAsOfCount+' transaction(s) have posting dates later than the ledger balance as-of date. This can be a legitimate bank retrieval-window difference; review the source dates. No rows were removed and no reconciliation is claimed.']:[]),
       ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[]),
       ...(missingReferenceCount?[missingReferenceCount+' OFX transaction(s) have no FITID; duplicate/reference checks may be incomplete.']:[]),
       ...(repeatedFitidCount?[repeatedFitidCount+' repeated FITID occurrence(s) contain identical transaction data within this account. They are preserved, NOT automatically deleted. Review possible duplicate downloads before import.']:[]),
