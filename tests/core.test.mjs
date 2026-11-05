@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,decodeFinancialBytes,parseIIF,parseInput,validateGenericCSVExport,genericCSVExportPlan,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,validateQuickBooksCSVParts,auditTransactions,totals} from '../src/core.mjs';
+import {toMinorUnits,fromMinorUnits,isoDate,isAmbiguousNumericDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,decodeFinancialBytes,parseIIF,parseInput,validateGenericCSVExport,genericCSVExportPlan,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,validateQuickBooksCSVParts,auditTransactions,totals} from '../src/core.mjs';
 import {toXLSX,toZIP} from '../src/xlsx.mjs';
 
 test('strict cents and signed amounts',()=>{
@@ -1270,4 +1270,56 @@ test('unambiguous parenthesized debits retain exact cents across CSV, QIF, OFX a
   assert.equal(result.transactions[0].amount,'-12.34');
   assert.equal(result.transactions[0].date,'2026-11-04');
  }
+});
+
+test('numeric date ambiguity is disclosed only when both calendar orders produce different valid dates',()=>{
+  assert.equal(isAmbiguousNumericDate('03/04/2026'),true);
+  assert.equal(isAmbiguousNumericDate('03-04-2026'),true);
+  assert.equal(isAmbiguousNumericDate('03.04.2026'),true);
+  for(const date of ['12/12/2026','2026-03-04','02/29/2024','13/04/2026','04/31/2026','20261104']) {
+    assert.equal(isAmbiguousNumericDate(date),false,'not ambiguous: '+date);
+  }
+  const input='Date,Description,Amount\n03/04/2026,A,-10.20\n05/06/2026,B,15.30\n';
+  const us=csvTransactions(input,{},'us'),eu=csvTransactions(input,{},'eu');
+  assert.deepEqual(us.transactions.map(t=>t.date),['2026-03-04','2026-05-06']);
+  assert.deepEqual(eu.transactions.map(t=>t.date),['2026-04-03','2026-06-05']);
+  assert.deepEqual(us.transactions.map(t=>t.amount),eu.transactions.map(t=>t.amount));
+  assert.equal(totals(us.transactions).net,'5.10');
+  assert.deepEqual(us.dateReview,{ambiguousDateRows:2,selectedDateFormat:'us'});
+  assert.deepEqual(eu.dateReview,{ambiguousDateRows:2,selectedDateFormat:'eu'});
+  assert.match(us.warnings.join(' '),/2 of 2 numeric date\(s\).*US month-first/);
+  assert.match(eu.warnings.join(' '),/day-first/);
+  const unambiguous='Date,Description,Amount\n02/29/2024,A,-1.00\n11/13/2026,B,2.00\n';
+  assert.equal(csvTransactions(unambiguous).warnings.length,0);
+  assert.equal(csvTransactions(unambiguous).dateReview.ambiguousDateRows,0);
+  assert.throws(()=>csvTransactions(input,{},'auto'),/Unsupported source date format/);
+});
+test('blank debit and credit must not quietly become zero while explicit zero remains reviewable',()=>{
+  const missing='Date,Payee,Debit,Credit\n11/13/2026,Blank,,\n';
+  assert.throws(()=>csvTransactions(missing),/CSV row 2: Debit and Credit are both blank/);
+  const signedZero=csvTransactions('Date,Payee,Amount\n11/13/2026,No movement,0.00\n');
+  assert.equal(signedZero.transactions[0].amount,'0.00');
+  assert.equal(auditTransactions(signedZero.transactions).zeroAmountCount,1);
+  const explicitDebitCredit=csvTransactions('Date,Payee,Debit,Credit\n11/13/2026,No movement,0,0\n');
+  assert.equal(explicitDebitCredit.transactions[0].amount,'0.00');
+  assert.equal(auditTransactions(explicitDebitCredit.transactions).zeroAmountCount,1);
+});
+test('zero and >=USD 1,000,000 amount risks require review without truncating real financial values',()=>{
+  const input='Date,Description,Amount\n11/13/2026,Zero,0.00\n11/14/2026,Large positive,1000000.00\n11/15/2026,Large negative,-1000000.00\n11/16/2026,Below threshold,999999.99\n';
+  const parsed=csvTransactions(input);
+  const audit=auditTransactions(parsed.transactions);
+  assert.equal(parsed.warnings.length,0);
+  assert.equal(audit.zeroAmountCount,1);
+  assert.equal(audit.largeAmountCount,2);
+  assert.equal(audit.summary.net,'999999.99');
+  assert.match(audit.warnings.join(' '),/exactly zero amount/);
+  assert.match(audit.warnings.join(' '),/at least USD 1,000,000/);
+  const plan=quickBooksCSVExportPlan(parsed.transactions);
+  assert.equal(plan.report.zeroAmountReviewCount,1);
+  assert.equal(plan.report.largeAmountReviewCount,2);
+  assert.match(plan.report.warnings.join(' '),/zero-amount transaction/);
+  assert.equal(plan.parts.length,1);
+  assert.equal(parseCSV(plan.parts[0]).length,5);
+  assert.equal(parseCSV(plan.parts[0])[2][2],'1000000.00');
+  assert.equal(parseCSV(plan.parts[0])[3][2],'-1000000.00');
 });
