@@ -16,6 +16,15 @@ export function writeQboLab(dist,root){
     throw Error('Downloaded fictional comparator QBO changed; refuse publishing synthetic test fixture.');
   const sampleDir=path.join(dist,'samples');fs.mkdirSync(sampleDir,{recursive:true});
   fs.writeFileSync(path.join(sampleDir,'sonomir-synthetic-reference-test-only.qbo'),synthetic);
+  // This is the exact original fictional CSV submitted to the independent
+  // Sonomir converter, rather than an unrelated synthetic CSV on the home page.
+  const pairedCSV='Date,Description,Amount,Reference\n'+
+    '10/14/2026,Fictional Espresso,-12.50,SYN001\n'+
+    '10/15/2026,Fictional Refund,20.75,SYN002\n';
+  const expectedCSV='fcd3ccce6ad75502788e588ac78765954fa16e02d88b409d83f6317ce5de2cd9';
+  if(createHash('sha256').update(pairedCSV,'utf8').digest('hex')!==expectedCSV)
+    throw Error('Sonomir original fictional CSV no longer matches pinned source SHA-256.');
+  fs.writeFileSync(path.join(sampleDir,'sonomir-synthetic-source-test-only.csv'),pairedCSV,'utf8');
   const assetDir=path.join(dist,'assets');
   fs.copyFileSync(path.join(root,'src','qbo-writer.mjs'),path.join(assetDir,'qbo-writer.mjs'));
   fs.copyFileSync(path.join(root,'src','qbo-writer-ui.mjs'),path.join(assetDir,'qbo-writer-ui.mjs'));
@@ -63,7 +72,7 @@ export function writeQboLab(dist,root){
 <p class="lab-tip">No upload to our server. Your bank QBO reference is used only to copy the FI/BID and bank/account metadata locally. You must verify it belongs to the same bank/account as the CSV.</p>
 <div class="lab-grid"><label class="lab-field">Transactions CSV<input type="file" id="lab-csv" accept=".csv,.tsv" aria-label="Transactions CSV"></label>
 <label class="lab-field">Same-account QBO reference (or fictional test sample)<input type="file" id="lab-reference" accept=".qbo" aria-label="Existing bank QBO reference"></label></div>
-<div class="lab-note"><strong>Test-only example (not for QuickBooks import):</strong> <a class="lab-link" href="/samples/sonomir-synthetic-reference-test-only.qbo" download>Download independently generated fictional QBO reference</a>. This 923-byte Sonomir output uses fictional bank and account identifiers; it is provided solely to test local CSV→QBO file creation. Do NOT use those identifiers for a real bank/account. For real data, use a QBO reference you are entitled to use from the same bank/account.</div><p class="lab-meta"><a class="lab-link" href="/samples/csv-synthetic.csv" download>Download synthetic CSV</a> (separate fictional transactions). You do not need to sign up for QuickBooks to run the syntax-only demo.</p>
+<div class="lab-note"><strong>Test-only example (not for QuickBooks import):</strong> <a class="lab-link" href="/samples/sonomir-synthetic-reference-test-only.qbo" download>Download independently generated fictional QBO reference</a>. This 923-byte Sonomir output uses fictional bank and account identifiers; it is provided solely to test local CSV→QBO file creation. Do NOT use those identifiers for a real bank/account. For real data, use a QBO reference you are entitled to use from the same bank/account.</div><p class="lab-meta"><a class="lab-link" href="/samples/sonomir-synthetic-source-test-only.csv" download>Download the matching original fictional CSV</a>. This CSV and the 923-byte Sonomir QBO reference were generated from the same two fictional transactions (−12.50, +20.75; net +8.25 USD). Select these exact two files to reproduce the comparator-based CSV→QBO output test. No QuickBooks signup is needed.</p>
 <div class="lab-options">
 <label class="lab-field">Source date order<select id="lab-date"><option value="us">US — MM/DD/YYYY</option><option value="eu">Day-first — DD/MM/YYYY</option></select></label>
 <label class="lab-field">CSV delimiter<select id="lab-delimiter"><option value="auto">Auto</option><option value="comma">Comma</option><option value="semicolon">Semicolon</option><option value="tab">Tab</option></select></label>

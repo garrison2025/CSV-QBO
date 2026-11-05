@@ -42,11 +42,15 @@ try{
  const sampleUrl='http://127.0.0.1:'+server.address().port+'/samples/sonomir-synthetic-reference-test-only.qbo';
  const sampleRequest=await page.request.get(sampleUrl);
  assert.equal(sampleRequest.status(),200,'Fictional comparator sample must be downloadable on site');
+ const sourceResponse=await page.request.get('http://127.0.0.1:'+server.address().port+'/samples/sonomir-synthetic-source-test-only.csv');
+ assert.equal(sourceResponse.status(),200);
+ const publicTestCSV=await sourceResponse.body();
+ assert.deepEqual(publicTestCSV,Buffer.from(csv),'Public matching CSV bytes must equal original third-party submission');
  const publicTestReference=await sampleRequest.body();
  assert.equal(publicTestReference.length,923);
  assert.deepEqual(publicTestReference,reference,'Published sample must match the original real competitor bytes');
  assert.match(await page.locator('body').innerText(),/TEST-ONLY EXAMPLE|Test-only example/i);
- await page.locator('#lab-csv').setInputFiles({name:'fictional.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+ await page.locator('#lab-csv').setInputFiles({name:'sonomir-synthetic-source-test-only.csv',mimeType:'text/csv',buffer:publicTestCSV});
  await page.locator('#lab-reference').setInputFiles({name:'fictional-reference.qbo',mimeType:'application/x-ofx',buffer:publicTestReference});
  await page.locator('#lab-preview').click();
  await page.locator('#lab-result').waitFor({state:'visible'});
