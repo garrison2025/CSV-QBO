@@ -46,19 +46,6 @@ jobs:
           command -v google-chrome
           npm install --no-save --no-package-lock playwright-core@1.55.0
           npm run test:browser
-      - name: Probe public Intuit Test Drive for permitted bank CSV upload (one-time, unauthenticated)
-        if: github.head_ref == 'verify/public-intuit-testdrive-20261105'
-        run: node scripts/probe-intuit-testdrive.mjs
-      - name: Archive public demo probe evidence (one-time)
-        if: github.head_ref == 'verify/public-intuit-testdrive-20261105'
-        uses: actions/upload-artifact@v4
-        with:
-          name: public-intuit-testdrive-probe
-          path: |
-            qbo-public-testdrive-evidence.json
-            qbo-public-testdrive-probe.png
-          if-no-files-found: ignore
-          retention-days: 7
       - name: Upload synthetic browser failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
