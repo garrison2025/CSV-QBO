@@ -1,5 +1,8 @@
 # Real-bank compatibility and QuickBooks UAT
 
+**Important target-UAT correction (2026-11-05):** Intuit's official developer Sandbox FAQ says Sandbox companies **cannot import or export files**. The QuickBooks Online Test Drive is not a trustworthy bank-import acceptance environment. Use an authorized, isolated real/trial QuickBooks Online company that explicitly permits manual uploads, or mark import UAT NOT RUN. No guaranteed free import-capable account exists in this project. See [the actual QuickBooks import acceptance worksheet](QUICKBOOKS-REAL-IMPORT-UAT.md). Do not mistake a sandbox API write or parser self-test for a manual CSV import.
+
+
 ## V2.8: Local verification of actual bank export files
 
 This is an executable, local-only source-versus-export comparison. It does NOT authenticate the bank file or test QuickBooks imports. It never uploads source data.
@@ -19,7 +22,7 @@ This is an executable, local-only source-versus-export comparison. It does NOT a
 
 5. If successful, a private JSON draft is written to report_file, outside the repository. The tool never overwrites an existing report. A local technical match is NOT QuickBooks import validation.
 6. Independently compare the original bank export against the bank's displayed transaction records, including independent totals, date/signs, references, duplicates and fields not represented by the output. Screenshots stay private and should be redacted.
-7. For QuickBooks Online CSV, manually import into a disposable test company/account, and record actual row count, sign/amount, target version, account type and repeat-import behavior; the application may differ by region/account. For QIF use a disposable Quicken data file.
+7. For QuickBooks Online CSV, manually import into an authorized, isolated upload-capable test or trial company/account (not an Intuit Developer Sandbox), and record actual row count, sign/amount, target version, account type and repeat-import behavior; the application may differ by region/account. For QIF use a disposable Quicken data file.
 8. After source authenticity and target-import UAT are independently reviewed, complete the separate PRIVATE UAT registry and run the validation commands in the rest of this document. The draft intentionally cannot be published: source_kind is PENDING_AUTHENTICITY_REVIEW, owner_approved is false, and target_import_result remains NOT_RUN.
 
 **Privacy guardrails:** File paths inside the repository are refused, parser errors are not echoed with potentially sensitive bank values, and the exported draft's hashes and aggregate financial totals are confidential. Never copy the draft directly into data/uat-public.json. IIF extraction represents TRNS summaries only, not SPL allocations; QuickBooks three-column CSV intentionally omits source reference/Memo fields.
