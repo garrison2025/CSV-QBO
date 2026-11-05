@@ -15,11 +15,25 @@ export function toMinorUnits(input) {
   let s = original;
   if (!s) fail('Amount is empty.');
   let negative = false;
-  if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
-  if (s.startsWith('-')) { negative = !negative; s = s.slice(1); }
-  else if (s.startsWith('+')) s = s.slice(1);
+  // Accounting parentheses are one negative sign, never a second sign
+  // that cancels a minus. "(-12.34)" must not become positive 12.34.
+  if (s.startsWith('(') || s.endsWith(')')) {
+    if (!/^\(.*\)$/.test(s))
+      fail('Invalid amount parentheses. Use one signed-amount convention.');
+    negative = true;
+    s = s.slice(1,-1).trim();
+    if (/^[+-]/.test(s) || /^\$[+-]/.test(s))
+      fail('Conflicting amount signs. Use either parentheses or a leading sign.');
+  } else if (s.startsWith('-')) {
+    negative = true;
+    s = s.slice(1);
+  } else if (s.startsWith('+')) {
+    s = s.slice(1);
+  }
   s = s.trim();
   if (s.startsWith('$')) s = s.slice(1);
+  if (/^[+-]/.test(s))
+    fail('Conflicting amount signs. Use one leading sign.');
   if (/\s/.test(s)) fail('Invalid amount spacing: ' + input + '.');
   if (/^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(s)) s = s.replaceAll(',', '');
   if (!/^\d+(\.\d{1,2})?$/.test(s)) fail('Invalid amount: ' + input + '. Use a period for decimals.');

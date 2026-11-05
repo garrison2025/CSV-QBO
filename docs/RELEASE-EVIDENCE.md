@@ -237,3 +237,11 @@
 - Node tests cover missing/extra columns, alias mismatch for both transaction and split records, cent accuracy, malformed terminators, header errors, and atomic batch rejection; Chrome E2E checks actual XLSX output and stale download blocking after invalid file upload.
 - Both IIF tools disclose that they export only validated TRNS summaries, not reconstructed ledgers or verified QuickBooks imports.
 - No paid API, backend bank uploads or premature production indexing. Record GitHub and Cloudflare evidence after release verification.
+
+## V2.6 — contradictory accounting amount sign fail-closed guard (2026-11-05)
+
+- Shared `toMinorUnits` previously toggled its negativity flag twice for a parenthesized negative with an inner minus (`(-12.34)`), silently converting a debit into positive money. The defect was reproducible across CSV, QIF, OFX/QBO/QFX and IIF paths.
+- The parser now allows exactly one negative sign convention: outer accounting parentheses OR a leading minus. Contradictory mixed signs and incomplete parentheses are rejected early with generic, privacy-safe messages. Existing valid signed cent amounts remain unchanged.
+- Node tests verify acceptable negatives, protected malformed variants, all four parser families, and all-or-nothing batches. Chrome acceptance downloads valid negative CSV and verifies an invalid QIF source removes stale preview/export.
+- All 12 landing pages disclose the amount-sign rule; `noindex,nofollow` remains the preview policy. Real bank provider and QuickBooks import acceptance are not claimed.
+- GitHub CI and Cloudflare deployment evidence to be confirmed after merge.
