@@ -42,6 +42,11 @@ try{
  page.setDefaultTimeout(20000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  async function dl(selector){
+  // Most synthetic CSV fixtures have date-order ambiguity in both formats.
+  // Ordinary download tests acknowledge an explicit warning; dedicated tests
+  // below separately assert the locked export state until user review.
+  if(selector==='#export-button'&&await page.locator('#warning-ack-label').isVisible()&&
+     !(await page.locator('#warning-ack').isChecked()))await page.locator('#warning-ack').check();
   const [d]=await Promise.all([page.waitForEvent('download'),page.locator(selector).click()]);
   assert.equal(await d.failure(),null);
   return {name:d.suggestedFilename(),content:await readFile(await d.path())};
@@ -493,6 +498,9 @@ try{
  assert.match(await page.locator('#preview-filter-status').textContent(),/1 of 1001/);
  await page.locator('#preview-search').fill('NO-SUCH-BANK-TRANSACTION');
  assert.equal(await page.locator('#preview-body tr').count(),0);
+ assert.equal(await page.locator('#export-button').isDisabled(),true,'ambiguous month/day format requires review even for 1001 rows');
+ assert.match(await page.locator('#warning-list').textContent(),/1001 of 1001 numeric date/);
+ await page.locator('#warning-ack').check();
  assert.equal(await page.locator('#export-button').isEnabled(),true);
  assert.match(await page.locator('#preview-caption').textContent(),/Downloads still include all 1001 transactions/);
  await page.locator('#preview-search').fill('');
@@ -620,6 +628,9 @@ try{
  await page.locator('#preview-button').click();
  assert.equal(await page.locator('#summary-count').textContent(),'5');
  assert.equal(await page.locator('#summary-net').textContent(),'1119.22');
+ assert.match(await page.locator('#warning-list').textContent(),/numeric date/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#warning-ack').check();
  assert.equal(await page.locator('#export-button').isEnabled(),true);
  let wellsDownload=await dl('#export-button');
  assert.match(wellsDownload.content.toString('utf8'),/GAS STATION 4471 PURCHASE AUTHORIZED,-45\.20/);
@@ -638,6 +649,65 @@ try{
  console.log('PASS Chrome multiple transaction/posted date mapping caution without silent sign inversion');
 
  console.log('PASS Chrome seven independently-authored fictional bank-format inputs, previews, exact signed totals and downloads');
+
+
+ // An entirely ambiguous numeric date column must not be silently treated
+ // as definitively US or day-first. Require user-visible review, and changing
+ // formats must invalidate the previous preview and output before re-export.
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const ambiguous='Date,Description,Amount\n03/04/2026,Date A,-10.20\n05/06/2026,Date B,15.30\n';
+ await page.locator('#file-input').setInputFiles(file('ambiguous-source.csv',ambiguous));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-net').textContent(),'5.10');
+ assert.match(await page.locator('#warning-list').textContent(),/2 of 2 numeric date/);
+ assert.match(await page.locator('#warning-list').textContent(),/US month-first/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const dateReviewReport=await dl('#download-report');
+ assert.deepEqual(JSON.parse(dateReviewReport.content.toString('utf8')).dateReview,
+                  {ambiguousDateRows:2,selectedDateFormat:'us'});
+ await page.locator('#warning-ack').check();
+ const usDateDownload=await dl('#export-button');
+ assert.match(usDateDownload.content.toString('utf8'),/03\/04\/2026,Date A,-10\.20/);
+ await page.locator('#date-format').selectOption('eu');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ await page.locator('#preview-button').click();
+ assert.match(await page.locator('#warning-list').textContent(),/day-first/);
+ assert.equal(await page.locator('#summary-net').textContent(),'5.10');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#warning-ack').check();
+ const euDateDownload=await dl('#export-button');
+ assert.match(euDateDownload.content.toString('utf8'),/04\/03\/2026,Date A,-10\.20/);
+ assert.match(euDateDownload.content.toString('utf8'),/06\/05\/2026,Date B,15\.30/);
+ console.log('PASS Chrome date-order ambiguity review blocks export, US/EU changes clear preview and preserve signed cents');
+
+ // Blank debit+credit is NOT a zero-value bank transaction; explicit 0.00
+ // is preserved but needs a warning. Huge transactions are never truncated
+ // or auto-rejected merely for reaching the review heuristic.
+ await page.locator('#file-input').setInputFiles(file('blank-split.csv',
+   'Date,Description,Debit,Credit\n11/13/2026,Unknown,,\n'));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.match(await page.locator('#work-status').textContent(),/Debit and Credit are both blank/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#file-input').setInputFiles(file('large-and-zero.csv',
+   'Date,Description,Amount\n11/13/2026,True zero,0.00\n11/14/2026,Large credit,1000000.00\n'));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'2');
+ assert.equal(await page.locator('#summary-net').textContent(),'1000000.00');
+ assert.match(await page.locator('#warning-list').textContent(),/exactly zero amount/);
+ assert.match(await page.locator('#warning-list').textContent(),/at least USD 1,000,000/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const amountReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.equal(amountReport.zeroAmountReviewCount,1);
+ assert.equal(amountReport.largeAmountReviewCount,1);
+ await page.locator('#warning-ack').check();
+ const amountWire=(await dl('#export-button')).content.toString('utf8');
+ assert.match(amountWire,/True zero,0\.00/);
+ assert.match(amountWire,/Large credit,1000000\.00/);
+ console.log('PASS Chrome refuses missing debit/credit and flags actual zero/million-dollar amounts without data mutation');
 
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
