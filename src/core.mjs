@@ -199,12 +199,12 @@ export function genericCSVExportPlan(transactions,{includeMemo=false}={}){
 }
 
 const FIELD_SYNONYMS = {
- date:['date','transaction date','posted date','posting date','dtposted'],
+ date:['date','posted date','posting date','post date','transaction date','trans. date','trans date','dtposted'],
  description:['description','payee','name','details','merchant','transaction description','memo'],
  amount:['amount','transaction amount','net amount','total'],
  debit:['debit','withdrawal','withdrawals','paid out','money out'],
  credit:['credit','deposit','deposits','paid in','money in'],
- id:['id','fitid','reference','transaction id','check number'],
+ id:['id','fitid','reference','transaction id','check number','check or slip #','check or slip number','ref #'],
  memo:['memo','memo text','transaction memo','notes','note','bank memo']
 };
 export function guessMapping(header) {
@@ -215,6 +215,36 @@ export function guessMapping(header) {
   if(guessed.memo===guessed.description)guessed.memo=-1;
   return guessed;
 }
+/**
+ * Create a privacy-minimized, all-row summary of column population.
+ * This is used only to SUGGEST a safer manual selection, never to change
+ * financial field meanings automatically. Source transaction text is not kept.
+ */
+export function csvColumnEvidence(rows){
+  if(!Array.isArray(rows)||!Array.isArray(rows[0]))fail('CSV column analysis requires parsed table rows.');
+  const headers=rows[0].map(value=>String(value??''));
+  const populated=Array(headers.length).fill(0);
+  let rowCount=0;
+  for(let i=1;i<rows.length;i++){
+    const row=rows[i];
+    if(!Array.isArray(row))fail('Invalid CSV row structure in mapping inspection.');
+    if(row.every(v=>!String(v??'').trim()))continue;
+    rowCount++;
+    for(let j=0;j<headers.length;j++)if(String(row[j]??'').trim())populated[j]++;
+  }
+  return {headers,rowCount,populated};
+}
+export function suggestCSVDescriptionRemap(evidence,mapping){
+  if(!evidence||!mapping||!Number.isInteger(evidence.rowCount)||evidence.rowCount<1)return null;
+  const description=mapping.description,memo=mapping.memo;
+  if(!Number.isInteger(description)||!Number.isInteger(memo)||description<0||memo<0||
+    description===memo||description>=evidence.headers.length||memo>=evidence.headers.length)return null;
+  const header=String(evidence.headers[memo]??'').trim().toLowerCase().replace(/[_-]+/g,' ');
+  if(!['memo','memo text','transaction memo','bank memo'].includes(header))return null;
+  if(evidence.populated[description]!==0||evidence.populated[memo]!==evidence.rowCount)return null;
+  return {descriptionIndex:description,memoIndex:memo,rowsChecked:evidence.rowCount};
+}
+
 export function csvTransactions(data, mapping={}, dateFormat='us') {
   const rows=typeof data==='string' ? parseCSV(data) : data;
   if (rows.length<2) fail('CSV has no transaction rows.');
