@@ -170,7 +170,8 @@ export function inspectQuickBooksZIP(data,transactions){
   let manifest;
   try{manifest=JSON.parse(textValue(entries.get('quickbooks-csv-validation.json')));}
   catch{throw Error('QuickBooks ZIP validation manifest is invalid');}
-  insist(isDeepStrictEqual(manifest,checked),'QuickBooks ZIP manifest and actual CSV bytes differ');
+  const changedKeys=Object.keys(checked).filter(key=>!isDeepStrictEqual(manifest[key],checked[key]));
+  insist(isDeepStrictEqual(manifest,checked),'QuickBooks ZIP manifest and actual CSV bytes differ: '+changedKeys.join(', '));
   insist(checked.partCount===parts.length,'QuickBooks ZIP part count differs');
   return {rows:checked.sourceRows,netCents:transactions.reduce((n,t)=>n+toMinorUnits(t.amount),0n).toString(),
     parts:parts.length,orderedRowsReconciled:true,actualZipPartsInspected:true};
