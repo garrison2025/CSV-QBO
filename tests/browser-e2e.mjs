@@ -111,6 +111,91 @@ try{
  assert.match(cells,/Salary \^ café/);
  console.log('PASS browser QIF-to-XLSX one-cent debit and leading-zero transaction reference');
 
+ // Default four-column workbooks must not accidentally claim the source Memo
+ // is included. Opt-in adds a fifth text-only column, preserving integer cents.
+ await page.goto(base+'/tools/qif-to-excel/');
+ const memoQIF='!Type:Bank\nD11/04/2026\nT-1.01\nPStore\nM=SUM(1,2) & <note>\nN00001234\n^\n';
+ await page.locator('#file-input').setInputFiles(file('memo.qif',memoQIF));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#preview-memo-head').isVisible(),true);
+ assert.equal(await page.locator('#memo-toggle-label').isVisible(),true);
+ assert.match(await page.locator('#memo-coverage').textContent(),/default four-column Excel download EXCLUDES Memo/);
+ assert.match(await page.locator('#preview-body tr').first().textContent(),/=SUM\(1,2\) & <note>/);
+ await page.locator('#preview-search').fill('=SUM(1,2)');
+ assert.equal(await page.locator('#preview-body tr').count(),1);
+ await page.locator('#preview-search').fill('');
+ output=await dl('#export-button');
+ const noMemoSheet=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
+ assert.match(noMemoSheet,/<dimension ref="A1:D2"\/>/);
+ assert.ok(!noMemoSheet.includes('r="E2"'));
+ await page.locator('#include-memo').check();
+ assert.match(await page.locator('#memo-coverage').textContent(),/additional Memo column WILL be included/);
+ output=await dl('#export-button');
+ const memoSheet=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
+ assert.match(memoSheet,/<dimension ref="A1:E2"\/>/);
+ assert.match(memoSheet,/<c r="C2" s="1"><v>-1\.01<\/v><\/c>/);
+ assert.match(memoSheet,/<c r="D2" t="inlineStr"><is><t xml:space="preserve">00001234<\/t><\/is><\/c>/);
+ assert.match(memoSheet,/<c r="E2" t="inlineStr"><is><t xml:space="preserve">=SUM\(1,2\) &amp; &lt;note&gt;<\/t><\/is><\/c>/);
+ assert.ok(!memoSheet.includes('<f>'),'memo cannot become Excel formula');
+ console.log('PASS Chrome QIF-to-XLSX optional fifth Memo text column and unchanged default workbook');
+
+ // The same source can preserve Memo in a generic five-column CSV after opt-in.
+ await page.goto(base+'/tools/qif-to-csv/');
+ await page.locator('#file-input').setInputFiles(file('memo.qif',memoQIF));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/^﻿date,description,amount,id\r\n/);
+ assert.ok(!output.content.toString('utf8').includes('=SUM(1,2)'));
+ await page.locator('#include-memo').check();
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/^﻿date,description,amount,id,memo\r\n/);
+ assert.ok(output.content.toString('utf8').includes("'=SUM(1,2) & <note>"),
+  'CSV guard must neutralize formula-like Memo values');
+ console.log('PASS Chrome QIF-to-CSV Memo option and formula-injection guard');
+
+ // QuickBooks Online bank-upload format stays strictly three columns. A CSV
+ // source with independent Memo explicitly discloses exclusion before download.
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const mappedMemoCSV='Date,Description,Memo,Amount,Reference\n11/04/2026,Office shop,Private separate Memo,-2.50,0002\n';
+ await page.locator('#file-input').setInputFiles(file('source-memo.csv',mappedMemoCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#map-memo').inputValue(),'2');
+ await page.locator('#preview-button').click();
+ assert.match(await page.locator('#memo-coverage').textContent(),/QuickBooks Online requires exactly three CSV columns/);
+ assert.equal(await page.locator('#memo-toggle-label').isHidden(),true);
+ assert.match(await page.locator('#preview-body').textContent(),/Private separate Memo/);
+ output=await dl('#export-button');
+ assert.equal(output.content.toString('utf8').trim().split(/\r?\n/)[0],'Date,Description,Amount');
+ assert.ok(!output.content.toString('utf8').includes('Private separate Memo'));
+ console.log('PASS Chrome QuickBooks strict 3-column CSV with separate Memo exclusion disclosed');
+
+ // Batch mode must acknowledge Memo omissions; opt-in regenerates files and
+ // reports counts without leaking private Memo text in its JSON validation.
+ await page.goto(base+'/tools/qif-to-csv/');
+ const extraMemo='!Type:Bank\nD11/05/2026\nT3.00\nPSecond source\nMSeparate batch Memo\nN0003\n^\n';
+ const bankBatch=[file('memo-first.qif',memoQIF),file('memo-second.qif',extraMemo)];
+ await page.locator('#batch-input').setInputFiles(bankBatch);
+ await page.waitForFunction(()=>document.querySelector('#batch-status')?.textContent.includes('separate outputs ready'));
+ assert.equal(await page.locator('#batch-export').isDisabled(),true);
+ assert.match(await page.locator('#batch-status').textContent(),/2 source transaction\(s\) have separate Memo/);
+ await page.locator('#batch-include-memo').check();
+ assert.match(await page.locator('#batch-status').textContent(),/Reselect batch files/);
+ await page.locator('#batch-input').setInputFiles(bankBatch);
+ await page.waitForFunction(()=>document.querySelector('#batch-status')?.textContent.includes('separate outputs ready'));
+ assert.equal(await page.locator('#batch-export').isEnabled(),true);
+ output=await dl('#batch-export');
+ const memoBatchZIP=storedZip(output.content);
+ const memoReport=JSON.parse(memoBatchZIP.get('batch-validation.json').toString('utf8'));
+ assert.equal(memoReport.memoIncluded,true);
+ assert.equal(memoReport.memoRowsWithContent,2);
+ assert.equal(memoReport.memoRowsOmitted,0);
+ assert.ok(!JSON.stringify(memoReport).includes('Separate batch Memo'));
+ const csvPart=memoBatchZIP.get('converted-001.csv').toString('utf8');
+ assert.match(csvPart,/date,description,amount,id,memo/);
+ assert.match(csvPart,/'=SUM\(1,2\) & <note>/);
+ console.log('PASS Chrome batch Memo opt-in, preserved ZIP source rows and private report counts');
+
+
  // Legacy bank exports may use Mac-style CR-only records rather than LF/CRLF.
  // Validate the actual UI upload and independent XLSX ZIP contents.
  await page.goto(base+'/tools/qif-to-excel/');
