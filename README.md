@@ -1,3 +1,14 @@
+## V2.18 — CSV header ambiguity, source-line errors and no-silent money mapping (2026-11-05)
+
+- CSV/TSV input already rejected malformed quotes, header/row width mismatches and extra/absent fields. **V2.18 does not claim those old safeguards as new.**
+- Multiple recognizable **signed Amount** columns (e.g. `Amount` and `Transaction Amount`) now produce an explicit aggregate warning. The user must verify the selected monetary column and acknowledge the warning before downloading. The converter does **not** silently choose a different column or reinterpret source cents; running balances and other unmapped columns are never automatically imported as transactions.
+- Multiple recognizable **Date** columns (e.g. `Transaction Date` and `Posted Date`) now produce a mandatory acknowledgment warning; the tool does not infer which date has banking meaning. Duplicate nonempty header labels also warn; the manual mapping selector appends a one-based **source column number** to duplicate labels so users can distinguish visually identical options.
+- Local validation JSON includes only numeric `headerReview` counts (`duplicateHeaderLabels`, `dateCandidates`, `amountCandidates`) and `requiresReview`; source customer values and bank file names are not added.
+- For a CSV with a quoted multiline payee/memo, a transaction value error now provides the CSV transaction row and its **physical source file line**, including older CR-only line endings. Row metadata is non-enumerable and never changes output data.
+- Direct `csvTransactions(array)` calls now enforce the same strict row widths as `parseCSV(text)`; a missing trailing field cannot become a synthetic zero amount. Invalid money format error messages no longer repeat the original source text.
+- Added synthetic Node cases for mapping choices, duplicate headers, date semantics, malformed amounts, CR/LF/CRLF line endings and private error redaction; real Chrome UI tests verify mapping dropdown labels, warning gate, remap reset, report privacy and downloaded signed cents.
+- Authentic bank-file UAT: **0**. Real QuickBooks import acceptance: **0**. Pages preview is still `noindex,nofollow`.
+
 ## V2.17 — balance-to-statement provenance checks and date diagnostics (2026-11-05)
 
 - OFX `LEDGERBAL`/`AVAILBAL` elements are now accepted **only when they structurally belong to one complete `STMTRS` or `CCSTMTRS` response that contains its own complete `BANKTRANLIST`**. Balance blocks outside the account response, in unrelated top-level markup, in a missing/incomplete response, or incorrectly nested inside `BANKTRANLIST` now reject the entire source instead of being falsely attributed to the transactions being exported.

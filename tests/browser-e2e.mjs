@@ -865,6 +865,64 @@ try{
  console.log('PASS Chrome blocks orphan ledger data and warns on post-ledger transactions without changing original cents');
 
 
+ // Duplicate CSV headings are visually disambiguated by source column
+ // position. Alternative monetary/date columns demand explicit review.
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const uncertainHeaders='Date,Posted Date,Description,Amount,Amount\n'+
+   '2026-11-04,2026-11-05,Synthetic debit,-12.50,-1250.00\n'+
+   '2026-11-06,2026-11-07,Synthetic credit,20.00,2000.00\n';
+ await page.locator('#file-input').setInputFiles(file('alternative-amounts.csv',uncertainHeaders));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ const amountOptions=await page.locator('#map-amount option').allTextContents();
+ assert.ok(amountOptions.some(t=>t.includes('Amount (column 4)')));
+ assert.ok(amountOptions.some(t=>t.includes('Amount (column 5)')));
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-net').textContent(),'7.50');
+ const sourceHeaderNotes=await page.locator('#warning-list').textContent();
+ assert.match(sourceHeaderNotes,/repeated nonempty column label/);
+ assert.match(sourceHeaderNotes,/2 possible signed Amount columns/);
+ assert.match(sourceHeaderNotes,/2 possible Date columns/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const ambiguityReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.deepEqual(ambiguityReport.headerReview,{
+   duplicateHeaderLabels:1,dateCandidates:2,amountCandidates:2,requiresReview:true
+ });
+ assert.ok(!JSON.stringify(ambiguityReport).includes('Synthetic debit'));
+ assert.ok(!JSON.stringify(ambiguityReport).includes('1250.00'));
+ await page.locator('#warning-ack').check();
+ const firstAmountOutput=(await dl('#export-button')).content.toString('utf8');
+ assert.match(firstAmountOutput,/Synthetic debit,-12\.50/);
+ await page.locator('#map-amount').selectOption('4');
+ assert.equal(await page.locator('#export-button').isDisabled(),true,
+   'switching financial source columns always invalidates preview and acceptance');
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-net').textContent(),'750.00');
+ assert.equal(await page.locator('#warning-ack').isChecked(),false);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#warning-ack').check();
+ const secondAmountOutput=(await dl('#export-button')).content.toString('utf8');
+ assert.match(secondAmountOutput,/Synthetic debit,-1250\.00/);
+ assert.ok(!secondAmountOutput.includes('Synthetic debit,-12.50'));
+ console.log('PASS Chrome distinguishes duplicate CSV headings, warns on ambiguous amount/date and resets authorization on remapping');
+
+ // A multiline quoted Memo may shift the physical source file line away
+ // from its transaction index. An invalid money value must never be echoed.
+ const multilineBad='Date,Description,Amount\n'+
+   '2026-11-04,"Two\nsource lines",-4.00\n'+
+   '2026-11-05,Missing,PRIVATE-INVALID-MONEY\n';
+ await page.locator('#file-input').setInputFiles(file('multiline-bad.csv',multilineBad));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ const badStatus=await page.locator('#work-status').textContent();
+ assert.match(badStatus,/CSV row 3:/);
+ assert.match(badStatus,/Source file line 4/);
+ assert.ok(!badStatus.includes('PRIVATE-INVALID-MONEY'));
+ console.log('PASS Chrome identifies physical CSV source line and refuses stale download without exposing invalid source money');
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
