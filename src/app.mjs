@@ -1,4 +1,4 @@
-import {MAX_FILE_BYTES,decodeFinancialBytes,parseCSV,guessMapping,parseInput,genericCSVExportPlan,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals,escapeHtml} from './core.mjs';
+import {MAX_FILE_BYTES,decodeFinancialBytes,parseCSV,guessMapping,csvColumnEvidence,suggestCSVDescriptionRemap,parseInput,genericCSVExportPlan,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals,escapeHtml} from './core.mjs';
 import {toXLSX,toZIP} from './xlsx.mjs';
 import {batchConvert,MAX_BATCH_FILES,MAX_BATCH_BYTES} from './batch.mjs';
 
@@ -7,7 +7,7 @@ const drop=$('#drop-zone'), fileInput=$('#file-input'), formatPicker=$('#target-
 if(drop && fileInput){
   const source=drop.dataset.source||'any';
   const fixedOutput=drop.dataset.output||'csv';
-  let file=null,parsed=null,table=null,fileText="",fileExt="",fileEncoding='utf-8',audit=null,selectionEpoch=0;
+  let file=null,parsed=null,table=null,csvEvidence=null,fileText="",fileExt="",fileEncoding='utf-8',audit=null,selectionEpoch=0;
   let batchFiles=[],batchArchive=null,batchInfo=null,batchHasWarnings=false,batchEpoch=0;
   const PREVIEW_PAGE_SIZE=25;
   let previewPage=0,reviewCursor=0,reviewRows=[];
@@ -24,8 +24,36 @@ if(drop && fileInput){
       el.value=String(saved?.[field]??guess[field]??-1);
     }
     $('#mapping-panel').hidden=false;
+    updateMappingAdvice();
   }
   function mapping(){return Object.fromEntries(['date','description','amount','debit','credit','id','memo'].map(k=>[k,Number($('#map-'+k).value)]));}
+  function updateMappingAdvice(){
+    const hint=$('#mapping-advice'),action=$('#apply-memo-description'),dateHint=$('#mapping-date-advice');
+    const candidate=csvEvidence?suggestCSVDescriptionRemap(csvEvidence,mapping()):null;
+    if(hint) {
+      hint.hidden=!candidate;
+      hint.textContent=candidate
+        ? 'In all '+candidate.rowsChecked+' transaction row(s), the selected Description column is blank while Memo has text. This may be a Memo-as-payee export. Review before applying: no bank data or amounts are changed automatically.'
+        : '';
+    }
+    if(action)action.hidden=!candidate;
+    if(dateHint){
+      const cols=(csvEvidence?.headers||[]).map((h,i)=>({h:String(h).trim(),i}))
+        .filter(x=>/^(date|transaction date|trans\.? date|posted date|post date|posting date)$/i.test(x.h));
+      dateHint.hidden=cols.length<2;
+      dateHint.textContent=cols.length<2?'':'Multiple date columns found (such as transaction and posted date). Confirm the intended Date column before preview; the date meaning will not be inferred from transaction amounts.';
+    }
+  }
+  $('#apply-memo-description')?.addEventListener('click',()=>{
+    if(!csvEvidence)return;
+    const candidate=suggestCSVDescriptionRemap(csvEvidence,mapping());
+    if(!candidate)return;
+    $('#map-description').value=String(candidate.memoIndex);
+    $('#map-memo').value='-1';
+    invalidatePreview();
+    updateMappingAdvice();
+    say('Memo explicitly selected as Description and Memo duplicate mapping cleared. Verify dates and amount signs, then select Preview transactions.');
+  });
   // A preview is valid only for the file, date order and exact column
   // mapping used to create it. Never leave previously reviewed bank data
   // exportable after a user changes any of those inputs.
@@ -216,6 +244,7 @@ if(drop && fileInput){
     $('#map-'+field)?.addEventListener('change',()=>{
       if(!file||!['csv','tsv'].includes(fileExt))return;
       invalidatePreview();
+      updateMappingAdvice();
       say('Column mapping changed. Preview transactions again before downloading; the previous results were cleared.');
     });
   }
@@ -226,7 +255,8 @@ if(drop && fileInput){
   async function prepare(chosen){
     const epoch=++selectionEpoch;
     invalidatePreview();
-    file=chosen;table=null;fileText='';fileExt='';fileEncoding='utf-8';$('#mapping-panel').hidden=true;$('#file-name').textContent='';
+    file=chosen;table=null;csvEvidence=null;fileText='';fileExt='';fileEncoding='utf-8';$('#mapping-panel').hidden=true;$('#file-name').textContent='';
+    updateMappingAdvice();
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
     const ext=(file.name.split('.').pop()||'').toLowerCase();
@@ -239,7 +269,9 @@ if(drop && fileInput){
       const {text,encoding}=decoded;
       fileText=text;fileExt=ext;fileEncoding=encoding;
       if(ext==='csv'||ext==='tsv'){
-        updateMapping(parseCSV(text,ext==='tsv'?'\t':undefined)[0]);
+        const csvRows=parseCSV(text,ext==='tsv'?'\t':undefined);
+        csvEvidence=csvColumnEvidence(csvRows);
+        updateMapping(csvRows[0]);
         say('Select column mappings, then choose Preview transactions.');
       }else{parsed=withEncodingWarning(parseInput(text,ext,{dateFormat:$('#date-format').value}),encoding);renderResult(parsed);}
     }catch(err){if(epoch===selectionEpoch){invalidatePreview();say(err.message||'Could not read file.','error');}}
@@ -322,7 +354,8 @@ if(drop && fileInput){
     if($('#batch-file-list'))$('#batch-file-list').replaceChildren();
     batchSay('Batch files and generated ZIP cleared from the workspace.');
     invalidatePreview();
-    file=null;table=null;fileText='';fileExt='';fileEncoding='utf-8';
+    file=null;table=null;csvEvidence=null;fileText='';fileExt='';fileEncoding='utf-8';
+    updateMappingAdvice();
     fileInput.value='';
     $('#file-name').textContent='';
     $('#mapping-panel').hidden=true;
