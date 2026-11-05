@@ -7,8 +7,11 @@ import {validatePublicRegistry} from './uat-evidence.mjs';
 
 function insist(value,message){if(!value)throw Error('Production release gate: '+message);}
 const own=(obj,key)=>Object.prototype.hasOwnProperty.call(obj,key);
-const exactDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&
-  new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
+const exactDate=s=>{
+  if(typeof s!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;
+  const day=new Date(s+'T00:00:00Z');
+  return !Number.isNaN(day.getTime())&&day.toISOString().slice(0,10)===s;
+};
 
 export function assessProductionRelease({approval,registry,tools,siteUrl='',publishSeo=false}){
   validatePublicRegistry(registry);
