@@ -121,7 +121,7 @@ test('realistic posted and transaction date headers are recognized without infer
   const guessed=guessMapping(rows[0]);
   assert.equal(guessed.date,1,'posting date preferred for bank statement date by default');
   assert.equal(guessed.description,2);
-  const parsed=parseInput(rows,'csv',{mapping:guessed});
+  const parsed=parseInput('Trans. Date,Post Date,Description,Amount\n01/31/2024,02/01/2024,Purchase,10.00\n','csv',{mapping:guessed});
   assert.equal(parsed.transactions[0].date,'2024-02-01');
   assert.equal(guessMapping(['Check or Slip #']).id,0);
   assert.equal(guessMapping(['Credit Card Number']).id,-1,'do not misinterpret account number as transaction reference');
