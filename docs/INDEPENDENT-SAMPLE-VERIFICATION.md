@@ -71,3 +71,7 @@ New synthetic cases contain two money columns (`Amount` / `Transaction Amount`),
 ## V2.19 — Windows-1252 CSV and TSV synthetic byte fixtures
 
 A synthetic 0xE9 legacy payee is decoded only when Windows-1252 is explicitly chosen, while UTF-8 remains strict by default. UTF-8 and UTF-16 BOMs override unsupported manual interpretation by rejecting mismatch; undefined legacy control bytes, NUL, malformed financial rows and invalid signed amounts are rejected. A real Chrome fixture exercises explicit encoding selection, source-byte re-read, warning confirmation, exact payee/cents/leading-zero reference preservation, reset after changing encoding, and BOM conflict refusal. No real bank-issued sample or external QuickBooks import acceptance has been performed.
+
+## V2.20 — Excel sep= bank CSV dialect fixtures
+
+Synthetic Excel/CSV sources with a first-line `sep=;`, `sep=,` or `sep=<TAB>` directive validate that the directive is not counted as a transaction and that source physical row numbers, row identity and signed cents remain unchanged. Nonstandard bank preambles are deliberately not discarded. A first-header tie between comma and semicolon fails until explicitly selected. Test files with contradictory separator selections, malformed rows after multiline quoted payees, unrecognized directives and multiple directive lines reject the full source. Browser Chrome tests verify review acknowledgment and invalidation of stale exports. These are **not** bank-issued exports or actual accounting software imports.
