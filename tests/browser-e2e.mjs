@@ -681,6 +681,7 @@ try{
  assert.match(euDateDownload.content.toString('utf8'),/04\/03\/2026,Date A,-10\.20/);
  assert.match(euDateDownload.content.toString('utf8'),/06\/05\/2026,Date B,15\.30/);
  console.log('PASS Chrome date-order ambiguity review blocks export, US/EU changes clear preview and preserve signed cents');
+ await page.locator('#date-format').selectOption('us');
 
  // Blank debit+credit is NOT a zero-value bank transaction; explicit 0.00
  // is preserved but needs a warning. Huge transactions are never truncated
