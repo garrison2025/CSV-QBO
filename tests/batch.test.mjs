@@ -320,3 +320,34 @@ test('valid IIF with dual amount aliases produces unchanged signed cents in batc
  assert.ok(!report.includes('Private rent'));
  assert.ok(!report.includes('0006'));
 });
+
+
+test('batch blocks all outputs when one QIF or OFX bank file uses contradictory money signs',()=>{
+ const valid='!Type:Bank\nD11/04/2026\nT-2.00\nPValid synthetic bank\n^\n';
+ const invalid=[
+  {name:'invalid.qif',text:'!Type:Bank\nD11/05/2026\nT(-12.34)\nPPrivate customer\n^\n'},
+  {name:'invalid.ofx',text:'<OFX><STMTTRN><DTPOSTED>20261105<TRNAMT>(-$12.34)<NAME>Private customer</STMTTRN></OFX>'}
+ ];
+ for(const file of invalid){
+  try{batchConvert([{name:'valid.qif',text:valid},file],{target:'csv'});
+   assert.fail('Expected all-or-nothing invalid source rejection');
+  }catch(error){
+   if(error.code==='ERR_ASSERTION')throw error;
+   assert.match(error.message,/Batch file 2:.*Conflicting amount signs/);
+   assert.ok(!error.message.includes('Private customer'));
+   assert.ok(!error.message.includes('valid.qif'));
+  }
+ }
+});
+test('batch retains unambiguous parenthesized negatives with signed totals and complete ZIP',()=>{
+ const negative='!Type:Bank\nD11/05/2026\nT($12.34)\nPValid debit\nN001\n^\n';
+ const positive='!Type:Bank\nD11/05/2026\nT12.34\nPValid credit\nN002\n^\n';
+ const result=batchConvert([{name:'debit.qif',text:negative},{name:'credit.qif',text:positive}],{target:'csv'});
+ assert.equal(result.report.totalTransactions,2);
+ assert.deepEqual(result.report.files.map(x=>x.net),['-12.34','12.34']);
+ assert.equal(result.report.totalFiles,2);
+ assert.equal(result.report.files[0].rows,1);
+ assert.equal(result.report.files[1].rows,1);
+ assert.equal(result.archive[0],80);
+ assert.equal(result.archive[1],75);
+});
