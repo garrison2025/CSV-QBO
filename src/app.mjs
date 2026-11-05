@@ -81,6 +81,8 @@ if(drop && fileInput){
     for(const key of ['count','net','debit','credit'])$('#summary-'+key).textContent='0';
     const statement=$('#statement-coverage');
     if(statement){statement.hidden=true;statement.textContent='';}
+    const balance=$('#balance-coverage');
+    if(balance){balance.hidden=true;balance.textContent='';}
     $('#warning-ack-label').hidden=true;
     $('#warning-ack').checked=false;
     const report=$('#download-report');
@@ -225,6 +227,19 @@ if(drop && fileInput){
       statement.hidden=!hasWindow;
       if(hasWindow)statement.textContent='Bank retrieval period: '+start+' to '+end+' (end exclusive; OFX bank search window, not a guarantee of posted-date coverage). '+outside+' transaction(s) posted outside the displayed dates; no rows were removed.';
       else statement.textContent='';
+    }
+    const balance=$('#balance-coverage'),bankBalance=data.integrity?.balanceReview;
+    if(balance){
+      balance.hidden=!bankBalance;
+      if(bankBalance){
+        const ledger=bankBalance.ledgerBalancePresent?
+          'declared (as of '+bankBalance.ledgerAsOfDate+')':'not provided';
+        const available=bankBalance.availableBalancePresent?
+          'declared (as of '+bankBalance.availableAsOfDate+')':'not provided';
+        balance.textContent='Bank-reported balances: ledger '+ledger+'; available '+available+
+          '. Balance amounts were checked locally but not stored in the validation report. '+
+          'NOT reconciled to the exported transactions: an independently verified opening balance and complete bank posting history are unavailable.';
+      }else balance.textContent='';
     }
     $('#warning-list').replaceChildren();for(const note of [...data.warnings,...audit.warnings]){const li=document.createElement('li');li.textContent=note;$('#warning-list').append(li);}
     $('#warning-box').hidden=!(data.warnings.length+audit.warnings.length);
