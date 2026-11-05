@@ -10,7 +10,9 @@ import {isDeepStrictEqual} from 'node:util';
 import {isoDate,toMinorUnits,fromMinorUnits,validateQuickBooksCSVParts} from '../src/core.mjs';
 
 function insist(ok,reason){if(!ok)throw Error(reason);}
-const td=new TextDecoder('utf-8',{fatal:true});
+// Preserve a leading UTF-8 BOM: QuickBooks CSV part byte counts include it.
+// TextDecoder's default strips BOM, which would hide three original bytes.
+const td=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
 const crcTable=Uint32Array.from({length:256},(_,index)=>{
   let n=index;
   for(let i=0;i<8;i++)n=(n>>>1)^(0xedb88320&-(n&1));
