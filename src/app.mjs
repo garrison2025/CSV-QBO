@@ -15,12 +15,20 @@ if(drop && fileInput){
   function setButton(on){const btn=$('#export-button');btn.disabled=!on;btn.setAttribute('aria-disabled',String(!on));}
   function updateMapping(headers){
     table=headers;const guess=guessMapping(headers);
+    // Distinguish identically named columns in manual selectors. The bank's
+    // source headings remain unchanged; positions are one-based UI labels.
+    const normalized=headers.map(x=>String(x??'').trim().toLowerCase().replace(/[_-]+/g,' '));
+    const labelCounts=new Map();
+    for(const name of normalized)if(name)labelCounts.set(name,(labelCounts.get(name)||0)+1);
     let stored=null;try{stored=JSON.parse(localStorage.getItem('finance-file-lab:column-mapping:v1')||'null');}catch{}
     const saved=stored&&JSON.stringify(stored.headers)===JSON.stringify(headers)?stored.mapping:null;
     for(const field of ['date','description','amount','debit','credit','id','memo']){
       const el=$('#map-'+field);if(!el)continue;
       el.replaceChildren();el.add(new Option('— Not selected —','-1'));
-      headers.forEach((name,i)=>el.add(new Option(name,String(i))));
+      headers.forEach((name,i)=>{
+        const label=labelCounts.get(normalized[i])>1?name+' (column '+(i+1)+')':name;
+        el.add(new Option(label,String(i)));
+      });
       el.value=String(saved?.[field]??guess[field]??-1);
     }
     $('#mapping-panel').hidden=false;
@@ -392,7 +400,7 @@ if(drop && fileInput){
   $('#download-report')?.addEventListener('click',()=>{
     if(!parsed||!audit)return;
     const dates=parsed.transactions.map(transaction=>transaction.date).sort();
-    const report={reportType:'Finance File Lab local validation summary v3',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,dateReview:parsed.dateReview||null,outputIsLedger:false,csvEscapedDescriptionCount:audit.csvFormulaGuardCount,zeroAmountReviewCount:audit.zeroAmountCount,largeAmountReviewCount:audit.largeAmountCount,requiresUserWarningAcknowledgement:(parsed.warnings.length+audit.warnings.length)>0,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
+    const report={reportType:'Finance File Lab local validation summary v3',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,dateReview:parsed.dateReview||null,headerReview:parsed.headerReview||null,outputIsLedger:false,csvEscapedDescriptionCount:audit.csvFormulaGuardCount,zeroAmountReviewCount:audit.zeroAmountCount,largeAmountReviewCount:audit.largeAmountCount,requiresUserWarningAcknowledgement:(parsed.warnings.length+audit.warnings.length)>0,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json;charset=utf-8'});
     saveBlob(blob,'validation-summary.json');
     say('Validation summary downloaded (no account numbers or transaction descriptions).','success');
