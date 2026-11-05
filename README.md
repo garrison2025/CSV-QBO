@@ -1,3 +1,12 @@
+## V2.8 — local reconciliation of actual bank source and downloaded output (2026-11-05)
+
+- Added `scripts/uat-local-check.mjs`: a local-only preflight comparing **two separate files** (original bank export and actual downloaded output), without uploading either to a server.
+- Supports QBO/QFX/OFX/QIF/IIF → generic CSV, CSV → QuickBooks Online 3-column CSV (single output), and CSV → QIF. Exactly compares supported rows, order, dates, cents and representable text, and privately fingerprints both file bytes with SHA-256.
+- Rejects missing explicit CSV mappings, data/sign/row mismatches, lost Memo fields in generic CSV, and unsupported XLSX/multi-part files. Independent bank balances can be supplied but are never guessed.
+- Produces an intentionally UNAPPROVED private UAT draft. This is **not** evidence of an actual bank-issued file or a QuickBooks/Quicken import; human review of the genuine original and manual import remain mandatory.
+- Instructions: [docs/REAL-BANK-UAT.md](docs/REAL-BANK-UAT.md) and [manifest example](docs/local-preflight-manifest.example.json). Bank files, private manifest, hash, aggregate figures, and screenshots must be outside the Git repository.
+- Actual real-bank acceptance and QuickBooks target imports remain **0**. Preview site continues noindex; no Web Connect .qbo writer, IIF writer, payments, or expensive API.
+
 ## V2.7 — real-bank and QuickBooks import acceptance evidence (2026-11-05)
 
 - Added the documented real-bank UAT and QuickBooks Online/Quicken test procedure in [docs/REAL-BANK-UAT.md](docs/REAL-BANK-UAT.md). This is a **manual, private-first** evidence requirement, not another claim of simulated compatibility.
