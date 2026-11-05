@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright-core';
+import {externalSamples} from './external-bank-fixtures.mjs';
 const dist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 const mime={'.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml'};
 const server=createServer(async(req,res)=>{
@@ -552,6 +553,40 @@ try{
  console.log('PASS Chrome duplicate review locates source rows on distant pages and keeps download acknowledgement gate');
 
 
+
+
+ // Independently authored external fictional bank dialects, not bank-certified
+ // records. Exercise the deployed DOM input -> preview -> actual download path.
+ for(const sample of externalSamples){
+   await page.goto(base+'/tools/'+(sample.input==='qif'?'qif-to-csv':'quickbooks-csv-formatter')+'/');
+   await page.locator('#file-input').setInputFiles(file(sample.source.split('/').pop(),sample.text));
+   if(sample.input==='csv'){
+     await page.locator('#mapping-panel').waitFor({state:'visible'});
+     // Selecting the same source explicitly avoids any guessed Payee/Memo
+     // crossover on bank formats like Wells Fargo where Payee is blank.
+     for(const field of ['date','description','amount','debit','credit','id','memo']){
+       await page.locator('#map-'+field).selectOption(String(sample.mapping[field]));
+     }
+   }
+   await page.locator('#preview-button').click();
+   const count=await page.locator('#summary-count').textContent();
+   const net=await page.locator('#summary-net').textContent();
+   assert.equal(count.trim(),String(sample.count),'browser source row count for '+sample.name);
+   assert.equal(net.replaceAll(',','').trim(),sample.net,'browser signed-cent total for '+sample.name);
+   if(sample.input==='qif'&&await page.locator('#include-memo').isVisible()){
+     await page.locator('#include-memo').check();
+   }
+   if(await page.locator('#warning-ack-label').isVisible()){
+     await page.locator('#warning-ack').check();
+   }
+   assert.equal(await page.locator('#export-button').isEnabled(),true,'browser export enabled for '+sample.name);
+   const sampleDownload=await dl('#export-button');
+   const exported=sampleDownload.content.toString('utf8').replace(/^\uFEFF/,'');
+   const rowCount=exported.split(/\r?\n/).filter(Boolean).length-1;
+   assert.equal(rowCount,sample.count,'download records for '+sample.name);
+   assert.match(exported,/Date|date/);
+ }
+ console.log('PASS Chrome seven independently-authored fictional bank-format inputs, previews, exact signed totals and downloads');
 
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
