@@ -61,8 +61,8 @@ test('QIF export comparison checks every date, signed cents, payee and reference
   assert.equal(v.target_import_observed,false);
   assert.throws(()=>reconcileLocalPair({route_slug:'csv-to-qif',source_bytes:bytes(srcCSV),output_bytes:bytes(good.replace('PBooks','PNot books')),mapping}),/QIF field\/order mismatch/);
 });
-test('rejects formats not implemented in the independent local verifier and wrong date setting',()=>{
-  assert.throws(()=>reconcileLocalPair({route_slug:'qbo-to-excel',source_bytes:bytes(srcQIF),output_bytes:bytes(qbOutput)}),/XLSX requires separate independent inspection/);
+test('rejects mismatched source format and wrong date setting',()=>{
+  assert.throws(()=>reconcileLocalPair({route_slug:'qbo-to-excel',source_bytes:bytes(srcQIF),output_bytes:bytes(qbOutput)}),/No bank STMTTRN entries found/);
   assert.throws(()=>reconcileLocalPair({route_slug:'csv-to-qbo',source_bytes:bytes(srcCSV),output_bytes:bytes(qbOutput),mapping}),/Unsupported UAT route/);
   assert.throws(()=>reconcileLocalPair({route_slug:'quickbooks-csv-formatter',source_bytes:bytes(srcCSV),output_bytes:bytes(qbOutput),mapping,date_format:'invalid'}),/explicit source date/);
 });
