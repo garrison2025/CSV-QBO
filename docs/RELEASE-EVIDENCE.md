@@ -290,3 +290,11 @@
 - The validator scans the all-row column fill summary in memory and retains counts, not source transaction strings, for the mapping hint. Advice disappears as soon as mappings change or a different file is opened; a fresh preview is mandatory before exporting.
 - CSV headers with multiple Transaction/Posted Date choices now show a date review warning. Summary labels no longer assert that positive charges mean money in; they refer to signed positive/negative totals.
 - Independently sourced mock shapes and real Chrome upload/preview/download tests are technical evidence only: genuine bank UAT = **0**; actual QuickBooks imports = **0**.
+
+## V2.13 — CSV date/amount preflight validation (2026-11-05)
+
+- Added non-guessing CSV date-risk detection for numeric dates valid and different in both US and day-first orders. The chosen date order is honored exactly, an aggregate risk count is shown, and downloadable file export is gated behind explicit warning acknowledgment. Changing date order resets preview and export authorization.
+- Corrected silent financial zero: blank Debit + Credit cells in a populated transaction row now reject rather than produce 0.00. Explicit 0.00 is not discarded but is flagged for review.
+- An absolute transaction amount at least USD 1,000,000 is flagged for review rather than automatically changed or rejected. This threshold is a review aid only, not currency conversion, a statutory limit or evidence of transaction error.
+- Aggregate date/zero/high-amount risk counts are recorded in local validation reports; QuickBooks split-output manifest retains aggregate zero and high-value counts. Tests cover US/EU dates, browser download acknowledgment, actual serialized cents, manual date selection and refusal of blank split amounts.
+- **Authentic bank issuer file evidence: 0. Observed QuickBooks imports: 0.** No new claims of bank certification or target import success.
