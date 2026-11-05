@@ -91,6 +91,10 @@ for(const site of cases){
      const d=downloads[0],file=await readFile(await d.path());
      p.fileDownloaded=true;p.sizeBytes=file.length;p.sha256=hash(file);
      p.downloadExt=d.suggestedFilename().split('.').pop()?.toLowerCase();
+     if(site.id==='sonomir'&&file.length<5000&&p.downloadExt==='qbo'){
+       await writeFile('sonomir-fictional-competitor.qbo',file);
+       console.log('SONOMIR_SYNTHETIC_QBO_BASE64 '+file.toString('base64'));
+     }
      if(file.length>5_000_000){p.status='unexpected_large_public_output';}
      else{
        try{
