@@ -822,7 +822,7 @@ try{
  assert.deepEqual(balanceReport.parserIntegrity.balanceReview,{
    ledgerBalancePresent:true,availableBalancePresent:true,
    ledgerAsOfDate:'2026-11-05',availableAsOfDate:'2026-11-05',
-   independentReconciliationPerformed:false
+   independentReconciliationPerformed:false,statementScoped:true
  });
  for(const secret of ['98765.43','76543.21','PRIVATE-SOURCE-REF-123'])
    assert.ok(!JSON.stringify(balanceReport).includes(secret));
@@ -839,6 +839,31 @@ try{
  assert.equal(await page.locator('#download-report').isDisabled(),true);
  assert.ok(!(await page.locator('#work-status').textContent()).includes('98765.43'));
  console.log('PASS Chrome OFX bank balances checked, privacy-safe as-of summary, no fake reconciliation and malformed duplicate rejected');
+
+ const unrelatedBalance=syntheticBalanceOFX.replace(
+   '</BANKTRANLIST><LEDGERBAL>',
+   '</BANKTRANLIST></STMTRS><LEDGERBAL>')
+   .replace('</AVAILBAL></STMTRS>','</AVAILBAL>');
+ await page.locator('#file-input').setInputFiles(file('unrelated-ledger.ofx',unrelatedBalance));
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('balance metadata appears outside'));
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#balance-coverage').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('98765.43'));
+ const postedLaterOFX=syntheticBalanceOFX.replace(
+   '<DTPOSTED>20261104','<DTPOSTED>20261107');
+ await page.locator('#file-input').setInputFiles(file('balance-posted-later.ofx',postedLaterOFX));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.match(await page.locator('#balance-coverage').textContent(),/1 posted transaction\(s\) occur AFTER the ledger balance date/);
+ assert.match(await page.locator('#warning-list').textContent(),/posting dates later than the ledger balance as-of date/);
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-12.50');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const futureReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.equal(futureReport.parserIntegrity.postedAfterLedgerAsOfCount,1);
+ assert.equal(futureReport.parserIntegrity.balanceReview.statementScoped,true);
+ console.log('PASS Chrome blocks orphan ledger data and warns on post-ledger transactions without changing original cents');
+
 
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});

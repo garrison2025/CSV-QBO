@@ -230,14 +230,18 @@ if(drop && fileInput){
     }
     const balance=$('#balance-coverage'),bankBalance=data.integrity?.balanceReview;
     if(balance){
-      balance.hidden=!bankBalance;
-      if(bankBalance){
+      const hasBalances=Boolean(bankBalance?.ledgerBalancePresent||bankBalance?.availableBalancePresent);
+      balance.hidden=!hasBalances;
+      if(hasBalances){
         const ledger=bankBalance.ledgerBalancePresent?
           'declared (as of '+bankBalance.ledgerAsOfDate+')':'not provided';
         const available=bankBalance.availableBalancePresent?
           'declared (as of '+bankBalance.availableAsOfDate+')':'not provided';
-        balance.textContent='Bank-reported balances: ledger '+ledger+'; available '+available+
-          '. Balance amounts were checked locally but not stored in the validation report. '+
+        const later=data.integrity?.postedAfterLedgerAsOfCount||0;
+        balance.textContent='Bank-reported balances within this statement: ledger '+ledger+'; available '+available+
+          '. Structure checked: '+(bankBalance.statementScoped?'yes':'no balance elements')+'. '+
+          (later?later+' posted transaction(s) occur AFTER the ledger balance date. ':'')+
+          'Balance amounts were checked locally but not stored in the validation report. '+
           'NOT reconciled to the exported transactions: an independently verified opening balance and complete bank posting history are unavailable.';
       }else balance.textContent='';
     }

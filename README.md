@@ -1,3 +1,11 @@
+## V2.17 — balance-to-statement provenance checks and date diagnostics (2026-11-05)
+
+- OFX `LEDGERBAL`/`AVAILBAL` elements are now accepted **only when they structurally belong to one complete `STMTRS` or `CCSTMTRS` response that contains its own complete `BANKTRANLIST`**. Balance blocks outside the account response, in unrelated top-level markup, in a missing/incomplete response, or incorrectly nested inside `BANKTRANLIST` now reject the entire source instead of being falsely attributed to the transactions being exported.
+- The report contains `balanceReview.statementScoped` (a structural validation boolean, *not* bank identity authentication). Original bank balance values are still neither retained nor included in local JSON/ZIP summaries.
+- When bank-supplied transaction posting dates fall **after** the reported ledger `DTASOF` calendar date, `postedAfterLedgerAsOfCount` and a dedicated user-facing warning disclose the mismatch. This is a **review observation only**, not proof of error, and signed amounts/record order are preserved. Bank retrieval windows and posted dates can differ legitimately.
+- Empty balance metadata produces no redundant balance callout. Changing the input clears all previous balance status, preview and export authorization. Tests cover synthetic orphan/misnested/nested SGML/XML data, later postings and real Chrome flow.
+- **Important:** valid bank balance metadata, bank account structural context and user acknowledgment do not prove original bank-issued file authenticity, complete posting history, independent reconciliation or downstream QuickBooks acceptance. Those UAT counts remain zero. SEO remains noindex until real validation and an approved domain.
+
 ## V2.16 — bank-reported OFX balances as unverified metadata (2026-11-05)
 
 - OFX/QBO/QFX read-only import now explicitly inspects optional `LEDGERBAL` (ledger balance) and `AVAILBAL` (available balance) aggregates in both OFX 1.x SGML and OFX 2.x XML, validating their `BALAMT` as exact signed USD cents and their `DTASOF` as a real calendar date. Empty fields, duplicate/truncated balance blocks, impossible dates or malformed amounts **block** the whole source instead of silently discarding malformed financial metadata.
