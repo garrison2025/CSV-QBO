@@ -262,3 +262,11 @@
 - XLSX and multi-part QuickBooks CSV validation through this CLI are currently unsupported and clearly rejected; regular browser converter features unchanged.
 - Real-bank variants verified: **0**. Actual QuickBooks target imports verified: **0**. Existing synthetic checks are separate.
 - CI and Cloudflare Pages evidence should be verified per merged commit; this tool has no bank-file network calls.
+
+## V2.9 — target import environment correction and SEO release hard block (2026-11-05)
+
+- Intuit developer Sandbox FAQ explicitly states Sandbox companies **cannot import or export data**; do not count sandbox API tests as manual bank CSV acceptance. Test Drive demos are not reliable manual-import evidence. Use an authorized upload-capable trial/test company and manual import receipt, or mark NOT RUN.
+- Original bank-source samples reviewed: **0**. Actual QuickBooks bank CSV import receipts reviewed: **0**. No compatibility claim upgraded.
+- SEO publish mode now requires custom HTTPS domain, explicit owner approval per route, corresponding privacy-reviewed real-bank read UAT case and KD<=29. Without approvals, even PUBLISH_SEO=true stays noindex/robots-disallow with no sitemap.
+- The technical gate cannot verify the truth of human observations and does not constitute bank or Intuit certification. Browser and synthetic CI tests remain separate evidence classes.
+- Official source: https://static.developer.intuit.com/output_html/qbo/docs/develop/sandboxes/sandbox-faqs.html; import instructions: https://quickbooks.intuit.com/learn-support/en-us/help-article/import-transactions/manually-upload-transactions-quickbooks-online/L0rE9OXBz_US_en_US
