@@ -66,26 +66,42 @@ export function isoDate(input, format='us') {
   return [String(nY).padStart(4,'0'), String(nM).padStart(2,'0'), String(nD).padStart(2,'0')].join('-');
 }
 
-export function parseCSV(text, delimiter) {
-  const s = String(text ?? '').replace(/^\uFEFF/, '');
-  if(s.includes('\u0000'))fail('CSV contains null bytes or an unsupported text encoding.');
-  if (delimiter == null) {
-    // Count separators in the first logical record only, excluding quoted fields.
+export function parseCSV(text, delimiter, {manualDelimiter=false}={}) {
+  const original = String(text ?? '').replace(/^\uFEFF/, '');
+  if(original.includes('\u0000'))fail('CSV contains null bytes or an unsupported text encoding.');
+  if(delimiter!=null&&![',',';','\t'].includes(delimiter))fail('Unsupported CSV delimiter.');
+  // Only the exact first physical line "sep=," / "sep=;" / "sep=<TAB>"
+  // is an Excel delimiter directive. Do not skip blank records, arbitrary
+  // bank preambles, transaction rows, or text containing "sep=" elsewhere.
+  const directive=original.match(/^sep=([,;\t])(?:\r\n|\n|\r|$)/i);
+  const declared=directive?.[1]||null;
+  if(declared&&delimiter!=null&&delimiter!==declared)
+    fail('CSV first-line sep= delimiter declaration conflicts with the selected delimiter. Choose Automatic or the declared separator.');
+  let s=directive?original.slice(directive[0].length):original;
+  let line=directive?2:1, recordLine=line;
+  if(declared)delimiter=declared;
+  if(delimiter == null) {
+    // Count separators in the header's first logical record only, ignoring
+    // quoted commas, semicolons, tabs and embedded quoted newlines.
     const counts = {',': 0, ';': 0, '\t': 0};
     let inQuotes = false;
-    for (let i = 0; i < s.length; i++) {
-      const c = s[i];
-      if (c === '"') {
-        if (inQuotes && s[i + 1] === '"') { i++; continue; }
-        inQuotes = !inQuotes;
-      } else if (!inQuotes && (c === '\n' || c === '\r')) break;
-      else if (!inQuotes && Object.hasOwn(counts, c)) counts[c]++;
+    for(let i=0;i<s.length;i++){
+      const c=s[i];
+      if(c==='"'){
+        if(inQuotes&&s[i+1]==='"'){i++;continue;}
+        inQuotes=!inQuotes;
+      }else if(!inQuotes&&(c==='\n'||c==='\r'))break;
+      else if(!inQuotes&&Object.hasOwn(counts,c))counts[c]++;
     }
-    delimiter = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+    const peak=Math.max(...Object.values(counts));
+    if(!peak)fail('CSV header contains no supported separator. Choose Comma, Semicolon or Tab explicitly, or fix the file.');
+    const winners=Object.keys(counts).filter(key=>counts[key]===peak);
+    if(winners.length!==1)
+      fail('CSV header has ambiguous separators. Choose Comma, Semicolon or Tab explicitly; no rows were exported.');
+    delimiter=winners[0];
   }
-  if (![',', ';', '\t'].includes(delimiter)) fail('Unsupported CSV delimiter.');
-  const records = [];
-  let row = [], cell = '', quoted = false, closed = false, line = 1, recordLine = 1;
+  const records=[];
+  let row=[],cell='',quoted=false,closed=false;
   const commit = () => {
     row.push(cell);
     if (row.some(value => value.trim() !== '')) records.push({fields: row, line: recordLine});
@@ -119,10 +135,13 @@ export function parseCSV(text, delimiter) {
       fail('CSV line ' + record.line + ': expected ' + width + ' columns, found ' + record.fields.length + '. Fix the source file before converting.');
     }
   }
-  return records.map(record => {
-    // Non-enumerable physical start line: used for diagnostics only. Quoted
-    // newlines and skipped blank records must not move financial row values.
+  return records.map((record,i) => {
+    // Non-enumerable source metadata does not become exported bank data.
     Object.defineProperty(record.fields,'sourceLine',{value:record.line,enumerable:false});
+    if(i===0)Object.defineProperty(record.fields,'sourceDialect',{
+      value:{delimiter,excelSepDirective:Boolean(declared),manualDelimiterSelected:Boolean(manualDelimiter)},
+      enumerable:false
+    });
     return record.fields;
   });
 }
@@ -302,6 +321,7 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
     fail('CSV row '+(i+1)+': expected '+rows[0].length+' columns, found '+(Array.isArray(rows[i])?rows[i].length:'invalid')+'. Fix the source row before previewing.');
   const guesses=guessMapping(rows[0]);
   const headerReview=csvHeaderReview(rows[0]);
+  const sourceDialect=rows[0].sourceDialect||null;
   const map={...guesses,...mapping};
   if (map.date<0 || map.description<0) fail('Choose Date and Description columns.');
   if (map.amount<0 && (map.debit<0 || map.credit<0)) fail('Choose Amount or both Debit and Credit columns.');
@@ -347,6 +367,10 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   }
   if(!transactions.length) fail('No transactions found.');
   const warnings=[];
+  if(sourceDialect?.excelSepDirective)
+    warnings.push('Excel sep= delimiter instruction on source line 1 was recognized (not a transaction). The bank CSV header starts at physical line 2. No transaction rows were skipped.');
+  if(sourceDialect?.manualDelimiterSelected)
+    warnings.push('CSV delimiter was explicitly selected as '+({',':'comma',';':'semicolon','\t':'tab'}[sourceDialect.delimiter])+'. Verify the source column mapping and exact signed amounts before exporting; no automatic delimiter correction was made.');
   if(headerReview.duplicateHeaderLabels)
     warnings.push('CSV source has '+headerReview.duplicateHeaderLabels+' repeated nonempty column label(s). In the mapping selectors, choose by COLUMN POSITION; identically named columns may hold different financial values. No mapping was automatically corrected.');
   if(headerReview.amountCandidates>1)
@@ -358,7 +382,7 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
     warnings.push(ambiguousDateRows+' of '+transactions.length+' numeric date(s) are valid but DIFFERENT in US and day-first order. '+
       'The '+selected+' selection was applied exactly as chosen; confirm the original bank date order before downloading. No date order was guessed.');
   }
-  return {transactions,warnings,source:'CSV',headerReview,dateReview:{ambiguousDateRows,selectedDateFormat:dateFormat}};
+  return {transactions,warnings,source:'CSV',headerReview,sourceDialect,dateReview:{ambiguousDateRows,selectedDateFormat:dateFormat}};
 }
 
 /**
@@ -898,7 +922,13 @@ export function parseIIF(text,dateFormat='us'){
 export function parseInput(text,format,opts={}) {
   if(String(text).length>MAX_FILE_BYTES)fail('File exceeds the 8 MB browser processing limit.');
   const f=String(format).replace(/^\./,'').toLowerCase();
-  if(f==='csv'||f==='tsv')return csvTransactions(typeof text==='string'?parseCSV(text,f==='tsv'?'\t':undefined):text,opts.mapping,opts.dateFormat||'us');
+  if(f==='csv'||f==='tsv'){
+    const selected=opts.delimiter??'auto';
+    const choices={auto:null,comma:',',semicolon:';',tab:'\t'};
+    if(!Object.hasOwn(choices,selected))fail('Unsupported CSV delimiter choice.');
+    const separator=selected==='auto'?(f==='tsv'?'\t':undefined):choices[selected];
+    return csvTransactions(typeof text==='string'?parseCSV(text,separator,{manualDelimiter:selected!=='auto'}):text,opts.mapping,opts.dateFormat||'us');
+  }
   if(f==='qif')return parseQIF(text,opts.dateFormat||'us');
   if(['qbo','qfx','ofx'].includes(f))return parseOFX(text);
   if(f==='iif')return parseIIF(text,opts.dateFormat||'us');

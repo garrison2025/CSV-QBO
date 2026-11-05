@@ -1,3 +1,13 @@
+## V2.20 — exact Excel sep= declarations and explicit CSV/TSV delimiter control (2026-11-05)
+
+- Bank/Excel CSV exports may begin with an exact first physical line such as `sep=;`, `sep=,` or `sep=<TAB>`. The reader now recognizes **only that exact directive at the start** (after an optional UTF BOM), selects the declared comma/semicolon/tab delimiter, and excludes the directive itself from transaction rows. Header and transaction **physical source-line numbers remain correct**. Arbitrary introductory account notes, blank rows, other preamble text and subsequent `sep=` lines are not automatically skipped.
+- Previously the CSV parser selected the maximum separator count in the first logical header and chose comma on ties. Such ambiguous headers now **fail closed** and ask the user to choose the actual separator rather than guessing and possibly shifting money columns.
+- A new **CSV/TSV column separator** selector offers Automatic, Comma, Semicolon and Tab. For .tsv, Automatic continues to mean tab. Explicit choices that contradict a real first-line `sep=` declaration are rejected before any transaction is exported. Manually selected separators add a mandatory preview warning and acknowledgment.
+- Any separator change re-reads the original file locally and resets mapping, old preview, previous report-download authorization and warning acknowledgment. Validation summaries include only the delimiter enum and two booleans (declaration present, manually selected) — never transaction text, account details or user bank filenames.
+- Existing exact-cents validation, fail-closed ragged rows, column ambiguities and on-device Windows-1252 selection still apply. This does **not** introduce arbitrary bank-report header stripping or claim real bank compatibility.
+- New synthetic Node tests cover Excel directives for all three delimiters, CR/LF/CRLF, TSV defaults, signed cents, source-line offsets, quoted commas, wrong delimiter refusal, tied headers, hidden transaction risks and private report metadata. Real Chrome acceptance covers upload → parse → acknowledge → download → reselect → refusal/review.
+- Authentic bank export validation count remains **0**, actual QuickBooks import validations remain **0**. SEO preview is `noindex,nofollow`; no official domain has been purchased.
+
 ## V2.19 — manually selected Windows-1252 for legacy bank CSV / TSV (2026-11-05)
 
 - CSV/TSV uploads now offer an explicit **CSV/TSV character encoding** selector: `Automatic (UTF-8 or UTF BOM)` by default, or `Windows-1252` when the user knows a bank export is legacy-encoded. The default never guesses Windows-1252 after UTF-8 fails. QBO/QFX/OFX retain their existing declared-charset behavior; QIF and IIF remain unchanged.
