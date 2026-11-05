@@ -478,6 +478,11 @@ export function decodeFinancialBytes(input,format='',opts={}){
   let text;
   try{text=new TextDecoder(encoding,{fatal:true}).decode(bytes);}
   catch{fail('Cannot decode '+encoding+' financial file safely. '+(csv&&csvEncoding==='auto'?'If your legacy bank CSV uses Windows-1252, choose that encoding manually and retry.':'Re-export as UTF-8 before retrying.'));}
+  // WHATWG Windows-1252 preserves five undefined bytes as C1 controls
+  // (U+0081/U+008D/U+008F/U+0090/U+009D), even with fatal:true. Their
+  // appearance in bank CSV is not a trusted character conversion.
+  if(encoding==='windows-1252'&&/[\u0081\u008d\u008f\u0090\u009d]/.test(text))
+    fail('Legacy Windows-1252 file has undefined control byte values. Re-export as UTF-8 before converting.');
   if(text.includes('\uFFFD'))fail('File contains undecodable replacement characters. Re-export in a supported encoding.');
   if(text.includes('\u0000'))fail('Unsupported null byte in financial file.');
   return {text,encoding};
