@@ -66,20 +66,6 @@ jobs:
           command -v google-chrome
           npm install --no-save --no-package-lock playwright-core@1.55.0
           npm run test:browser
-      - name: One-time live Chrome verification of original V3 AccountingConverter and DocuClipper
-        if: github.head_ref == 'verify/original-v3-competitors-20261105'
-        run: node scripts/probe-original-v3-competitors.mjs
-      - name: Save original-competitor evidence and screenshots
-        if: github.head_ref == 'verify/original-v3-competitors-20261105'
-        uses: actions/upload-artifact@v4
-        with:
-          name: original-v3-competitor-20261105
-          path: |
-            original-competitor-20261105.json
-            original-competitor-accountingconverter.png
-            original-competitor-docuclipper.png
-          if-no-files-found: ignore
-          retention-days: 7
       - name: Upload synthetic browser failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
