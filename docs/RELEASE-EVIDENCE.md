@@ -253,3 +253,12 @@
 - Public compatibility page now derives its evidence ledger from the registry and refuses unsupported status claims; private originals, transaction aggregates, file hashes and screenshots must never be committed.
 - New CI validation checks the public registry schema and scope. The correct evidence claims remain **NOT TESTED**, even if CI/Chrome passes. Cloudflare Pages deployment of V2.7 requires verification after merge.
 - Open release blockers: real authorized bank exports, per-row private reconciliation, actual QuickBooks test-company import screenshots/row-cents confirmation and duplicate reimport observation, target-specific .qbo writing (not implemented).
+
+## V2.8 — real-file cross-file verification support, no bank acceptance claimed (2026-11-05)
+
+- Added private local CLI comparing the ACTUAL source bytes with the ACTUAL exported CSV/QIF bytes for supported directions; records SHA-256, row/date/text/order/exact cents validation, and redaction-safe reporting.
+- CSV input mappings are explicit and checked. Original-bank statement row-count/net-cent independent baseline is optional but, if supplied, must match; blank evidence never auto-promotes to PASS.
+- Draft is deliberately unapproved: manual source authenticity, ledger field preservation and downstream QuickBooks/Quicken test-company import are still required. Source records, amounts, original hashes and screenshots stay private.
+- XLSX and multi-part QuickBooks CSV validation through this CLI are currently unsupported and clearly rejected; regular browser converter features unchanged.
+- Real-bank variants verified: **0**. Actual QuickBooks target imports verified: **0**. Existing synthetic checks are separate.
+- CI and Cloudflare Pages evidence should be verified per merged commit; this tool has no bank-file network calls.
