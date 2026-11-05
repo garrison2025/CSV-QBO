@@ -20,6 +20,16 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V2.3 — optional independent Memo columns without changing QuickBooks three-column import
+
+- Previously the generic CSV and XLSX export default contained only Date, Description, signed Amount and Reference. For QIF/OFX bank sources that also contain **independent Memo details**, this meant those details were silently excluded even though the parser had preserved them in memory.
+- An **Include separate Memo column** checkbox now appears whenever the selected bank file has independent Memo values and the output is generic CSV or Excel. It is **off by default** to preserve the existing four-column output contract; when enabled, the exported file gains a fifth `memo` (CSV) or `Memo` (Excel) text column in source order. Excel Memo is inert inline text, not a formula; CSV Memo retains quotes and embedded line breaks and neutralizes spreadsheet-formula prefixes using the existing guard.
+- QIF/QBO/QFX/OFX inputs show Memo in the preview and search results; CSV users can optionally map a separate Memo/Notes column. Where the sole `Memo` header is already the fallback Description, the same physical column is never auto-mapped twice. Mapping to the same source column twice remains an error.
+- **QuickBooks Online CSV is unchanged and limited to exactly three columns** (Date, Description, Amount). If a source has independent Memo, the UI discloses that the QuickBooks upload will not contain it. No unsupported extra QBO field is introduced, and no real application import is claimed.
+- **QIF export** uses M records for separate Memo from a mapped CSV source; multiline or control-character M values still fail closed per V1.9 rather than being silently flattened.
+- Batch CSV/Excel ZIP generation includes its own opt-in Memo checkbox, privacy-safe per-file/aggregate Memo presence and omission counts, and a warning/acknowledgement gate if a four-column batch would omit Memo. Changing the batch preference invalidates previously generated ZIP and requires file re-selection; source accounts remain separate.
+- Test coverage: source mapping, whitespace/quoted multiline Memo preservation, CSV injection prevention, true numeric Excel cents with optional E column, QIF Memo M records, QuickBooks three-column contract, ZIP omission counts, reset and source change. Real Chrome acceptance checks actual file downloads and UI disclosure. No paid services or server-side bank uploads; preview remains `noindex,nofollow`.
+
 ## V2.2 — correct OFX 2.x XML mixed-content and entity validation
 
 - Fixed real source-to-export text-integrity hazards in OFX/QBO/QFX: XML leaf fields can contain **ordinary XML text, `<![CDATA[...]]>` segments, and XML comments in arbitrary order**. The old extractor could silently drop text after CDATA or leave comment markup inside a payee/memo. The new reader concatenates literal text and CDATA, omits comments and preserves the resulting merchant/reference/memo string without rewriting amounts or record order.
