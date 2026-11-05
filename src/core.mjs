@@ -260,6 +260,22 @@ export function csvHeaderReview(header){
     requiresReview:duplicateHeaderLabels>0||countAliases('date')>1||countAliases('amount')>1
   };
 }
+// Currency columns are source evidence, not user-selectable transaction
+// fields: ignoring an unmapped Currency column could silently re-label EUR,
+// GBP or other transaction amounts as USD. These are intentionally narrow,
+// recognizable labels; unknown bank dialects still need issuer-specific UAT.
+const CSV_CURRENCY_HEADERS=new Set([
+  'currency','currency code','iso currency','iso currency code','currency iso code',
+  'currency (iso)','ccy','curr','transaction currency','transaction currency code',
+  'original currency','original currency code','settlement currency',
+  'settlement currency code','account currency','payment currency','booking currency'
+]);
+function currencyColumnIndices(header){
+  return header.flatMap((v,i)=>{
+    const name=String(v??'').trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+    return CSV_CURRENCY_HEADERS.has(name)?[i]:[];
+  });
+}
 export function guessMapping(header) {
   const lowered=header.map(x=>String(x).trim().toLowerCase().replace(/[_-]+/g,' '));
   const guessed=Object.fromEntries(Object.entries(FIELD_SYNONYMS).map(([field,choices])=>[field, choices.map(c=>lowered.indexOf(c)).find(index=>index>=0) ?? -1]));
@@ -322,6 +338,8 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   const guesses=guessMapping(rows[0]);
   const headerReview=csvHeaderReview(rows[0]);
   const sourceDialect=rows[0].sourceDialect||null;
+  const currencyColumns=currencyColumnIndices(rows[0]);
+  let currencyCheckedRows=0;
   const map={...guesses,...mapping};
   if (map.date<0 || map.description<0) fail('Choose Date and Description columns.');
   if (map.amount<0 && (map.debit<0 || map.credit<0)) fail('Choose Amount or both Debit and Credit columns.');
@@ -346,6 +364,15 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
     const getRaw=key=>map[key]>=0?String(r[map[key]]??''):'';
     const get=key=>getRaw(key).trim();
     try {
+      // Check every recognized standalone Currency column, regardless of
+      // mapping selection. Exact USD is the only valid currency declaration.
+      // Do not echo raw source currency text, which may contain private data.
+      for(const index of currencyColumns){
+        const declared=String(r[index]??'').trim().toUpperCase();
+        if(!declared)fail('A recognized Currency column is blank. Verify the bank file currency before converting; only explicit USD is supported.');
+        if(declared!=='USD')fail('Non-USD or unsupported code in a recognized Currency column. Only USD is supported; no currency conversion is performed.');
+      }
+      if(currencyColumns.length)currencyCheckedRows++;
       if(map.amount<0&&!get('debit')&&!get('credit'))fail('Debit and Credit are both blank. A dated row with no amount cannot be converted into a zero transaction.');
       const credit=map.credit>=0?toMinorUnits(get('credit')||'0'):0n;
       const debit=map.debit>=0?toMinorUnits(get('debit')||'0'):0n;
@@ -366,7 +393,19 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
     }
   }
   if(!transactions.length) fail('No transactions found.');
+  const currencyReview={
+    recognizedCurrencyColumnCount:currencyColumns.length,
+    checkedTransactionRows:currencyCheckedRows,
+    allRecognizedCurrencyCellsUSD:currencyColumns.length>0,
+    currencyConversionPerformed:false
+  };
   const warnings=[];
+  if(currencyColumns.length)
+    warnings.push('All '+currencyCheckedRows+' transaction row(s) in '+currencyColumns.length+' recognized CSV Currency column(s) explicitly declare USD. Bank authenticity, account currency and foreign-exchange history are NOT independently verified. No currency conversion was performed.');
+  // Without a recognized currency column, the UI visibly describes the
+  // unverified scope but does not add an otherwise-unactionable warning to
+  // every ordinary CSV upload. The user remains responsible for confirming
+  // that the source is USD; no bank certification is claimed.
   if(sourceDialect?.excelSepDirective)
     warnings.push('Excel sep= delimiter instruction on source line 1 was recognized (not a transaction). The bank CSV header starts at physical line 2. No transaction rows were skipped.');
   if(sourceDialect?.manualDelimiterSelected)
@@ -382,7 +421,7 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
     warnings.push(ambiguousDateRows+' of '+transactions.length+' numeric date(s) are valid but DIFFERENT in US and day-first order. '+
       'The '+selected+' selection was applied exactly as chosen; confirm the original bank date order before downloading. No date order was guessed.');
   }
-  return {transactions,warnings,source:'CSV',headerReview,sourceDialect,dateReview:{ambiguousDateRows,selectedDateFormat:dateFormat}};
+  return {transactions,warnings,source:'CSV',headerReview,sourceDialect,currencyReview,dateReview:{ambiguousDateRows,selectedDateFormat:dateFormat}};
 }
 
 /**
