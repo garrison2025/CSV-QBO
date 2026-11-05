@@ -796,6 +796,50 @@ try{
  assert.ok(!(await page.locator('#work-status').textContent()).includes('PRIVATE-ACCOUNT-02'));
  console.log('PASS Chrome rejects multiple account identity declarations under one statement response');
 
+ // Bank balances are not synonymous with transaction sums. Display only
+ // bank-declared metadata presence and as-of dates, never publish balances
+ // or claim closing-ledger reconciliation without a verified opening balance.
+ await page.goto(base+'/tools/ofx-to-csv/');
+ const syntheticBalanceOFX='OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\n'+
+   '<OFX><STMTRS><CURDEF>USD<BANKTRANLIST><DTSTART>20261101<DTEND>20261201'+
+   '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261104<TRNAMT>-12.50'+
+   '<FITID>PRIVATE-SOURCE-REF-123<NAME>Bookstore</STMTTRN>'+
+   '</BANKTRANLIST><LEDGERBAL><BALAMT>98765.43<DTASOF>20261105010101[-5:EST]</LEDGERBAL>'+
+   '<AVAILBAL><BALAMT>76543.21<DTASOF>20261105010101[-5:EST]</AVAILBAL></STMTRS></OFX>';
+ await page.locator('#file-input').setInputFiles(file('private-ledger.ofx',syntheticBalanceOFX));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#balance-coverage').isVisible(),true);
+ const visibleBalanceNote=await page.locator('#balance-coverage').textContent();
+ assert.match(visibleBalanceNote,/ledger declared \(as of 2026-11-05\)/);
+ assert.match(visibleBalanceNote,/available declared \(as of 2026-11-05\)/);
+ assert.match(visibleBalanceNote,/NOT reconciled/);
+ assert.ok(!visibleBalanceNote.includes('98765.43'));
+ assert.ok(!visibleBalanceNote.includes('76543.21'));
+ assert.equal(await page.locator('#summary-net').textContent(),'-12.50');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.match(await page.locator('#warning-list').textContent(),/NOT independently reconciled/);
+ const balanceReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.deepEqual(balanceReport.parserIntegrity.balanceReview,{
+   ledgerBalancePresent:true,availableBalancePresent:true,
+   ledgerAsOfDate:'2026-11-05',availableAsOfDate:'2026-11-05',
+   independentReconciliationPerformed:false
+ });
+ for(const secret of ['98765.43','76543.21','PRIVATE-SOURCE-REF-123'])
+   assert.ok(!JSON.stringify(balanceReport).includes(secret));
+ await page.locator('#warning-ack').check();
+ const balanceConverted=(await dl('#export-button')).content.toString('utf8');
+ assert.match(balanceConverted,/Bookstore,-12\.50/);
+ const malformedBalanceOFX=syntheticBalanceOFX.replace('</BANKTRANLIST><LEDGERBAL>',
+   '</BANKTRANLIST><LEDGERBAL><BALAMT>10.00<DTASOF>20261105</LEDGERBAL><LEDGERBAL>');
+ await page.locator('#file-input').setInputFiles(file('duplicate-ledger.ofx',malformedBalanceOFX));
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('balance groups'));
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#balance-coverage').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('98765.43'));
+ console.log('PASS Chrome OFX bank balances checked, privacy-safe as-of summary, no fake reconciliation and malformed duplicate rejected');
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
