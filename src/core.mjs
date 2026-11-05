@@ -449,13 +449,23 @@ export function parseQIF(text, dateFormat='us') {
 }
 
 /** Decode bank files locally. OFX 1.x frequently declares the Windows-1252 code page. */
-export function decodeFinancialBytes(input,format=''){
+export function decodeFinancialBytes(input,format='',opts={}){
   const bytes=input instanceof Uint8Array?input:new Uint8Array(input);
   if(bytes.byteLength>MAX_FILE_BYTES)fail('File exceeds the 8 MB browser processing limit.');
+  const csv=['csv','tsv'].includes(String(format).toLowerCase());
+  const csvEncoding=opts?.csvEncoding??'auto';
+  if(!['auto','windows-1252'].includes(csvEncoding))fail('Unsupported CSV character encoding selection.');
+  if(!csv&&csvEncoding!=='auto')fail('Manual Windows-1252 encoding is only supported for CSV/TSV.');
+  const hasBOM=(bytes[0]===0xff&&bytes[1]===0xfe)||
+    (bytes[0]===0xfe&&bytes[1]===0xff)||
+    (bytes[0]===0xef&&bytes[1]===0xbb&&bytes[2]===0xbf);
+  if(csvEncoding==='windows-1252'&&hasBOM)
+    fail('CSV has an explicit UTF byte-order mark. Select Automatic encoding to preserve the declared character encoding.');
   let encoding='utf-8';
   if(bytes[0]===0xff&&bytes[1]===0xfe)encoding='utf-16le';
   else if(bytes[0]===0xfe&&bytes[1]===0xff)encoding='utf-16be';
   else if(bytes[0]===0xef&&bytes[1]===0xbb&&bytes[2]===0xbf)encoding='utf-8';
+  else if(csv&&csvEncoding==='windows-1252')encoding='windows-1252';
   else if(['ofx','qbo','qfx'].includes(String(format).toLowerCase())){
     const header=new TextDecoder('windows-1252').decode(bytes.subarray(0,Math.min(bytes.length,4096))).split(/<OFX\b/i)[0];
     if(/^\s*OFXHEADER\s*:/im.test(header)){
@@ -467,7 +477,7 @@ export function decodeFinancialBytes(input,format=''){
   }
   let text;
   try{text=new TextDecoder(encoding,{fatal:true}).decode(bytes);}
-  catch{fail('Cannot decode '+encoding+' financial file safely. Export as UTF-8 before retrying.');}
+  catch{fail('Cannot decode '+encoding+' financial file safely. '+(csv&&csvEncoding==='auto'?'If your legacy bank CSV uses Windows-1252, choose that encoding manually and retry.':'Re-export as UTF-8 before retrying.'));}
   if(text.includes('\uFFFD'))fail('File contains undecodable replacement characters. Re-export in a supported encoding.');
   if(text.includes('\u0000'))fail('Unsupported null byte in financial file.');
   return {text,encoding};
