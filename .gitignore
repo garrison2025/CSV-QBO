@@ -5,3 +5,8 @@ dist/
 .env.*
 !.env.example
 .DS_Store
+
+# Do not commit private real-bank files, QuickBooks screenshots, or full UAT reports
+private/
+uat-private/
+*.bank-original
