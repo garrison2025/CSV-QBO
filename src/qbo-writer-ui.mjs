@@ -3,6 +3,7 @@ import {decodeFinancialBytes,parseCSV,guessMapping,parseInput,toMinorUnits,MAX_F
 import {readReferenceQBO,writeWebConnectQBO} from './qbo-writer.mjs';
 
 const el=id=>document.getElementById(id);
+const formatNet=cents=>{const n=BigInt(cents),a=n<0n?-n:n;return(n<0n?'-':'')+String(a/100n)+'.'+String(a%100n).padStart(2,'0');};
 const inputCSV=el('lab-csv'),reference=el('lab-reference'),preview=el('lab-preview'),download=el('lab-download');
 let csvText='',csvHeaders=[],epoch=0,generated=null;
 const report=(message,kind='info')=>{el('lab-status').textContent=message;el('lab-status').dataset.kind=kind;};
@@ -84,7 +85,7 @@ preview.addEventListener('click',async()=>{
      }
      rows.appendChild(tr);
    }
-   el('lab-result-summary').textContent=output.report.transactionCount+' transaction(s), net '+(Number(output.report.netCents)/100).toFixed(2)+' USD; '+output.wire.length+' ASCII bytes generated. First '+Math.min(25,back.length)+' rows previewed (all rows written and checked).';
+   el('lab-result-summary').textContent=output.report.transactionCount+' transaction(s), net '+formatNet(output.report.netCents)+' USD; '+output.wire.length+' ASCII bytes generated. First '+Math.min(25,back.length)+' rows previewed (all rows written and checked).';
    const notes=[...parsed.warnings,...audit.warnings,
      'QBO institution metadata was copied from your local reference; bank authenticity and account matching are NOT independently verified.',
      'No real QuickBooks Desktop/Online import test has been performed. Syntax-only output.'];
@@ -105,3 +106,11 @@ download.addEventListener('click',()=>{
  report('Experimental QBO saved locally. Syntax and row reconciliation passed; QuickBooks import has NOT been tested.','success');
 });
 updatePreviewAvailability();
+
+el('lab-clear').addEventListener('click',()=>{
+ invalidate();csvText='';csvHeaders=[];inputCSV.value='';reference.value='';
+ for(const select of document.querySelectorAll('[data-map]'))select.replaceChildren();
+ el('lab-mapping-tip').textContent='Choose a CSV to load its column names.';
+ report('Local workspace cleared. Previously downloaded files remain on your device.');
+ updatePreviewAvailability();
+});
