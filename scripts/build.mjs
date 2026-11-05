@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import {summarizeRegistry} from './uat-evidence.mjs';
+import {assessProductionRelease} from './production-gate.mjs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -8,9 +9,11 @@ const tools=JSON.parse(fs.readFileSync(path.join(root,'data/tools.json'),'utf8')
 const uatRegistry=JSON.parse(fs.readFileSync(path.join(root,'data/uat-public.json'),'utf8'));
 const uatStats=summarizeRegistry(uatRegistry);
 const site=(process.env.SITE_URL||'').replace(/\/$/,'');
-const origin=site?new URL(site):null;
-const production=process.env.PUBLISH_SEO==='true'&&origin?.protocol==='https:'&&!origin.hostname.endsWith('.pages.dev')&&!['localhost','127.0.0.1'].includes(origin.hostname);
-const allowed=tool=>tool.release==='read_only_tested'&&tool.kd!==null&&tool.kd<=29;
+const releaseApproval=JSON.parse(fs.readFileSync(path.join(root,'data/production-release.json'),'utf8'));
+const releaseDecision=assessProductionRelease({approval:releaseApproval,registry:uatRegistry,tools,siteUrl:site,publishSeo:process.env.PUBLISH_SEO==='true'});
+const production=releaseDecision.production;
+const approvedToolSlugs=new Set(releaseDecision.routes);
+const allowed=tool=>approvedToolSlugs.has(tool.slug);
 fs.rmSync(dist,{recursive:true,force:true});fs.mkdirSync(dist,{recursive:true});
 function write(route,content){const output=route==='/'?'index.html':path.join(route.replace(/^\//,''),'index.html');const full=path.join(dist,output);fs.mkdirSync(path.dirname(full),{recursive:true});fs.writeFileSync(full,content);}
 function esc(t){return String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -98,5 +101,5 @@ fs.writeFileSync(path.join(dist,'favicon.svg'),'<svg xmlns="http://www.w3.org/20
 fs.writeFileSync(path.join(dist,'_headers'),'/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: DENY\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'; form-action \'self\'\n');
 if(production){const routes=['/','/formats/','/compatibility/','/about/',...tools.filter(allowed).map(t=>'/tools/'+t.slug+'/')];fs.writeFileSync(path.join(dist,'sitemap.xml'),'<?xml version="1.0" encoding="utf-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(r=>'<url><loc>'+esc(site+r)+'</loc></url>').join('')+'</urlset>');fs.writeFileSync(path.join(dist,'robots.txt'),'User-agent: *\nAllow: /\nSitemap: '+site+'/sitemap.xml\n');}else{fs.writeFileSync(path.join(dist,'robots.txt'),'User-agent: *\nDisallow: /\n');}
 fs.writeFileSync(path.join(dist,'compatibility-evidence.json'),JSON.stringify(uatRegistry,null,2));
-fs.writeFileSync(path.join(dist,'build-manifest.json'),JSON.stringify({releaseMode:production?'production':'preview-noindex',targetOrigin:production?site:null,realBankEvidenceCases:uatStats.total,targetApplicationImportEvidenceCases:uatStats.targetImports,tools:tools.map(t=>({route:'/tools/'+t.slug+'/',release:t.release,indexable:production&&allowed(t),keyword:t.keyword,volumeUS:t.volume,kd:t.kd})),publishedAt:new Date().toISOString()},null,2));
+fs.writeFileSync(path.join(dist,'build-manifest.json'),JSON.stringify({releaseMode:production?'production':'preview-noindex',targetOrigin:production?site:null,realBankEvidenceCases:uatStats.total,targetApplicationImportEvidenceCases:uatStats.targetImports,manualPublicationApproved:releaseApproval.approved,approvedIndexableRoutes:releaseDecision.routes,tools:tools.map(t=>({route:'/tools/'+t.slug+'/',release:t.release,indexable:production&&allowed(t),keyword:t.keyword,volumeUS:t.volume,kd:t.kd})),publishedAt:new Date().toISOString()},null,2));
 console.log('Generated',tools.length,'tool pages +',Object.keys(docs).length,'information pages; mode:',production?'production':'preview/noindex');
