@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V2.6 — reject contradictory accounting money signs rather than reverse cashflow
+
+- Fixed a shared financial-amount parser defect: `(-12.34)` or `(-$12.34)` previously canceled two negative indicators and silently became a **positive** transaction. This could reverse the debit/credit meaning in CSV, QIF, OFX/QBO/QFX or IIF conversions.
+- Only **one** negative convention is permitted per value: an ordinary leading minus (`-12.34`, `-$1,234.50`) **or** accounting parentheses (`(12.34)`, `($1,234.50)`). Existing positive values, leading `+` and recognized $-prefix formatting remain supported; contradictory combinations such as `(-12.34)`, `($-12.34)`, `-+12.34` and `$-12.34` now fail closed rather than being silently normalized.
+- The checks run through the shared exact signed-integer-cent parser, across all supported bank formats and batch files. A single malformed source blocks its download or the whole batch ZIP, without exposing merchant names or transaction references in the new sign-error text.
+- Synthetic Node regressions cover valid parenthesized debits, malformed signs across CSV/QIF/OFX/IIF, and all-or-nothing batch archives. Chrome E2E verifies a normal parenthesized debit downloads as a negative CSV amount and a mixed-sign QIF file disables previous preview/download.
+- All 12 converter pages disclose this rule; financial data stays in the browser, no paid APIs, no invented currency exchange and no external QuickBooks acceptance claims. `csv-qbo.pages.dev` remains a `noindex,nofollow` technical preview.
+
 ## V2.5 — exact IIF field-width and dual-amount reconciliation
 
 - **Fixed silent extra-field loss:** the IIF reader previously matched `TRNS`/`SPL` fields by the declared `!TRNS`/`!SPL` headers but silently ignored any extra tab-separated cells. The reader now rejects any transaction-row field count that differs from its declared header (including unexpectedly short rows), as well as `ENDTRNS` lines with additional cells. Empty/duplicate header names also fail closed.
