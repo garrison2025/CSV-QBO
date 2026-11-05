@@ -46,19 +46,6 @@ jobs:
           command -v google-chrome
           npm install --no-save --no-package-lock playwright-core@1.55.0
           npm run test:browser
-      - name: One-time external AccountingConverter synthetic Web Connect differential probe
-        if: github.head_ref == 'test/accountingconverter-differential-20261105'
-        run: node scripts/probe-accountingconverter-compare.mjs
-      - name: Archive competitor public synthetic probe result and screenshot
-        if: github.head_ref == 'test/accountingconverter-differential-20261105'
-        uses: actions/upload-artifact@v4
-        with:
-          name: accountingconverter-synthetic-differential
-          path: |
-            competitor-synthetic-probe.json
-            competitor-synthetic-probe.png
-          if-no-files-found: ignore
-          retention-days: 7
       - name: Upload synthetic browser failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
