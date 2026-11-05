@@ -285,6 +285,8 @@ if(drop && fileInput){
     file=chosen;table=null;csvEvidence=null;fileText='';fileExt='';fileEncoding='utf-8';$('#mapping-panel').hidden=true;$('#file-name').textContent='';
     const encodingChoice=$('#encoding-choice');
     if(encodingChoice)encodingChoice.hidden=!chosen||!['csv','tsv'].includes((chosen.name.split('.').pop()||'').toLowerCase());
+    const delimiterChoice=$('#delimiter-choice');
+    if(delimiterChoice)delimiterChoice.hidden=!chosen||!['csv','tsv'].includes((chosen.name.split('.').pop()||'').toLowerCase());
     updateMappingAdvice();
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
@@ -299,7 +301,10 @@ if(drop && fileInput){
       const {text,encoding}=decoded;
       fileText=text;fileExt=ext;fileEncoding=encoding;
       if(ext==='csv'||ext==='tsv'){
-        const csvRows=parseCSV(text,ext==='tsv'?'\t':undefined);
+        const choices={auto:null,comma:',',semicolon:';',tab:'\t'};
+        const selected=$('#source-delimiter')?.value||'auto';
+        const sep=selected==='auto'?(ext==='tsv'?'\t':undefined):choices[selected];
+        const csvRows=parseCSV(text,sep,{manualDelimiter:selected!=='auto'});
         csvEvidence=csvColumnEvidence(csvRows);
         updateMapping(csvRows[0]);
         say((encoding==='windows-1252'?'Windows-1252 selected manually. Verify all accented names and transaction values. ':'')+'Select column mappings, then choose Preview transactions.');
@@ -309,6 +314,13 @@ if(drop && fileInput){
   // Encoding changes must re-read the ORIGINAL bytes (not re-encode stale
   // decoded strings), clear mapping and invalidate any accepted preview.
   $('#source-encoding')?.addEventListener('change',()=>{
+    if(!file){invalidatePreview();return;}
+    if(!['csv','tsv'].includes((file.name.split('.').pop()||'').toLowerCase()))return;
+    prepare(file);
+  });
+  // The delimiter changes what each source field means. Re-read the original
+  // file and invalidate all prior preview, mapping and download permissions.
+  $('#source-delimiter')?.addEventListener('change',()=>{
     if(!file){invalidatePreview();return;}
     if(!['csv','tsv'].includes((file.name.split('.').pop()||'').toLowerCase()))return;
     prepare(file);
@@ -393,6 +405,8 @@ if(drop && fileInput){
     invalidatePreview();
     file=null;table=null;csvEvidence=null;fileText='';fileExt='';fileEncoding='utf-8';
     if($('#source-encoding'))$('#source-encoding').value='auto';
+    if($('#source-delimiter'))$('#source-delimiter').value='auto';
+    if($('#delimiter-choice'))$('#delimiter-choice').hidden=source==='any';
     if($('#encoding-choice'))$('#encoding-choice').hidden=source==='any';
     updateMappingAdvice();
     fileInput.value='';
@@ -412,7 +426,7 @@ if(drop && fileInput){
   $('#download-report')?.addEventListener('click',()=>{
     if(!parsed||!audit)return;
     const dates=parsed.transactions.map(transaction=>transaction.date).sort();
-    const report={reportType:'Finance File Lab local validation summary v3',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,dateReview:parsed.dateReview||null,headerReview:parsed.headerReview||null,outputIsLedger:false,csvEscapedDescriptionCount:audit.csvFormulaGuardCount,zeroAmountReviewCount:audit.zeroAmountCount,largeAmountReviewCount:audit.largeAmountCount,requiresUserWarningAcknowledgement:(parsed.warnings.length+audit.warnings.length)>0,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
+    const report={reportType:'Finance File Lab local validation summary v3',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,dateReview:parsed.dateReview||null,headerReview:parsed.headerReview||null,sourceDialect:parsed.sourceDialect||null,outputIsLedger:false,csvEscapedDescriptionCount:audit.csvFormulaGuardCount,zeroAmountReviewCount:audit.zeroAmountCount,largeAmountReviewCount:audit.largeAmountCount,requiresUserWarningAcknowledgement:(parsed.warnings.length+audit.warnings.length)>0,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json;charset=utf-8'});
     saveBlob(blob,'validation-summary.json');
     say('Validation summary downloaded (no account numbers or transaction descriptions).','success');
@@ -421,7 +435,7 @@ if(drop && fileInput){
     if(!file||!fileText)return;
     invalidatePreview();
     try{
-      const next=withEncodingWarning(parseInput(fileText,fileExt,{mapping:mapping(),dateFormat:$('#date-format').value}),fileEncoding);
+      const next=withEncodingWarning(parseInput(fileText,fileExt,{mapping:mapping(),dateFormat:$('#date-format').value,delimiter:$('#source-delimiter')?.value||'auto'}),fileEncoding);
       parsed=next;
       renderResult(next);
     }catch(err){
