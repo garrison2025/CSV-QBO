@@ -389,3 +389,9 @@
 - Changed owner-reviewed production release gate to accept independently verified competitor evidence for these read-only routes without claiming actual Intuit software import. No corresponding competitor evidence for QIF, IIF, OFX or QFX reading routes, or QuickBooks CSV formatter target acceptance. No outgoing Web Connect QBO writer exists.
 - Site remains preview noindex on pages.dev. CI checks simulated custom-domain production only for the two approved QBO readers. No actual custom domain, bank-source original or target QuickBooks account. Official QBO import UAT count **0**.
 - Full disclosure and competing-site inconclusive results: [COMPETITOR-READ-ACCEPTANCE-20261105.md](./COMPETITOR-READ-ACCEPTANCE-20261105.md).
+
+## 2026-11-05 — actual-original-competitor re-verification
+
+- Original V3 competitor test: [run 41987344999](https://github.com/garrison2025/CSV-QBO/actions/runs/41987344999), using two deliberately fictional USD CSV rows. AccountingConverter page loaded, selected the CSV, then reported **Forbidden**, with several own-origin API endpoints returning **403**; downloaded .qbo = **none**. DocuClipper landing's public Convert CTA navigated to `/signup/`; actual no-login QBO conversion could not be reached; downloaded .qbo = **none**. Neither outcome is evidence of incorrect QuickBooks output or provider instability outside the observed environment.
+- Detailed source-to-website evidence, scope limits and artifact link: [ORIGINAL-V3-COMPETITOR-ACTUAL-VERIFICATION-20261105.md](./ORIGINAL-V3-COMPETITOR-ACTUAL-VERIFICATION-20261105.md).
+- Critically, the site's P0 CSV→Web Connect .qbo function remains **unimplemented**. Third-party Sonomir file reception and our QBO→CSV/XLSX reader checks do **not** provide output parity with either original V3 competitor. Authentic issuer UAT=0, observed actual Intuit target imports=0. No SEO or product-release approval change.
