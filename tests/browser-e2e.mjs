@@ -463,6 +463,7 @@ try{
  await page.locator('#mapping-panel').waitFor({state:'visible'});
  await page.locator('#preview-button').click();
  assert.equal(await page.locator('#preview-panel').isVisible(),true);
+ if(await page.locator('#warning-ack-label').isVisible())await page.locator('#warning-ack').check();
  await page.locator('#export-button').click();
  assert.equal(await page.locator('#work-status').getAttribute('data-state'),'error');
  const errorText=await page.locator('#work-status').textContent();
