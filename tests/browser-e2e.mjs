@@ -1047,6 +1047,65 @@ try{
  assert.equal(await page.locator('#download-report').isDisabled(),true);
  console.log('PASS Chrome tied CSV delimiter requires manual selection, no guessed transactions, clear resets state');
 
+ // Explicit CSV Currency is required to be USD on every source row,
+ // even when that column was never manually mapped for the accounting output.
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const usdBankCSV='Date,Description,Amount,Currency,Reference\n'+
+   '2026-11-04,Private coffee,-12.50,USD,00000123\n'+
+   '2026-11-05,Private refund,20.75, usd ,00000124\n';
+ await page.locator('#file-input').setInputFiles(file('usd-bank.csv',usdBankCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'2');
+ assert.equal(await page.locator('#summary-net').textContent(),'8.25');
+ assert.match(await page.locator('#currency-coverage').textContent(),/1 recognized currency column/);
+ assert.match(await page.locator('#warning-list').textContent(),/explicitly declare USD/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const usdValidation=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.deepEqual(usdValidation.currencyReview,{
+   recognizedCurrencyColumnCount:1,checkedTransactionRows:2,
+   allRecognizedCurrencyCellsUSD:true,currencyConversionPerformed:false
+ });
+ for(const privateValue of ['Private coffee','Private refund','00000123','00000124'])
+   assert.ok(!JSON.stringify(usdValidation).includes(privateValue));
+ await page.locator('#warning-ack').check();
+ const usdExport=(await dl('#export-button')).content.toString('utf8');
+ assert.match(usdExport,/Private coffee,-12\.50/);
+ assert.match(usdExport,/Private refund,20\.75/);
+
+ // An incompatible Currency cell cannot be ignored by mapping choices.
+ const fxCSV=usdBankCSV.replace('Private refund,20.75, usd ',
+   'Private refund,20.75,EUR');
+ await page.locator('#file-input').setInputFiles(file('foreign-bank.csv',fxCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ const fxStatus=await page.locator('#work-status').textContent();
+ assert.match(fxStatus,/Non-USD or unsupported code/);
+ assert.match(fxStatus,/CSV row 3/);
+ assert.ok(!fxStatus.includes('EUR'));
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#currency-coverage').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ assert.equal(await page.locator('#warning-ack').isChecked(),false);
+
+ // When there is no recognized currency column, do NOT claim that USD has
+ // been verified. The user must acknowledge the uncertainty.
+ const unknownCSV='Date,Description,Amount\n2026-11-04,No currency supplied,-1.01\n';
+ await page.locator('#file-input').setInputFiles(file('unverified-currency.csv',unknownCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-net').textContent(),'-1.01');
+ assert.match(await page.locator('#currency-coverage').textContent(),/No recognized CSV currency column/);
+ assert.match(await page.locator('#warning-list').textContent(),/no recognized Currency column/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const unknownReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.equal(unknownReport.currencyReview.allRecognizedCurrencyCellsUSD,false);
+ assert.equal(unknownReport.currencyReview.checkedTransactionRows,0);
+ await page.locator('#warning-ack').check();
+ assert.match((await dl('#export-button')).content.toString('utf8'),/No currency supplied,-1\.01/);
+ console.log('PASS Chrome USD currency-column preflight, non-USD whole-file refusal, unknown-currency warning and private JSON');
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
