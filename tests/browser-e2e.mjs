@@ -711,6 +711,41 @@ try{
  assert.match(amountWire,/Large credit,1000000\.00/);
  console.log('PASS Chrome refuses missing debit/credit and flags actual zero/million-dollar amounts without data mutation');
 
+
+ // A corrected/deleted OFX record is an instruction against earlier bank
+ // history, not a new ordinary purchase. The real Chrome flow must fail
+ // closed, clear the previous preview, and not disclose a historical FITID.
+ await page.goto(base+'/tools/qbo-to-csv/');
+ const correctionQBO='OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\n'+
+   '<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>USD<BANKTRANLIST>'+
+   '<DTSTART>20261101<DTEND>20261130<STMTTRN><TRNTYPE>DEBIT'+
+   '<DTPOSTED>20261104120000[-5:EST]<TRNAMT>-20.00'+
+   '<FITID>FAKE-NEW<ID>nonnumeric<NAME>Sample correction'+
+   '<CORRECTFITID>PRIVATE-HISTORICAL-BANK-REF<CORRECTACTION>DELETE'+
+   '</STMTTRN></BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>';
+ await page.locator('#file-input').setInputFiles(file('correction.qbo',correctionQBO));
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.match(await page.locator('#work-status').textContent(),/correction action detected/);
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('PRIVATE-HISTORICAL-BANK-REF'));
+ console.log('PASS Chrome blocks OFX DELETE correction without exposing historical bank references');
+
+ const conflictingQBO='OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\n'+
+   '<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>USD<BANKTRANLIST>'+
+   '<DTSTART>20261101<DTEND>20261130<STMTTRN><TRNTYPE>DEBIT'+
+   '<DTPOSTED>20261104235959[-5:EST]<TRNAMT>20.00'+
+   '<FITID>SYNTHETIC-ID-1<NAME>Positive amount labeled DEBIT'+
+   '</STMTTRN></BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>';
+ await page.locator('#file-input').setInputFiles(file('contradictory.qbo',conflictingQBO));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.match(await page.locator('#warning-list').textContent(),/DEBIT\/CREDIT types that disagree/);
+ assert.equal(await page.locator('#summary-net').textContent(),'20.00');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#warning-ack').check();
+ const contraryOut=(await dl('#export-button')).content.toString('utf8');
+ assert.match(contraryOut,/Positive amount labeled DEBIT,20\.00/);
+ console.log('PASS Chrome warns on contradictory OFX debit sign but preserves source signed cents');
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
