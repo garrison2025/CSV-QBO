@@ -1,3 +1,7 @@
+## 2026-11-05 independent Intuit published-spec audit and external UAT gate
+
+The latest published Intuit QuickBooks Online CSV field/size/upload rules and its **sandbox no-import/no-export** restriction were independently checked and documented in [official import UAT blocker audit](docs/INTUIT-REAL-IMPORT-UAT-BLOCKERS-20261105.md). This is source-backed **public-spec review, not actual QuickBooks CSV upload**. Authentic issuer original file count remains **0**; observed QuickBooks imports **0**; noindex is unchanged. A real QBO test company and bank issuer originals must be authorized before any acceptance is recorded.
+
 ## V2.21 — prevent silent non-USD conversion when bank CSV declares currency separately (2026-11-05)
 
 - Closed a financial correctness gap: previously, a bank CSV with a numeric `Amount` and an independent `Currency` field could produce a USD-formatted QuickBooks CSV **even when the source transaction declared EUR, GBP or another currency**. Checking only currency symbols inside the amount string cannot catch that case.
