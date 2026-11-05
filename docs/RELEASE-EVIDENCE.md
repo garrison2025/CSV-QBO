@@ -208,3 +208,14 @@
 - Added regression tests for exact Unicode/CDATA/escaped text reconstruction, XML entity errors, source-to-CSV consistency and Chrome valid/invalid OFX uploads.
 - Six OFX/QFX/QBO converter pages disclose limitations; no real-bank acceptance or QuickBooks import certification has been performed. Preview remains noindex.
 - GitHub/Cloudflare release evidence must be verified after merge.
+
+## V2.3 — explicit Memo retention and compatible opt-in CSV/Excel exports (2026-11-05)
+
+- Optional CSV source Memo/Notes mapping avoids assigning the same physical source column to both Description and Memo. Multiline quoted and whitespace-sensitive Memo text is preserved in browser memory.
+- Generic CSV and XLSX opt-in `Memo` column defaults off to preserve four-column contract; QIF M record remains supported. Excel stores Memo as inert inline text, formula-looking CSV text is guarded.
+- QuickBooks Online export explicitly stays three columns and discloses independent Memo omission, rather than silently introducing an incompatible fourth bank-import column.
+- Single-file preview and search expose Memo, show row count with separate Memo, and state clearly whether it will be included or omitted; clearing/changing a source resets memo selection.
+- Batch option regenerates ZIP upon preference change, counts Memo-bearing rows and omitted rows in privacy-minimized JSON, requires warning acknowledgement on omission, and preserves account separation.
+- Node core/UI/batch/build and real Chrome E2E cover mapping, quote/newline values, memo output opt-in, malicious formula-like strings, warning/review reset and actual CSV/XLSX/ZIP downloads.
+- QuickBooks target-app acceptance and real-bank provider dialects remain NOT TESTED; technical preview remains noindex and no paid APIs are used.
+- CI/Cloudflare release evidence must be verified independently after merge.

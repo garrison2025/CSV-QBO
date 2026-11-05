@@ -301,3 +301,64 @@ test('source changes and clear workspace discard local search terms, match count
  assert.equal(get('preview-filter-status').textContent,'');
  assert.equal(get('preview-panel').hidden,true);
 });
+
+
+test('optional CSV Memo mapping is shown in preview and explicit omission note changes on opt-in',async()=>{
+ await clear();
+ get('target-format').value='csv';
+ const bank='Date,Description,Memo,Amount,Reference\n11/04/2026,Bookstore,Private second detail,-12.50,000123\n';
+ await load(bank);await preview();
+ assert.equal(get('map-description').value,'1');
+ assert.equal(get('map-memo').value,'2');
+ assert.equal(get('summary-count').textContent,'1');
+ assert.equal(get('preview-body').children[0].children.length,5);
+ assert.equal(get('preview-body').children[0].children[4].textContent,'Private second detail');
+ assert.equal(get('preview-memo-head').hidden,false);
+ assert.equal(get('memo-coverage').hidden,false);
+ assert.equal(get('memo-toggle-label').hidden,false);
+ assert.equal(get('include-memo').checked,false);
+ assert.match(get('memo-coverage').textContent,/default four-column CSV download EXCLUDES Memo/);
+ assert.equal(get('export-button').disabled,false);
+ get('include-memo').checked=true;
+ await get('include-memo').fire('change');
+ assert.match(get('memo-coverage').textContent,/additional Memo column WILL be included/);
+ assert.equal(get('export-button').disabled,false);
+ get('preview-search').value='Private second detail';
+ await get('preview-search').fire('input');
+ assert.equal(get('preview-body').children.length,1);
+ await setMapping('memo',-1);
+ assert.equal(get('memo-coverage').hidden,true);
+ assert.equal(get('include-memo').checked,false);
+ assert.equal(get('preview-body').children.length,0);
+ await preview();
+ assert.equal(get('memo-toggle-label').hidden,true);
+ assert.equal(get('preview-memo-head').hidden,true);
+ await clear();
+ get('target-format').value='qb-csv';
+});
+test('QuickBooks CSV keeps only three output columns and warns separately about mapped Memo',async()=>{
+ await clear();get('target-format').value='qb-csv';
+ await load('Date,Description,Memo,Amount,Reference\n11/04/2026,Shop,Separate note,-1.25,A1\n');
+ await preview();
+ assert.equal(get('memo-toggle-label').hidden,true);
+ assert.equal(get('memo-coverage').hidden,false);
+ assert.match(get('memo-coverage').textContent,/QuickBooks Online requires exactly three CSV columns/);
+ assert.match(get('memo-coverage').textContent,/will NOT be included/);
+ assert.equal(get('preview-body').children[0].children[4].textContent,'Separate note');
+ assert.equal(get('export-button').disabled,false);
+ await clear();
+});
+test('loading a new source clears prior optional Memo choice and private preview text',async()=>{
+ await clear();get('target-format').value='csv';
+ await load('Date,Description,Memo,Amount\n11/04/2026,A,Hidden note,2.00\n');await preview();
+ get('include-memo').checked=true;await get('include-memo').fire('change');
+ await load();
+ assert.equal(get('include-memo').checked,false);
+ assert.equal(get('memo-toggle-label').hidden,true);
+ assert.equal(get('memo-coverage').hidden,true);
+ assert.equal(get('memo-coverage').textContent,'');
+ assert.equal(get('preview-body').children.length,0);
+ await preview();
+ assert.equal(get('preview-memo-head').hidden,true);
+ await clear();get('target-format').value='qb-csv';
+});

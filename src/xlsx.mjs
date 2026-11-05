@@ -79,10 +79,11 @@ function zip(files){
   if(cursor!==output.byteLength)throw new Error('ZIP end-of-directory length mismatch.');
   return output;
 }
-export function toXLSX(transactions){
+export function toXLSX(transactions,{includeMemo=false}={}){
   if(!Array.isArray(transactions)||!transactions.length)throw new Error('No transactions to export.');
   if(transactions.length>1048575)throw new Error('Excel worksheet exceeds the 1,048,576-row limit.');
-  const header=['Date','Description','Amount','Reference'];
+  if(typeof includeMemo!=='boolean')throw new Error('Invalid Excel Memo export option.');
+  const header=['Date','Description','Amount','Reference',...(includeMemo?['Memo']:[])];
   const cells=['<row r="1">'+header.map((value,ci)=>{
     const address=String.fromCharCode(65+ci)+'1';
     return '<c r="'+address+'" t="inlineStr"><is><t>'+esc(value)+'</t></is></c>';
@@ -94,17 +95,18 @@ export function toXLSX(transactions){
     catch{throw new Error('Excel export transaction '+(i+1)+': invalid transaction date.');}
     try{amount=exactExcelAmount(t.amount);}
     catch{throw new Error('Excel export transaction '+(i+1)+': invalid amount or unsupported cent precision.');}
-    const description=String(t.description??''),reference=String(t.id??'');
+    const description=String(t.description??''),reference=String(t.id??''),memo=String(t.memo??'');
     if(!description.trim())throw new Error('Excel export transaction '+(i+1)+': Description is empty.');
     const textCell=(column,value)=>{
       try{return '<c r="'+column+row+'" t="inlineStr"><is><t xml:space="preserve">'+esc(value)+'</t></is></c>';}
-      catch{throw new Error('Excel export transaction '+(i+1)+': unsupported control character or invalid text in '+(column==='B'?'Description':'Reference')+'.');}
+      catch{throw new Error('Excel export transaction '+(i+1)+': unsupported control character or invalid text in '+({B:'Description',D:'Reference',E:'Memo'}[column]||'Text')+'.');}
     };
     cells.push('<row r="'+row+'">'+
       '<c r="A'+row+'" s="2"><v>'+serial+'</v></c>'+
       textCell('B',description)+
       '<c r="C'+row+'" s="1"><v>'+amount+'</v></c>'+
       textCell('D',reference)+
+      (includeMemo?textCell('E',memo):'')+
       '</row>');
   }
   const lastRow=transactions.length+1;
@@ -114,7 +116,7 @@ export function toXLSX(transactions){
     'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="0"/><sheets><sheet name="Transactions" sheetId="1" r:id="rId1"/></sheets></workbook>',
     'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
     'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" xfId="0"/><xf numFmtId="2" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>',
-    'xl/worksheets/sheet1.xml':'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:D'+lastRow+'"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="16" customWidth="1"/><col min="2" max="2" width="50" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="30" customWidth="1"/></cols><sheetData>'+cells.join('')+'</sheetData><autoFilter ref="A1:D'+lastRow+'"/></worksheet>'
+    'xl/worksheets/sheet1.xml':'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:'+ (includeMemo?'E':'D')+lastRow+'"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="1" width="16" customWidth="1"/><col min="2" max="2" width="50" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="30" customWidth="1"/>'+(includeMemo?'<col min="5" max="5" width="60" customWidth="1"/>':'')+'</cols><sheetData>'+cells.join('')+'</sheetData><autoFilter ref="A1:'+(includeMemo?'E':'D')+lastRow+'"/></worksheet>'
   };
   return zip(files);
 }

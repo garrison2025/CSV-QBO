@@ -17,7 +17,7 @@ if(drop && fileInput){
     table=headers;const guess=guessMapping(headers);
     let stored=null;try{stored=JSON.parse(localStorage.getItem('finance-file-lab:column-mapping:v1')||'null');}catch{}
     const saved=stored&&JSON.stringify(stored.headers)===JSON.stringify(headers)?stored.mapping:null;
-    for(const field of ['date','description','amount','debit','credit','id']){
+    for(const field of ['date','description','amount','debit','credit','id','memo']){
       const el=$('#map-'+field);if(!el)continue;
       el.replaceChildren();el.add(new Option('— Not selected —','-1'));
       headers.forEach((name,i)=>el.add(new Option(name,String(i))));
@@ -25,7 +25,7 @@ if(drop && fileInput){
     }
     $('#mapping-panel').hidden=false;
   }
-  function mapping(){return Object.fromEntries(['date','description','amount','debit','credit','id'].map(k=>[k,Number($('#map-'+k).value)]));}
+  function mapping(){return Object.fromEntries(['date','description','amount','debit','credit','id','memo'].map(k=>[k,Number($('#map-'+k).value)]));}
   // A preview is valid only for the file, date order and exact column
   // mapping used to create it. Never leave previously reviewed bank data
   // exportable after a user changes any of those inputs.
@@ -45,6 +45,11 @@ if(drop && fileInput){
     $('#preview-search').value='';
     $('#preview-only-flags').checked=false;
     $('#preview-filter-status').textContent='';
+    $('#include-memo').checked=false;
+    $('#memo-toggle-label').hidden=true;
+    $('#memo-coverage').hidden=true;
+    $('#memo-coverage').textContent='';
+    $('#preview-memo-head').hidden=true;
     for(const key of ['count','net','debit','credit'])$('#summary-'+key).textContent='0';
     const statement=$('#statement-coverage');
     if(statement){statement.hidden=true;statement.textContent='';}
@@ -64,12 +69,35 @@ if(drop && fileInput){
     for(let i=0;i<parsed.transactions.length;i++){
       if(flaggedOnly&&!flagged.has(i+1))continue;
       const item=parsed.transactions[i];
-      if(query&&![item.date,item.description,item.amount,item.id].some(
+      if(query&&![item.date,item.description,item.amount,item.id,item.memo].some(
         value=>String(value??'').toLowerCase().includes(query)))continue;
       matches.push(i);
     }
     return matches;
   }
+  function hasMemoValues(){
+    return Boolean(parsed?.transactions?.some(row=>String(row.memo??'').length>0));
+  }
+  function updateMemoCoverage(){
+    const box=$('#memo-coverage'),toggle=$('#memo-toggle-label');
+    if(!parsed?.transactions?.length){box.hidden=true;toggle.hidden=true;return;}
+    const count=parsed.transactions.reduce((n,row)=>n+(String(row.memo??'').length>0?1:0),0);
+    $('#preview-memo-head').hidden=count===0;
+    box.hidden=count===0;
+    const format=formatPicker?formatPicker.value:fixedOutput;
+    toggle.hidden=count===0||!['csv','xlsx'].includes(format);
+    if(!count)return;
+    const suffix=count+' of '+parsed.transactions.length+' source transaction(s) contain a separate Memo field. ';
+    if(format==='qb-csv')
+      box.textContent=suffix+'QuickBooks Online requires exactly three CSV columns: separate Memo values will NOT be included. Use a general CSV/Excel export if you need the separate Memo column.';
+    else if(format==='qif')
+      box.textContent=suffix+'QIF Bank export retains supported Memo values as M records; multiline values are rejected rather than changed.';
+    else if($('#include-memo').checked)
+      box.textContent=suffix+'The additional Memo column WILL be included in this '+(format==='xlsx'?'Excel':'CSV')+' download; verify that the receiving application accepts the extra column.';
+    else
+      box.textContent=suffix+'The default four-column '+(format==='xlsx'?'Excel':'CSV')+' download EXCLUDES Memo. Select the checkbox below to preserve the separate Memo column.';
+  }
+  $('#include-memo')?.addEventListener('change',()=>{if(parsed)updateMemoCoverage();});
   function renderPreviewPage(){
     if(!parsed?.transactions?.length||!audit)return;
     const records=parsed.transactions,total=records.length;
@@ -85,7 +113,7 @@ if(drop && fileInput){
       tr.setAttribute('data-row-number',String(rowNumber));
       tr.setAttribute('aria-label','Original source row '+rowNumber);
       if(flagged.has(rowNumber))tr.className='is-review-row';
-      for(const key of ['date','description','amount','id']){
+      for(const key of ['date','description','amount','id',...(hasMemoValues()?['memo']:[])]){
         const td=document.createElement('td');
         td.textContent=String(item[key]??'');
         if(key==='amount')td.className=String(item.amount).startsWith('-')?'negative':'positive';
@@ -154,6 +182,7 @@ if(drop && fileInput){
     previewPage=0;reviewCursor=0;
     reviewRows=[...new Set([...audit.duplicateIds,...audit.possibleDuplicates]
       .flatMap(pair=>[pair.firstRow,pair.row]))].sort((a,b)=>a-b);
+    updateMemoCoverage();
     renderPreviewPage();
     $('#preview-panel').hidden=false;$('#download-report').disabled=false;$('#summary-count').textContent=t.count.toLocaleString('en-US');$('#summary-net').textContent=t.net;$('#summary-debit').textContent=t.debit;
     $('#summary-credit').textContent=t.credit;
@@ -183,7 +212,7 @@ if(drop && fileInput){
     const warnings=parsed&&audit ? parsed.warnings.length+audit.warnings.length : 0;
     setButton(Boolean(parsed?.transactions?.length)&&(!warnings||$('#warning-ack').checked));
   });
-  for(const field of ['date','description','amount','debit','credit','id']){
+  for(const field of ['date','description','amount','debit','credit','id','memo']){
     $('#map-'+field)?.addEventListener('change',()=>{
       if(!file||!['csv','tsv'].includes(fileExt))return;
       invalidatePreview();
@@ -246,13 +275,15 @@ if(drop && fileInput){
     try{
       const texts=await Promise.all(batchFiles.map(async selected=>({name:selected.name,byteLength:selected.size,...decodeFinancialBytes(new Uint8Array(await selected.arrayBuffer()),selected.name.split('.').pop().toLowerCase())})));
       if(epoch!==batchEpoch)return;
-      batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value});
+      batchInfo=batchConvert(texts,{target,source,dateFormat:$('#date-format').value,includeMemo:$('#batch-include-memo')?.checked===true});
       batchArchive=batchInfo.archive;batchHasWarnings=batchInfo.warningCount>0;
       const iifGroups=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.balancedGroups||0),0);
       const statementWindows=batchInfo.report.files.filter(item=>item.parserIntegrity?.statementRange).length;
       const dateExceptions=batchInfo.report.files.reduce((sum,item)=>sum+(item.parserIntegrity?.postedBeforeRangeCount||0)+(item.parserIntegrity?.postedAfterRangeCount||0),0);
       const overlaps=batchInfo.report.crossFileReferenceMatches+batchInfo.report.crossFileFingerprintMatches;
-      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s).'+(iifGroups?' '+iifGroups+' balanced IIF group(s) checked.':'')+(statementWindows?' '+statementWindows+' OFX retrieval window(s) noted; '+dateExceptions+' posted-date exceptions (no rows removed).':'')+(overlaps?' '+overlaps+' cross-file possible match(es) flagged for review.':'')+' No accounts merged.');
+      const memoRows=batchInfo.report.memoRowsWithContent||0;
+      const memoText=memoRows?' '+memoRows+' source transaction(s) have separate Memo: '+(batchInfo.report.memoIncluded?'extra column included.':'default four-column batch files exclude Memo; tick the option above and reselect files to include it.') : '';
+      batchSay(batchInfo.report.totalFiles+' separate outputs ready · '+batchInfo.report.totalTransactions+' transactions · '+batchInfo.warningCount+' warning(s).'+(iifGroups?' '+iifGroups+' balanced IIF group(s) checked.':'')+(statementWindows?' '+statementWindows+' OFX retrieval window(s) noted; '+dateExceptions+' posted-date exceptions (no rows removed).':'')+(overlaps?' '+overlaps+' cross-file possible match(es) flagged for review.':'')+memoText+' No accounts merged.');
       if(batchHasWarnings){$('#batch-ack-label').hidden=false;batchExport.disabled=true;}
       else batchExport.disabled=false;
     }catch(err){if(epoch===batchEpoch){batchReset();batchSay(err.message||'Batch conversion failed; no files produced.',true);}}
@@ -263,6 +294,9 @@ if(drop && fileInput){
     if(batchHasWarnings&&!$('#batch-ack').checked)return batchSay('Acknowledge the warnings before downloading.',true);
     saveBlob(new Blob([batchArchive],{type:'application/zip'}),'finance-file-lab-separate-conversions.zip');
     batchSay('ZIP downloaded. Review each file and its validation report before import.');
+  });
+  $('#batch-include-memo')?.addEventListener('change',()=>{
+    if(batchFiles.length){batchEpoch++;batchReset();batchFiles=[];if(batchPicker)batchPicker.value='';$('#batch-file-list').replaceChildren();batchSay('Memo column preference changed. Reselect batch files to regenerate an accurate ZIP.');}
   });
   formatPicker?.addEventListener('change',()=>{
     if(batchFiles.length){batchEpoch++;batchReset();batchFiles=[];if(batchPicker)batchPicker.value='';$('#batch-file-list').replaceChildren();batchSay('Output format changed. Select batch files again to regenerate results.');}
@@ -283,6 +317,7 @@ if(drop && fileInput){
   $('#clear-workspace')?.addEventListener('click',()=>{
     selectionEpoch++;batchEpoch++;
     batchFiles=[];batchReset();
+    if($('#batch-include-memo'))$('#batch-include-memo').checked=false;
     if(batchPicker)batchPicker.value='';
     if($('#batch-file-list'))$('#batch-file-list').replaceChildren();
     batchSay('Batch files and generated ZIP cleared from the workspace.');
@@ -331,7 +366,7 @@ if(drop && fileInput){
     const target=formatPicker?formatPicker.value:fixedOutput;
     let content,mime,ext;
     try{
-      if(target==='csv'){content=toCSV(parsed.transactions);mime='text/csv;charset=utf-8';ext='csv';}
+      if(target==='csv'){content=toCSV(parsed.transactions,['date','description','amount','id',...($('#include-memo').checked?['memo']:[])]);mime='text/csv;charset=utf-8';ext='csv';}
       else if(target==='qb-csv'){
         const {parts,report}=quickBooksCSVExportPlan(parsed.transactions);
         if(parts.length===1){content=parts[0];mime='text/csv;charset=utf-8';ext='csv';}
@@ -341,7 +376,7 @@ if(drop && fileInput){
           content=toZIP(files);mime='application/zip';ext='zip';
         }
       }
-      else if(target==='xlsx'){content=toXLSX(parsed.transactions);mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';ext='xlsx';}
+      else if(target==='xlsx'){content=toXLSX(parsed.transactions,{includeMemo:$('#include-memo').checked});mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';ext='xlsx';}
       else if(target==='qif'){content=toQIF(parsed.transactions);mime='application/x-qif';ext='qif';}
       else throw Error('Output format is not available in this release.');
       const data=new Blob([content],{type:mime});saveBlob(data,file.name.replace(/\.[^.]+$/,'')+'-converted.'+ext);

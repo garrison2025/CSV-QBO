@@ -124,11 +124,16 @@ const FIELD_SYNONYMS = {
  amount:['amount','transaction amount','net amount','total'],
  debit:['debit','withdrawal','withdrawals','paid out','money out'],
  credit:['credit','deposit','deposits','paid in','money in'],
- id:['id','fitid','reference','transaction id','check number']
+ id:['id','fitid','reference','transaction id','check number'],
+ memo:['memo','memo text','transaction memo','notes','note','bank memo']
 };
 export function guessMapping(header) {
   const lowered=header.map(x=>String(x).trim().toLowerCase().replace(/[_-]+/g,' '));
-  return Object.fromEntries(Object.entries(FIELD_SYNONYMS).map(([field,choices])=>[field, choices.map(c=>lowered.indexOf(c)).find(index=>index>=0) ?? -1]));
+  const guessed=Object.fromEntries(Object.entries(FIELD_SYNONYMS).map(([field,choices])=>[field, choices.map(c=>lowered.indexOf(c)).find(index=>index>=0) ?? -1]));
+  // A bank file may have only a Memo column serving as its Description.
+  // That single column cannot represent two independently mapped fields.
+  if(guessed.memo===guessed.description)guessed.memo=-1;
+  return guessed;
 }
 export function csvTransactions(data, mapping={}, dateFormat='us') {
   const rows=typeof data==='string' ? parseCSV(data) : data;
@@ -141,7 +146,7 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   if (map.amount >= 0 && (map.debit >= 0 || map.credit >= 0)) {
     fail('Choose either the signed Amount column or the Debit and Credit columns, not both. Deselect unused columns before previewing.');
   }
-  const fields = map.amount >= 0 ? ['date','description','amount','id'] : ['date','description','debit','credit','id'];
+  const fields = map.amount >= 0 ? ['date','description','amount','id','memo'] : ['date','description','debit','credit','id','memo'];
   const used = new Map();
   for (const field of fields) {
     const index = map[field];
@@ -162,7 +167,8 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
       if(map.amount<0&&credit!==0n&&debit!==0n)fail('Both Debit and Credit are nonzero in the same row.');
       const amount=map.amount>=0?toMinorUnits(get('amount')):credit-debit;
       if(!get('description'))fail('Description is empty.');
-      transactions.push({date:isoDate(get('date'),dateFormat),description:get('description'),amount:fromMinorUnits(amount),id:get('id'),memo:''});
+      const memo=map.memo>=0?String(r[map.memo]??''):'';
+      transactions.push({date:isoDate(get('date'),dateFormat),description:get('description'),amount:fromMinorUnits(amount),id:get('id'),memo});
     } catch (e) { fail('CSV row '+(i+1)+': '+e.message); }
   }
   if(!transactions.length) fail('No transactions found.');
