@@ -230,8 +230,9 @@ if(drop && fileInput){
     }
     const balance=$('#balance-coverage'),bankBalance=data.integrity?.balanceReview;
     if(balance){
-      balance.hidden=!bankBalance;
-      if(bankBalance){
+      const hasBalances=Boolean(bankBalance?.ledgerBalancePresent||bankBalance?.availableBalancePresent);
+      balance.hidden=!hasBalances;
+      if(hasBalances){
         const ledger=bankBalance.ledgerBalancePresent?
           'declared (as of '+bankBalance.ledgerAsOfDate+')':'not provided';
         const available=bankBalance.availableBalancePresent?
