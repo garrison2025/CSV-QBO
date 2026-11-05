@@ -402,7 +402,10 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   const warnings=[];
   if(currencyColumns.length)
     warnings.push('All '+currencyCheckedRows+' transaction row(s) in '+currencyColumns.length+' recognized CSV Currency column(s) explicitly declare USD. Bank authenticity, account currency and foreign-exchange history are NOT independently verified. No currency conversion was performed.');
-  else warnings.push('This CSV has no recognized Currency column. Confirm that all imported amounts are already USD before downloading; this tool does not perform currency conversion.');
+  // Without a recognized currency column, the UI visibly describes the
+  // unverified scope but does not add an otherwise-unactionable warning to
+  // every ordinary CSV upload. The user remains responsible for confirming
+  // that the source is USD; no bank certification is claimed.
   if(sourceDialect?.excelSepDirective)
     warnings.push('Excel sep= delimiter instruction on source line 1 was recognized (not a transaction). The bank CSV header starts at physical line 2. No transaction rows were skipped.');
   if(sourceDialect?.manualDelimiterSelected)
