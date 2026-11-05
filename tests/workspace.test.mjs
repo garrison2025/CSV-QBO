@@ -75,11 +75,33 @@ async function clear(){
   await get('clear-workspace').fire('click');
   get('date-format').value='us';
 }
-async function preview(){await get('preview-button').fire('click');}
+async function preview(){
+  await get('preview-button').fire('click');
+  // Legacy UI tests exercise mapping, pagination and memo behavior. Their
+  // fictional fixture dates are deliberately ambiguous. Acknowledge ONLY
+  // the single date-warning case in this helper; duplicate / amount warnings
+  // must still stay locked and be tested separately.
+  const notes=get('warning-list').children.map(x=>x.textContent);
+  if(!get('warning-ack-label').hidden&&notes.length===1&&/numeric date\(s\) are valid but DIFFERENT/.test(notes[0])){
+    get('warning-ack').checked=true;
+    await get('warning-ack').fire('change');
+  }
+}
 async function setMapping(field,index){
   const el=get('map-'+field);el.value=String(index);await el.fire('change');
 }
 
+test('ambiguous source dates keep exports locked until explicit acknowledgment',async()=>{
+ await clear();await load();
+ await get('preview-button').fire('click'); // Do NOT use helper that acknowledges fixture-only warning
+ assert.equal(get('summary-net').textContent,'87.50');
+ assert.match(get('warning-list').children[0].textContent,/2 of 2 numeric date/);
+ assert.equal(get('export-button').disabled,true);
+ assert.equal(get('warning-ack').checked,false);
+ get('warning-ack').checked=true;
+ await get('warning-ack').fire('change');
+ assert.equal(get('export-button').disabled,false);
+});
 test('CSV mapping changes invalidate a successful preview, export and validation report',async()=>{
  await clear();await load();await preview();
  assert.equal(get('summary-net').textContent,'87.50');
