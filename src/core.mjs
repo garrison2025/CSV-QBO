@@ -118,6 +118,72 @@ export function toCSV(rows, keys=['date','description','amount','id']) {
   return '\uFEFF' + keys.join(',') + '\r\n' + rows.map(row => keys.map(key => safe(row[key])).join(',')).join('\r\n') + '\r\n';
 }
 
+/**
+ * Re-parse the exact generic spreadsheet CSV wire and verify every source
+ * field, boundary and row order before browser download. The report contains
+ * only counts and flags, never bank payees, references, Memo or file names.
+ * An apostrophe added for spreadsheet formula safety is the ONLY allowed
+ * text difference between a source field and its CSV cell.
+ */
+export function validateGenericCSVExport(transactions,csvText,{includeMemo=false}={}){
+  if(typeof includeMemo!=='boolean')fail('Invalid generic CSV Memo export option.');
+  if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to export.');
+  const keys=['date','description','amount','id',...(includeMemo?['memo']:[])];
+  let data;
+  try{
+    const encoded=new TextEncoder().encode(String(csvText));
+    const decoded=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(encoded);
+    if(decoded!==csvText)fail('CSV encoding changed invalid Unicode characters.');
+    data=parseCSV(decoded);
+  }catch{
+    fail('CSV export preflight failed: output encoding or record structure is invalid.');
+  }
+  if(data.length!==transactions.length+1)fail('CSV export preflight failed: source and output row counts differ.');
+  if(data[0].length!==keys.length||keys.some((k,j)=>data[0][j]!==k))
+    fail('CSV export preflight failed: column names or order differ.');
+  let guardedCells=0,memoRows=0;
+  for(let i=0;i<transactions.length;i++){
+    const tx=transactions[i],row=data[i+1];
+    if(!Array.isArray(row)||row.length!==keys.length)
+      fail('CSV export preflight failed at row '+(i+1)+': column count differs.');
+    let date,amount;
+    try{date=isoDate(tx.date);amount=fromMinorUnits(toMinorUnits(tx.amount));}
+    catch{fail('CSV export preflight failed at row '+(i+1)+': invalid date or signed amount.');}
+    if(!String(tx.description??'').trim())
+      fail('CSV export preflight failed at row '+(i+1)+': missing description.');
+    if(String(tx.memo??'').length) memoRows++;
+    for(let j=0;j<keys.length;j++){
+      const key=keys[j];
+      const source=key==='date'?date:key==='amount'?amount:String(tx[key]??'');
+      const guarded=needsCsvFormulaGuard(source);
+      const expected=guarded?"'"+source:source;
+      if(row[j]!==expected)
+        fail('CSV export preflight failed at row '+(i+1)+': '+key+' changed or moved.');
+      if(guarded)guardedCells++;
+    }
+  }
+  return {reportType:'generic_csv_exact_rows_v1',rowCount:transactions.length,
+    columnCount:keys.length,orderedRowsReconciled:true,exactTextReconciled:true,
+    signedAmountsReconciled:true,memoIncluded:includeMemo,memoRowsWithContent:memoRows,
+    memoRowsOmitted:includeMemo?0:memoRows,formulaGuardedCells:guardedCells};
+}
+export function genericCSVExportPlan(transactions,{includeMemo=false}={}){
+  if(typeof includeMemo!=='boolean')fail('Invalid generic CSV Memo export option.');
+  if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to export.');
+  const normalized=transactions.map((tx,i)=>{
+    try{
+      const date=isoDate(tx.date),amount=fromMinorUnits(toMinorUnits(tx.amount));
+      if(!String(tx.description??'').trim())fail('Description is empty.');
+      return {date,description:String(tx.description??''),amount,
+        id:String(tx.id??''),memo:String(tx.memo??'')};
+    }catch{fail('CSV export row '+(i+1)+': invalid date, description or amount.');}
+  });
+  const keys=['date','description','amount','id',...(includeMemo?['memo']:[])];
+  const csv=toCSV(normalized,keys);
+  const report=validateGenericCSVExport(normalized,csv,{includeMemo});
+  return {csv,report};
+}
+
 const FIELD_SYNONYMS = {
  date:['date','transaction date','posted date','posting date','dtposted'],
  description:['description','payee','name','details','merchant','transaction description','memo'],
@@ -159,7 +225,8 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   const transactions=[];
   for(let i=1;i<rows.length;i++) {
     const r=rows[i]; if(r.every(c=>!String(c??'').trim())) continue;
-    const get=key=>map[key]>=0?String(r[map[key]]??'').trim():'';
+    const getRaw=key=>map[key]>=0?String(r[map[key]]??''):'';
+    const get=key=>getRaw(key).trim();
     try {
       const credit=map.credit>=0?toMinorUnits(get('credit')||'0'):0n;
       const debit=map.debit>=0?toMinorUnits(get('debit')||'0'):0n;
@@ -167,8 +234,10 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
       if(map.amount<0&&credit!==0n&&debit!==0n)fail('Both Debit and Credit are nonzero in the same row.');
       const amount=map.amount>=0?toMinorUnits(get('amount')):credit-debit;
       if(!get('description'))fail('Description is empty.');
-      const memo=map.memo>=0?String(r[map.memo]??''):'';
-      transactions.push({date:isoDate(get('date'),dateFormat),description:get('description'),amount:fromMinorUnits(amount),id:get('id'),memo});
+      // Date/amount syntax may have outer whitespace, but quoted payees,
+      // references and Memo are real source text and must never be trimmed.
+      const memo=getRaw('memo');
+      transactions.push({date:isoDate(get('date'),dateFormat),description:getRaw('description'),amount:fromMinorUnits(amount),id:getRaw('id'),memo});
     } catch (e) { fail('CSV row '+(i+1)+': '+e.message); }
   }
   if(!transactions.length) fail('No transactions found.');

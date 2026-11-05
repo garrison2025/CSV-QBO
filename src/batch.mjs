@@ -1,5 +1,5 @@
 /** Separate, browser-local batch reader. Files are never merged across accounts. */
-import {parseInput,auditTransactions,toCSV,MAX_FILE_BYTES} from './core.mjs';
+import {parseInput,auditTransactions,genericCSVExportPlan,MAX_FILE_BYTES} from './core.mjs';
 import {toXLSX,toZIP} from './xlsx.mjs';
 
 export const MAX_BATCH_FILES=10;
@@ -44,7 +44,7 @@ export function batchConvert(inputs,{target='csv',source='any',dateFormat='us',i
     const sourceMemoRows=parsed.transactions.reduce((n,row)=>n+(String(row.memo??'').length>0?1:0),0);
     memoRowsWithContent+=sourceMemoRows;
     const name='converted-'+String(i+1).padStart(3,'0')+'.'+target;
-    entries[name]=target==='xlsx'?toXLSX(parsed.transactions,{includeMemo}):toCSV(parsed.transactions,['date','description','amount','id',...(includeMemo?['memo']:[])]);
+    entries[name]=target==='xlsx'?toXLSX(parsed.transactions,{includeMemo}):genericCSVExportPlan(parsed.transactions,{includeMemo}).csv;
     const duplicateFile=signatures.has(item.text)?signatures.get(item.text):null;
     if(!duplicateFile)signatures.set(item.text,i+1);
     const dates=parsed.transactions.map(transaction=>transaction.date).sort();

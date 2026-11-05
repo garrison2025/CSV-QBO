@@ -288,7 +288,26 @@ test('every converter includes Memo mapping, explicit coverage and optional expo
  assert.match(app,/batchInfo=batchConvert\(texts,\{target,source,dateFormat:.*includeMemo:/);
  const core=readFileSync(path.join(root,'src','core.mjs'),'utf8');
  assert.match(core,/memo:\['memo','memo text','transaction memo'/);
- assert.match(core,/memo=map.memo>=0\?String/);
+ assert.match(core,/const memo=getRaw\('memo'\)/);
  const batch=readFileSync(path.join(root,'src','batch.mjs'),'utf8');
  assert.match(batch,/memoRowsOmitted:includeMemo\?0:memoRowsWithContent/);
+});
+
+
+test('all generic CSV exits enforce source-to-wire preflight without changing QuickBooks 3-column export',()=>{
+ const core=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ const batch=readFileSync(path.join(root,'src','batch.mjs'),'utf8');
+ assert.match(core,/export function validateGenericCSVExport\(/);
+ assert.match(core,/export function genericCSVExportPlan\(/);
+ assert.match(core,/orderedRowsReconciled:true,exactTextReconciled:true/);
+ assert.match(core,/description:getRaw\('description'\)/);
+ assert.match(core,/id:getRaw\('id'\)/);
+ assert.match(app,/content=genericCSVExportPlan\(parsed.transactions/);
+ assert.match(batch,/genericCSVExportPlan\(parsed.transactions,\{includeMemo\}\)\.csv/);
+ assert.match(app,/quickBooksCSVExportPlan\(parsed.transactions\)/);
+ for(const route of ['/','/tools/qif-to-csv/','/tools/quickbooks-csv-formatter/']){
+  const html=read(route==='/'?'index.html':route.slice(1)+'index.html');
+  assert.match(html,/noindex,nofollow/);
+ }
 });

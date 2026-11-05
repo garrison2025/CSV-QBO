@@ -265,3 +265,23 @@ test('batch optional Excel Memo remains source-order text with true numeric cent
  assert.equal(result.report.files[0].memoRowsIncluded,1);
  assert.equal(result.report.files[0].net,'-0.01');
 });
+
+
+test('batch generic CSV source-to-wire validation retains payee/reference whitespace and Memo order',()=>{
+ const qifA='!Type:Bank\nD11/04/2026\nT-1.25\nP  Coffee & Sons  \nN  000012  \nMPrivate,\n^\n';
+ const qifB='!Type:Bank\nD11/05/2026\nT4.00\nP  Salary  \nN  000013  \nMNote\n^\n';
+ const result=batchConvert([{name:'a.qif',text:qifA},{name:'b.qif',text:qifB}],
+   {target:'csv',includeMemo:true});
+ assert.equal(result.report.totalTransactions,2);
+ assert.equal(result.report.memoIncluded,true);
+ assert.equal(result.report.memoRowsOmitted,0);
+ assert.equal(result.report.totalFiles,2);
+ const bytes=Buffer.from(result.archive);
+ assert.ok(bytes.includes(Buffer.from('  Coffee & Sons  ')));
+ assert.ok(bytes.includes(Buffer.from('  000012  ')));
+ assert.ok(bytes.includes(Buffer.from('  Salary  ')));
+ assert.ok(bytes.includes(Buffer.from('Private,')));
+ assert.ok(!JSON.stringify(result.report).includes('Coffee & Sons'));
+ assert.ok(!JSON.stringify(result.report).includes('000012'));
+ assert.deepEqual(result.report.files.map(f=>f.net),['-1.25','4.00']);
+});

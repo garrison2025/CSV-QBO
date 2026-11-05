@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,decodeFinancialBytes,parseIIF,parseInput,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,validateQuickBooksCSVParts,auditTransactions,totals} from '../src/core.mjs';
+import {toMinorUnits,fromMinorUnits,isoDate,parseCSV,toCSV,guessMapping,csvTransactions,parseQIF,parseOFX,decodeFinancialBytes,parseIIF,parseInput,validateGenericCSVExport,genericCSVExportPlan,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,validateQuickBooksCSVParts,auditTransactions,totals} from '../src/core.mjs';
 import {toXLSX,toZIP} from '../src/xlsx.mjs';
 
 test('strict cents and signed amounts',()=>{
@@ -1040,4 +1040,104 @@ test('opt-in Excel Memo column is text-only and defaults to the existing four co
  assert.ok(!memo.includes('<f>'),'memo text must never execute as spreadsheet formulas');
  assert.throws(()=>toXLSX(src,{includeMemo:'yes'}),/Invalid Excel Memo export option/);
  assert.throws(()=>toXLSX([{...src[0],memo:'private\u0001line'}],{includeMemo:true}),/unsupported control character or invalid text in Memo/);
+});
+
+
+test('quoted CSV source preserves exact leading/trailing whitespace in payee, reference and Memo',()=>{
+ const source='Date,Description,Memo,Amount,Reference\r\n'+
+ '11/04/2026,"  Café & Co  ","  Original memo, with  spaces  ",-12.50,"  000123  "\r\n'+
+ '11/05/2026,"Office  ","Receipt \r\n second line",10.00," REF-B "\r\n';
+ const parsed=csvTransactions(parseCSV(source));
+ assert.equal(parsed.transactions.length,2);
+ assert.equal(parsed.transactions[0].description,'  Café & Co  ');
+ assert.equal(parsed.transactions[0].id,'  000123  ');
+ assert.equal(parsed.transactions[0].memo,'  Original memo, with  spaces  ');
+ assert.equal(parsed.transactions[1].description,'Office  ');
+ assert.equal(parsed.transactions[1].id,' REF-B ');
+ const plan=genericCSVExportPlan(parsed.transactions,{includeMemo:true});
+ const after=parseCSV(plan.csv);
+ assert.deepEqual(after[1],['2026-11-04','  Café & Co  ','-12.50','  000123  ','  Original memo, with  spaces  ']);
+ assert.equal(after[2][4],'Receipt \r\n second line');
+ assert.equal(plan.report.exactTextReconciled,true);
+ assert.equal(plan.report.signedAmountsReconciled,true);
+ assert.equal(plan.report.memoRowsOmitted,0);
+ assert.deepEqual(plan.report.rowCount,2);
+ assert.ok(!JSON.stringify(plan.report).includes('Café'));
+ assert.ok(!JSON.stringify(plan.report).includes('000123'));
+});
+test('generic CSV preflight catches tampering even when counts and signed totals match',()=>{
+ const tx=[
+ {date:'2026-11-04',description:'Confidential First',amount:'-10.00',id:'001',memo:'Private A'},
+ {date:'2026-11-05',description:'Confidential Second',amount:'10.00',id:'002',memo:'Private B'},
+ ];
+ const source=genericCSVExportPlan(tx,{includeMemo:true});
+ assert.equal(source.report.rowCount,2);
+ const tests=[
+ [source.csv.replace('Confidential First','Changed Merchant'),/description changed or moved/],
+ [source.csv.replace('2026-11-04','2026-11-05'),/date changed or moved/],
+ [source.csv.replace('Private B','Tampered'),/memo changed or moved/],
+ [source.csv.replace('001','099'),/id changed or moved/],
+ [source.csv.replace('-10.00','-9.00'),/amount changed or moved/],
+ [source.csv.replace('date,description,amount,id,memo','date,memo,amount,id,description'),/column names or order differ/],
+ [source.csv.replace('Confidential Second','Confidential First'),/description changed or moved/],
+ [source.csv.replace(/\r\n2026-11-05,[^\r\n]+\r\n$/,'\r\n'),/source and output row counts differ/],
+ ];
+ for(const [wire,expected]of tests){
+  try{validateGenericCSVExport(tx,wire,{includeMemo:true});assert.fail('Expected preflight rejection');}
+  catch(error){
+    if(error.code==='ERR_ASSERTION')throw error;
+    assert.match(error.message,expected);
+    assert.ok(!error.message.includes('Confidential'));
+    assert.ok(!error.message.includes('Private A'));
+    assert.ok(!error.message.includes('Private B'));
+  }
+ }
+});
+test('generic CSV preflight guards formulas while keeping exact text and cents',()=>{
+ const data=[
+  {date:'2026-11-04',description:'=HYPERLINK("bad", "payee")',amount:'-0.01',id:'+SECRET-ID',memo:'=SUM(1,2)'},
+  {date:'2026-11-05',description:'Store',amount:'0.01',id:'00005',memo:'\n=DROP'}
+ ];
+ const result=genericCSVExportPlan(data,{includeMemo:true});
+ assert.equal(result.report.formulaGuardedCells,4);
+ assert.equal(result.report.memoRowsWithContent,2);
+ const rows=parseCSV(result.csv);
+ assert.deepEqual(rows[1],['2026-11-04',"'"+data[0].description,'-0.01',"'+SECRET-ID","'=SUM(1,2)"]);
+ assert.equal(rows[2][4],"'"+data[1].memo);
+ const attacked=result.csv.replace("'=SUM(1,2)",'=SUM(1,2)');
+ assert.throws(()=>validateGenericCSVExport(data,attacked,{includeMemo:true}),/memo changed or moved/);
+});
+test('generic CSV rejects encoding changes, NUL and unpaired surrogate with private errors',()=>{
+ const data=[{date:'2026-11-04',description:'Sensitive shop',amount:'1.00',id:'0001',memo:''}];
+ const wire=genericCSVExportPlan(data).csv;
+ assert.throws(()=>validateGenericCSVExport(data,wire+'\u0000'),/output encoding or record structure is invalid/);
+ const invalid={...data[0],description:'Sensitive \ud800 bank'};
+ try{genericCSVExportPlan([invalid]);assert.fail('Expected invalid unicode rejection');}
+ catch(error){if(error.code==='ERR_ASSERTION')throw error;
+  assert.match(error.message,/output encoding or record structure is invalid/);
+  assert.ok(!error.message.includes('Sensitive'));
+ }
+ assert.throws(()=>genericCSVExportPlan([{...data[0],amount:'1.001'}]),/CSV export row 1/);
+ assert.throws(()=>genericCSVExportPlan(data,{includeMemo:'true'}),/Invalid generic CSV Memo export option/);
+});
+test('1200-row generic CSV with embedded Unicode quotes and Memo preserves ordered signed cents',()=>{
+ const input=Array.from({length:1200},(_,i)=>({
+ date:'2026-11-'+String(i%28+1).padStart(2,'0'),
+ description:'Shop '+i+' "日本"  ',amount:fromMinorUnits(BigInt((i*211)%1000000-500000)),
+ id:'000'+i,memo:i%7===0?'Optional,\r\nnote '+i:''
+ }));
+ const plan=genericCSVExportPlan(input,{includeMemo:true});
+ assert.equal(plan.report.rowCount,1200);
+ assert.equal(plan.report.memoRowsOmitted,0);
+ assert.equal(plan.report.memoRowsWithContent,172);
+ const rows=parseCSV(plan.csv);
+ assert.equal(rows.length,1201);
+ for(const i of [0,1,6,7,1198,1199]){
+  assert.equal(rows[i+1][0],input[i].date);
+  assert.equal(rows[i+1][1],input[i].description);
+  assert.equal(rows[i+1][2],input[i].amount);
+  assert.equal(rows[i+1][3],input[i].id);
+  assert.equal(rows[i+1][4],input[i].memo);
+ }
+ assert.equal(totals(input).net,totals(rows.slice(1).map(r=>({date:r[0],description:r[1],amount:r[2],id:r[3],memo:r[4]}))).net);
 });
