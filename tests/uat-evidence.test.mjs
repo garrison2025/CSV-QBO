@@ -54,6 +54,7 @@ test('public summary contains only approved metadata, not source finances or raw
 });
 test('public registry rejects unreviewed, extraneous or invented compatible claims',()=>{
   const registry=makePublicRegistry({schema_version:1,cases:[artificialCase()]});
+  assert.throws(()=>validatePublicRegistry({...registry,bank_account:'123456'}),/unexpected key/);
   assert.throws(()=>validatePublicRegistry({...registry,cases:[{...registry.cases[0],bank_account:'123456'}]}),/unexpected key/);
   assert.throws(()=>validatePublicRegistry({...registry,cases:[{...registry.cases[0],review_state:'pending'}]}),/Unreviewed/);
   assert.throws(()=>validatePublicRegistry({...registry,cases:[{...registry.cases[0],evidence_scope:'real_bank_read_only'}]}),/scope mismatch/);
