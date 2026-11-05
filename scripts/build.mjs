@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {writeQboLab} from './build-qbo-lab.mjs';
 import {summarizeRegistry} from './uat-evidence.mjs';
 import {assessProductionRelease} from './production-gate.mjs';
 import path from 'node:path';
@@ -106,4 +107,5 @@ fs.writeFileSync(path.join(dist,'_headers'),'/*\n  X-Content-Type-Options: nosni
 if(production){const routes=['/','/formats/','/compatibility/','/about/',...tools.filter(allowed).map(t=>'/tools/'+t.slug+'/')];fs.writeFileSync(path.join(dist,'sitemap.xml'),'<?xml version="1.0" encoding="utf-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(r=>'<url><loc>'+esc(site+r)+'</loc></url>').join('')+'</urlset>');fs.writeFileSync(path.join(dist,'robots.txt'),'User-agent: *\nAllow: /\nSitemap: '+site+'/sitemap.xml\n');}else{fs.writeFileSync(path.join(dist,'robots.txt'),'User-agent: *\nDisallow: /\n');}
 fs.writeFileSync(path.join(dist,'compatibility-evidence.json'),JSON.stringify(uatRegistry,null,2));
 fs.writeFileSync(path.join(dist,'build-manifest.json'),JSON.stringify({releaseMode:production?'production':'preview-noindex',targetOrigin:production?site:null,realBankEvidenceCases:uatStats.total,targetApplicationImportEvidenceCases:uatStats.targetImports,competitorReadEvidenceCases:competitorEvidence.cases.length,releaseEvidenceScope:releaseDecision.evidenceScope,manualPublicationApproved:releaseApproval.approved,approvedIndexableRoutes:releaseDecision.routes,tools:tools.map(t=>({route:'/tools/'+t.slug+'/',release:t.release,indexable:production&&allowed(t),keyword:t.keyword,volumeUS:t.volume,kd:t.kd})),publishedAt:new Date().toISOString()},null,2));
+writeQboLab(dist,root);
 console.log('Generated',tools.length,'tool pages +',Object.keys(docs).length,'information pages; mode:',production?'production':'preview/noindex');
