@@ -64,6 +64,11 @@ try{
  assert.equal(await page.locator('#lab-result').isVisible(),false);
  assert.equal(await page.locator('#lab-download').isDisabled(),true);
  console.log('PASS input change prevents stale QBO download');
+ await page.locator('#lab-clear').click();
+ assert.equal(await page.locator('#lab-csv').inputValue(),'');
+ assert.equal(await page.locator('#lab-reference').inputValue(),'');
+ assert.equal(await page.locator('#lab-preview').isDisabled(),true);
+ console.log('PASS local clear removes both selected files and disabled export state');
 
  await page.setViewportSize({width:390,height:844});
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);
