@@ -288,7 +288,7 @@ test('every converter includes Memo mapping, explicit coverage and optional expo
  assert.match(app,/batchInfo=batchConvert\(texts,\{target,source,dateFormat:.*includeMemo:/);
  const core=readFileSync(path.join(root,'src','core.mjs'),'utf8');
  assert.match(core,/memo:\['memo','memo text','transaction memo'/);
- assert.match(core,/memo=map.memo>=0\?String/);
+ assert.match(core,/const memo=getRaw\('memo'\)/);
  const batch=readFileSync(path.join(root,'src','batch.mjs'),'utf8');
  assert.match(batch,/memoRowsOmitted:includeMemo\?0:memoRowsWithContent/);
 });
