@@ -1,3 +1,16 @@
+## V2.11: Independently inspect actual downloaded XLSX and split QuickBooks ZIP bytes
+
+The previously unsupported source-to-XLSX and multi-part QuickBooks ZIP cross-file preflight now has a **separate output-byte inspector**, built without external dependencies and independent of the application's XLSX ZIP writer. The same private manifest and local command work with these outputs; choose `qbo-to-excel`, `qif-to-excel`, `ofx-to-excel`, `qfx-to-excel`, or `iif-to-excel` for downloaded `.xlsx`, or `quickbooks-csv-formatter` with downloaded `.zip` for large outputs.
+
+- For **XLSX**, the inspector checks the *actual ZIP bytes* (directory boundaries, CRC32, duplicate file names and storage type), sheet headers, date serials and styles, exact signed cents, row order, descriptions, reference IDs, included Memo fields, formula absence, and worksheet row count. Any omitted nonempty source Memo requires you to re-export with Include Memo. The inspector intentionally rejects differently compressed or re-saved Excel workbooks rather than treating them as exactly matching the website's original download.
+- For **QuickBooks multi-part ZIP**, every packaged CSV part is re-read and compared to the original source row order, date, descriptions and cents; the parts must be consecutively numbered with no missing or unexpected files, each part must respect the built-in QuickBooks CSV limits, and the packaged validation JSON must match recomputed results exactly.
+- The local report hashes the original and actual output bytes, never publishes transactions, and still has `owner_approved:false`, `source_kind:PENDING_AUTHENTICITY_REVIEW` and `target_import_result:NOT_RUN`. No bank authenticity or actual Excel/QuickBooks application acceptance is inferred.
+- **Limits:** This exact archive checker accepts only the uncompressed *stored* ZIP shape emitted by the website, not arbitrary ZIP dialects; Microsoft Excel or accounting software import acceptance remains untested. Continue independent bank portal and target UI review.
+
+Run `node scripts/uat-local-check.mjs "C:\private\case-manifest.json"` from the repo directory, with private input/output paths outside Git. The manifest schema is unchanged.
+
+---
+
 # Real-bank compatibility and QuickBooks UAT
 
 **Important target-UAT correction (2026-11-05):** Intuit's official developer Sandbox FAQ says Sandbox companies **cannot import or export files**. The QuickBooks Online Test Drive is not a trustworthy bank-import acceptance environment. Use an authorized, isolated real/trial QuickBooks Online company that explicitly permits manual uploads, or mark import UAT NOT RUN. No guaranteed free import-capable account exists in this project. See [the actual QuickBooks import acceptance worksheet](QUICKBOOKS-REAL-IMPORT-UAT.md). Do not mistake a sandbox API write or parser self-test for a manual CSV import.
@@ -7,9 +20,9 @@
 
 This is an executable, local-only source-versus-export comparison. It does NOT authenticate the bank file or test QuickBooks imports. It never uploads source data.
 
-**Currently covered:** QBO/QFX/OFX/QIF/IIF to generic CSV; explicitly mapped bank CSV to one QuickBooks Online 3-column CSV file; CSV to QIF. It compares date, signed cents, payee, reference, Memo when supported, row count and source order, and records SHA-256 of the actual files. Import target acceptance requires a separate QuickBooks/Quicken manual UAT.
+**Currently covered:** QBO/QFX/OFX/QIF/IIF to generic CSV or independently inspected XLSX; explicitly mapped bank CSV to QuickBooks Online 3-column CSV as one file or as all parts of the ZIP; CSV to QIF. It compares date, signed cents, payee, reference, Memo when supported, row count and source order, and records SHA-256 of the actual files. Import target acceptance requires a separate QuickBooks/Quicken manual UAT.
 
-**Not covered by this checker:** XLSX independent file inspection, multi-part QuickBooks CSV ZIP, Web Connect .qbo creation, CSV to IIF, independent verification of bank authenticity. It rejects those unsupported outputs instead of displaying a false PASS.
+**Not covered by this checker:** Web Connect .qbo creation, CSV to IIF, independently establishing bank authenticity or downstream application acceptance. It rejects those unsupported outputs instead of displaying a false PASS.
 
 ### Windows / PowerShell workflow
 
