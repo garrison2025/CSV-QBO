@@ -73,7 +73,8 @@ export function writeQboLab(dist,root){
 <div class="lab-scroll"><table class="lab-table"><thead><tr><th>Date</th><th>Payee</th><th>Signed USD</th><th>Reference present</th></tr></thead><tbody id="lab-rows"></tbody></table></div>
 <p id="lab-warnings" class="lab-note"></p>
 <label class="lab-ack"><input type="checkbox" id="lab-ack">I checked the source amount signs, dates, account match and warnings. I understand this QBO has not passed real QuickBooks import testing.</label>
-<button class="lab-button" id="lab-download" disabled>Download experimental .qbo file</button>\n<button type="button" id="lab-clear" class="lab-button" style="background:#566673;margin-left:8px">Clear workspace</button>
+<button class="lab-button" id="lab-download" disabled>Download experimental .qbo file</button>
+<button type="button" id="lab-clear" class="lab-button" style="background:#566673;margin-left:8px">Clear workspace</button>
 <p class="lab-meta">Output state: <strong>syntax_valid_only</strong>. No QuickBooks compatibility, bank authentication, or official financial-institution endorsement is claimed.</p></div></section>
 <section class="lab-stage"><h2>What this pilot does not do</h2>
 <p class="lab-tip">It does not create an institution identity, connect to a bank, certify a Web Connect import, adjust signed amounts, silently remove duplicate rows, or support QFX / credit cards. Non-ASCII transaction text is rejected rather than corrupted. Identical transactions without distinguishing references are rejected.</p>
