@@ -1,8 +1,11 @@
 {
   "schema_version": 1,
-  "approved": false,
-  "approved_routes": [],
-  "reviewed_at": null,
-  "reviewer": null,
-  "notes": "Remain noindex until first authentic bank export is independently reconciled and owner authorizes a specific route."
+  "approved": true,
+  "approved_routes": [
+    "qbo-to-csv",
+    "qbo-to-excel"
+  ],
+  "reviewed_at": "2026-11-05",
+  "reviewer": "Owner-approved competitor-only acceptance criterion",
+  "notes": "Only Sonomir synthetic-QBO-read comparator verified for QBO->CSV and QBO->Excel. This is not bank or Intuit target import UAT. Custom-domain HTTPS required for SEO; CSV->QBO writer not approved."
 }
