@@ -298,3 +298,11 @@
 - An absolute transaction amount at least USD 1,000,000 is flagged for review rather than automatically changed or rejected. This threshold is a review aid only, not currency conversion, a statutory limit or evidence of transaction error.
 - Aggregate date/zero/high-amount risk counts are recorded in local validation reports; QuickBooks split-output manifest retains aggregate zero and high-value counts. Tests cover US/EU dates, browser download acknowledgment, actual serialized cents, manual date selection and refusal of blank split amounts.
 - **Authentic bank issuer file evidence: 0. Observed QuickBooks imports: 0.** No new claims of bank certification or target import success.
+
+## V2.14 — OFX/QFX/QBO corrected transactions and timezone safety (2026-11-05)
+
+- Consulted official [OFX 2.2 specification](https://www.financialdataexchange.org/common/Uploaded%20files/OFX%20files/OFX%202.2.pdf), especially section 3.2.8 (dated time/zone representation), section 3.2.9.2 (statement TRNAMT signage), and the STMTTRN record definition (correction actions).
+- OFX STMTTRN `CORRECTFITID` or `CORRECTACTION` indicates a prior bank history operation (`DELETE` or `REPLACE`), which a stateless CSV extraction cannot reproduce safely. The parser now rejects the whole file, even when fields are empty/invalid, instead of exporting these records as normal new transactions. The error omits corrected transaction reference data. This is a deliberate unsupported feature rather than an unverified claim of applied corrections.
+- For explicit OFX DEBIT/CREDIT types with a contradictory signed `TRNAMT`, aggregated warnings require user review; source cents and source order remain unchanged. Other types may legitimately have either sign, and no sign correction is inferred.
+- Checked OFX time zone GMT offsets against ±12 hours, with fractional-hour values accepted. Posting calendar dates remain as bank provided (not normalized to user's local time or UTC).
+- Added independent synthetic SGML/XML fixtures including CDATA/comments, DELETE/REPLACE actions, corrupted offsets, benign types and real Chrome upload/download gate tests. **Live bank-issuer UAT: 0. Actual QuickBooks/Quicken import UAT: 0.** No page index approval.
