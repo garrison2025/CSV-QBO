@@ -746,6 +746,56 @@ try{
  assert.match(contraryOut,/Positive amount labeled DEBIT,20\.00/);
  console.log('PASS Chrome warns on contradictory OFX debit sign but preserves source signed cents');
 
+ // Repeated FITIDs in the SAME statement may mean a repeated download.
+ // If financial fields are consistent, preserve rows but require review.
+ // If values conflict, never export a partial/stale file.
+ await page.goto(base+'/tools/qbo-to-csv/');
+ const fitidTx=(amount='-12.50',date='20261104')=>
+   '<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>'+date+
+   '<TRNAMT>'+amount+'<FITID>PRIVATE-FITID-12345<NAME>Bookstore'+
+   '<MEMO>Synthetic invoice</STMTTRN>';
+ const fitidWrap=transactions=>
+   'OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\n'+
+   '<OFX><STMTRS><CURDEF>USD<BANKACCTFROM><ACCTID>PRIVATE-ACCOUNT-01'+
+   '<BANKTRANLIST><DTSTART>20261101<DTEND>20261201'+transactions+
+   '</BANKTRANLIST></STMTRS></OFX>';
+ const identicalIdSource=fitidWrap(fitidTx()+fitidTx());
+ await page.locator('#file-input').setInputFiles(file('repeated-fitid.qbo',identicalIdSource));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-count').textContent(),'2');
+ assert.equal(await page.locator('#summary-net').textContent(),'-25.00');
+ assert.match(await page.locator('#warning-list').textContent(),/repeated FITID occurrence/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const repeatedIdReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.equal(repeatedIdReport.parserIntegrity.repeatedFitidCount,1);
+ assert.equal(repeatedIdReport.repeatedReferences.length,1);
+ assert.equal(JSON.stringify(repeatedIdReport).includes('PRIVATE-FITID-12345'),false,
+   'privacy-minimized report must not contain bank references');
+ await page.locator('#warning-ack').check();
+ const repeatOutput=(await dl('#export-button')).content.toString('utf8');
+ assert.equal(repeatOutput.split('Bookstore,-12.50').length-1,2,'user-confirmed duplicate remains in CSV');
+ const collisionSource=fitidWrap(fitidTx()+fitidTx('-12.51'));
+ await page.locator('#file-input').setInputFiles(file('conflicting-fitid.qbo',collisionSource));
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('Conflicting repeated FITID'));
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ assert.match(await page.locator('#work-status').textContent(),/Conflicting repeated FITID/);
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('PRIVATE-FITID-12345'));
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('PRIVATE-ACCOUNT-01'));
+ console.log('PASS Chrome duplicate FITID review preserves exact rows, inconsistent FITIDs fail closed with no private ID leakage');
+
+ const multipleAccountSource=fitidWrap(
+   fitidTx()).replace('<BANKTRANLIST>',
+     '<CCACCTFROM><ACCTID>PRIVATE-ACCOUNT-02<BANKTRANLIST>');
+ await page.locator('#file-input').setInputFiles(file('multiple-account-markers.qbo',multipleAccountSource));
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('Multiple bank/card account-from declarations'));
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.match(await page.locator('#work-status').textContent(),/Multiple bank\/card account-from declarations/);
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('PRIVATE-ACCOUNT-02'));
+ console.log('PASS Chrome rejects multiple account identity declarations under one statement response');
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');

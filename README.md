@@ -1,3 +1,13 @@
+## V2.15 — account-scoped OFX FITID collision integrity (2026-11-05)
+
+- **Banking specification grounding:** The [OFX 2.2 specification §3.2.3](https://www.financialdataexchange.org/common/Uploaded%20files/OFX%20files/OFX%202.2.pdf) defines `FITID` as a transaction identifier unique **within an account**, primarily used to detect duplicate responses. The converter does not assume identifiers are globally unique across different accounts or institutions.
+- When two `STMTTRN` records in **one statement file** share a FITID but have **different posted dates, signed amounts, descriptions, Memo values or TRNTYPE**, the entire source is rejected, not partially exported. The error identifies source row numbers but does not print the FITID, account number or transaction text.
+- When the repeated FITID's exported data is **identical**, all original rows remain intact but an aggregate warning is shown, requiring explicit review before download. The reader never automatically deletes transactions, guesses corrections, or claims which record should be imported.
+- Multiple real `BANKACCTFROM` / `CCACCTFROM` markers are rejected even if a damaged source contains only one `STMTRS` wrapper. Fake account/FITID tags inside XML comments or CDATA are ignored as document data.
+- In **separate-file batch** workflows, the same FITID across different inputs is a possible overlap, **not a definitive collision**: account identities cannot be validated from a private CSV report. Output files remain separate; cross-file reference matches are warnings only.
+- A downloaded BANKTRANLIST alone does not prove **all historical transactions** were returned or that transactions sum to LEDGERBAL; beginning balances, bank-side retrieval history and real import results are unavailable.
+- Added synthetic OFX 1.x/2.x Node tests and real Chrome upload/download tests of identical vs conflicting FITIDs, mixed account markers, privacy-safe validation and intact cents. **Authentic bank UAT = 0; actual QuickBooks target imports = 0.** Preview stays noindex.
+
 ## V2.14 — OFX/QFX/QBO corrections, sign consistency, time zone bounds (2026-11-05)
 
 - **Fail closed on correction instructions.** The OFX statement specification defines `CORRECTFITID` and `CORRECTACTION` (`REPLACE`/`DELETE`) as updates to a *previously sent transaction*. Since this local stateless CSV reader has no prior FITID/transaction history, it cannot safely apply a deletion or replacement. It now rejects the entire source if either correction element appears inside a real STMTTRN (including empty/unknown variants) instead of misrepresenting the corrected record as a fresh transaction. Error reports mention only the ordinal source row and syntax, **never** the corrected FITID.
