@@ -46,6 +46,19 @@ jobs:
           command -v google-chrome
           npm install --no-save --no-package-lock playwright-core@1.55.0
           npm run test:browser
+      - name: One-time independent free CSV-QBO competitor conversion comparison
+        if: github.head_ref == 'test/alternative-competitor-qbo-blackbox-20261105'
+        run: node scripts/probe-alternative-qbo-competitors.mjs
+      - name: Archive alternative competitor synthetic-only comparison
+        if: github.head_ref == 'test/alternative-competitor-qbo-blackbox-20261105'
+        uses: actions/upload-artifact@v4
+        with:
+          name: alternative-competitor-csv-qbo
+          path: |
+            alternative-competitor-probe.json
+            alternate-competitor-sonomir.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload synthetic browser failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
