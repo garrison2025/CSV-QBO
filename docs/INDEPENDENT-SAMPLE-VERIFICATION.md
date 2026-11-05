@@ -47,3 +47,7 @@ The external Wells Fargo-style fictional sample has a blank Payee and populated 
 ## V2.13 — date/amount safety edge cases
 
 Synthetic CSV regression cases test genuinely ambiguous month/day order (e.g. 03/04/2026) and ensure changing from US to day-first alters only the intended calendar interpretation, not amounts or record order. An all-blank Debit/Credit row fails rather than fabricating a zero-dollar transaction. Explicit 0.00 and amounts of USD 1,000,000 or greater are preserved, but require a visible review acknowledgment in the website. These are safety and usability results on mock data, not authentic bank compatibility or actual QuickBooks upload acceptance.
+
+## V2.14 — synthetic OFX transaction-correction and sign safety cases
+
+Synthetic OFX 1.x SGML and 2.x XML test files now exercise `CORRECTFITID`/`CORRECTACTION` as valid *correction* commands, not ordinary purchases. All variants, including `DELETE`/`REPLACE`, incomplete declarations and unknown actions, **block** download; the reader does not try to reconstruct prior FITID history. Sample values placed in XML CDATA/comments are not mistaken for actual correction tags. Explicit DEBIT/CREDIT sign mismatches trigger review but preserve original signed cents. Invalid GMT offsets fail rather than being silently accepted. Browser tests exercise actual QBO file upload, error privacy, sign warnings and downloaded CSV contents. These are local/synthetic checks only, not authentic bank exports or acceptance by QuickBooks.
