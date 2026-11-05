@@ -51,9 +51,12 @@ export function isoDate(input, format='us') {
   const v = String(input ?? '').trim();
   let y, m, d, match;
   if ((match = v.match(/^(\d{4})-(\d{2})-(\d{2})$/))) { [,y,m,d] = match; }
-  else if ((match = v.match(/^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2})?)?(?:\.\d{1,3})?(?:\[[+-]?\d{1,2}(?::[A-Za-z0-9_.+-]+)?\])?$/))) {
+  else if ((match = v.match(/^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2})(\d{2})?)?(?:\.\d{1,3})?(?:\[([+-]?\d{1,2}(?:\.\d{1,2})?)(?::[A-Za-z0-9_.+-]+)?\])?$/))) {
     [,y,m,d] = match;
-    if (match[4] != null && (Number(match[4]) > 23 || Number(match[5]) > 59 || (match[6] != null && Number(match[6]) > 59))) fail('Invalid OFX clock time: ' + v);
+    if (match[4] != null && (Number(match[4]) > 23 || Number(match[5]) > 59 || (match[6] != null && Number(match[6]) > 59))) fail('Invalid OFX clock time.');
+    // OFX 2.2 permits signed integer/fractional GMT-hour offsets, bounded
+    // to -12 through +12. Reject impossible zones, do not adjust posted dates.
+    if (match[7] != null && Math.abs(Number(match[7])) > 12) fail('Invalid OFX GMT offset: allowed range is -12 to +12 hours.');
   }
   else if ((match = v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/))) {
     y = match[3]; m = format === 'eu' ? match[2] : match[1]; d = format === 'eu' ? match[1] : match[2];
@@ -588,30 +591,41 @@ export function parseOFX(text) {
   if(bankBounds&&blocks.some(block=>block.index<bankBounds.begin||block.index+block[0].length>bankBounds.end))
     fail('OFX contains transactions outside the declared BANKTRANLIST. No data was exported.');
   let missingReferenceCount=0,missingTypeCount=0,postedBeforeRangeCount=0,postedAfterRangeCount=0;
+  let inconsistentTypeSignCount=0;
   const transactions=blocks.map((m,i)=>{
     const openTag=m[0].match(/^<STMTTRN\b[^>]*>/i)?.[0];
     const closeTag=m[0].match(/<\/STMTTRN\s*>$/i)?.[0];
     if(!openTag||!closeTag)fail('Invalid OFX transaction boundary.');
     const b=original.slice(m.index+openTag.length,m.index+m[0].length-closeTag.length);
     try{
+      // CORRECTACTION=DELETE/REPLACE refers to an earlier FITID, possibly
+      // downloaded in ANOTHER statement. Flattening such a record into a
+      // normal CSV transaction could double-count or resurrect deleted rows.
+      // The reader cannot safely apply cross-download correction history.
+      const recordStructure=ofxViews(b).structure;
+      if(/<CORRECT(?:FITID|ACTION)\b/i.test(recordStructure))
+        fail('OFX correction action detected (CORRECTFITID/CORRECTACTION). DELETE/REPLACE cannot be safely applied to a flat CSV without prior FITID history; no transactions were exported.');
       const date=ofxField(b,'DTPOSTED',xml),amount=ofxField(b,'TRNAMT',xml);
       const description=ofxField(b,'NAME',xml)||ofxField(b,'MEMO',xml);
       if(!description)fail('Transaction NAME and MEMO are both empty.');
       const id=ofxField(b,'FITID',xml),type=ofxField(b,'TRNTYPE',xml);
       if(!id)missingReferenceCount++;
       if(!type)missingTypeCount++;
+      const signedCents=toMinorUnits(amount);
+      if((type.toUpperCase()==='DEBIT'&&signedCents>0n)||
+         (type.toUpperCase()==='CREDIT'&&signedCents<0n))inconsistentTypeSignCount++;
       // OFX search ranges track bank system-add time, not necessarily DTPOSTED.
       // Warn about surprises, never drop rows or treat the difference as an error.
       const postedDate=isoDate(date);
       if(reportedStartDate&&postedDate<reportedStartDate)postedBeforeRangeCount++;
       if(reportedEndDate&&postedDate>reportedEndDate)postedAfterRangeCount++;
       // OFX TRNAMT is already signed. TRNTYPE does not redefine its sign.
-      return {date:postedDate,amount:fromMinorUnits(toMinorUnits(amount)),
+      return {date:postedDate,amount:fromMinorUnits(signedCents),
         description,memo:ofxField(b,'MEMO',xml),id};
     }catch(e){fail('OFX transaction '+(i+1)+': '+e.message);}
   });
   return {transactions,source:'OFX / QBO / QFX',
-    integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,
+    integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,inconsistentTypeSignCount,
       declaredCurrency:currencyTags.length?'USD':null,
       statementRange:reportedStartDate||reportedEndDate?{startInclusive:reportedStartDate,endExclusive:reportedEndDate}:null,
       postedBeforeRangeCount,postedAfterRangeCount},
@@ -620,6 +634,7 @@ export function parseOFX(text) {
       ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[]),
       ...(missingReferenceCount?[missingReferenceCount+' OFX transaction(s) have no FITID; duplicate/reference checks may be incomplete.']:[]),
       ...(missingTypeCount?[missingTypeCount+' OFX transaction(s) have no TRNTYPE; signed amounts remain unchanged.']:[]),
+      ...(inconsistentTypeSignCount?[inconsistentTypeSignCount+' OFX transaction(s) have DEBIT/CREDIT types that disagree with the signed TRNAMT amount. The amount was NOT inverted or discarded; verify the original bank statement before any import.']:[]),
       ...(bankList&&(reportedStartDate==null||reportedEndDate==null)?['BANKTRANLIST has incomplete DTSTART/DTEND date coverage metadata. Verify the selected statement period.']:[]),
       ...(postedBeforeRangeCount||postedAfterRangeCount?[(postedBeforeRangeCount+postedAfterRangeCount)+' OFX posted date(s) lie outside the reported retrieval dates. This can be legitimate because OFX search uses bank system-add time; review without dropping any rows.']:[])
     ]};
