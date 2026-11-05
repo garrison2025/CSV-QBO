@@ -67,6 +67,25 @@ try{
       result.syntheticUploadSelected=true;
       result.status='synthetic_input_supplied_no_download_yet';
       await page.waitForTimeout(3200);
+      result.uploadInputMeta=await inputs.first().evaluate(e=>({
+        name:e.name||null,accept:e.accept||null,files:e.files?.length||0,
+        parentText:e.parentElement?.parentElement?.innerText?.slice(0,500)||''
+      })).catch(()=>null);
+      const availableNodes=page.locator('button,[role="button"],input[type="submit"],a[download]');
+      result.allVisibleControls=[];
+      for(const node of (await availableNodes.all()).slice(0,65)){
+        if(!await node.isVisible().catch(()=>false))continue;
+        const info=await node.evaluate(e=>({
+          tag:e.tagName.toLowerCase(),
+          type:e.type||null,
+          aria:e.getAttribute('aria-label')||null,
+          text:(e.innerText||e.value||'').trim().slice(0,95)
+        })).catch(()=>null);
+        if(info)result.allVisibleControls.push(info);
+      }
+      result.uploadStatusText=(await page.locator('body').innerText().catch(()=>''))
+        .slice(0,1800);
+      result.fileDownloadAnchors=await page.locator('a[download],a[href$=".qbo"]').count();
       const available=page.getByRole('button',{name:/convert|download|generate|export/i});
       const buttons=await available.all();
       result.actionButtonsSeen=[];
