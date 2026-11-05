@@ -253,6 +253,46 @@ try{
  assert.match(journalSheet,/000111/);
  console.log('PASS Chrome IIF CR-only balanced TRNS/SPL bank-summary output without partial rows');
 
+ // Some IIF exports declare both AMOUNT and AMT. Accept them only when
+ // equivalent at exact integer-cent precision; validate actual XLSX cells.
+ await page.goto(base+'/tools/iif-to-excel/');
+ const dualIif=['!TRNS\tDATE\tAMOUNT\tAMT\tMEMO\tDOCNUM',
+  '!SPL\tAMOUNT\tAMT',
+  'TRNS\t11/04/2026\t-2.35\t-$2.35\tValid rent\t000007',
+  'SPL\t2.35\t$2.35',
+  'ENDTRNS',''].join('\n');
+ await page.locator('#file-input').setInputFiles(file('dual.iif',dualIif));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-2.35');
+ await page.locator('#warning-ack').check();
+ output=await dl('#export-button');
+ const dualSheet=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
+ assert.match(dualSheet,/<c r="C2" s="1"><v>-2\.35<\/v><\/c>/);
+ assert.match(dualSheet,/<c r="D2" t="inlineStr"><is><t xml:space="preserve">000007<\/t><\/is><\/c>/);
+ console.log('PASS Chrome IIF matching AMOUNT/AMT aliases preserve exact bank-side cents and document ID');
+
+ // New failed upload must clear previous preview and block stale downloads.
+ const badAmountIif=dualIif.replace('TRNS\t11/04/2026\t-2.35\t-$2.35',
+   'TRNS\t11/04/2026\t-2.35\t-2.36');
+ await page.locator('#file-input').setInputFiles(file('different-amount.iif',badAmountIif));
+ await page.locator('#work-status[data-state="error"]').waitFor({state:'visible'});
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.match(await page.locator('#work-status').textContent(),/AMOUNT and AMT values disagree/);
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('Valid rent'));
+ console.log('PASS Chrome IIF contradictory AMOUNT/AMT fails closed without stale export');
+
+ const extraColumnIif=dualIif.replace('000007','000007\tCONFIDENTIAL EXTRA');
+ await page.locator('#file-input').setInputFiles(file('extra-field.iif',extraColumnIif));
+ await page.locator('#work-status[data-state="error"]').waitFor({state:'visible'});
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.match(await page.locator('#work-status').textContent(),/header declares 5/);
+ assert.ok(!(await page.locator('#work-status').textContent()).includes('CONFIDENTIAL'));
+ console.log('PASS Chrome IIF extra ledger column rejects input with privacy-safe error');
+
+
 
 
  await page.goto(base+'/');

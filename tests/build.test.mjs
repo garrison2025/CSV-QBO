@@ -311,3 +311,21 @@ test('all generic CSV exits enforce source-to-wire preflight without changing Qu
   assert.match(html,/noindex,nofollow/);
  }
 });
+
+
+test('IIF converter pages disclose strict columns and dual signed-amount validation without indexing preview',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ const iif=tools.filter(x=>x.input==='iif');
+ assert.equal(iif.length,2);
+ for(const item of iif){
+  const html=read('tools/'+item.slug+'/index.html');
+  assert.match(html,/IIF source field counts must now match each !TRNS\/!SPL header exactly/);
+  assert.match(html,/When both AMOUNT and AMT are populated, they must agree in signed integer cents/);
+  assert.match(html,/not a full ledger or a verified bank import/);
+  assert.match(html,/noindex,nofollow/);
+ }
+ const parser=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ assert.match(parser,/IIF line '\+atLine\+': '\+tag\+' contains/);
+ assert.match(parser,/AMOUNT and AMT values disagree/);
+ assert.match(parser,/ENDTRNS contains unexpected fields/);
+});

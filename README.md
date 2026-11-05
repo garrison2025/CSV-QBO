@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V2.5 — exact IIF field-width and dual-amount reconciliation
+
+- **Fixed silent extra-field loss:** the IIF reader previously matched `TRNS`/`SPL` fields by the declared `!TRNS`/`!SPL` headers but silently ignored any extra tab-separated cells. The reader now rejects any transaction-row field count that differs from its declared header (including unexpectedly short rows), as well as `ENDTRNS` lines with additional cells. Empty/duplicate header names also fail closed.
+- **Fixed ambiguous signed money:** when IIF source headers declare both `AMOUNT` and `AMT`, the reader now parses both into exact signed integer cents and requires equality. Contradictory values reject the source, instead of silently choosing one amount. Files with only `AMOUNT`, only `AMT`, or one populated alias alongside an empty one remain supported.
+- Existing zero-sum `TRNS`/`SPL` group validation, source ordering, reference IDs and report privacy remain intact. IIF still exports **checked TRNS summaries only**, not SPL allocations, not a reconstructed accounting ledger, and not a verified bank statement.
+- Node regressions check extra/missing TRNS and SPL columns, mismatching dual-amount aliases, malformed ENDTRNS, header cardinality, fallback aliases, exact cents and all-or-nothing batch ZIP rejection. Real Chrome tests upload a valid dual-amount IIF and inspect XLSX money/ID cells, then verify invalid files disable previous previews/downloads with privacy-safe errors.
+- Both IIF landing pages now disclose stricter schema validation. This is synthetic file-integrity testing rather than a real QuickBooks/Excel import acceptance. Free Cloudflare technical preview continues with `noindex,nofollow`.
+
 ## V2.4 — CSV source text fidelity and exact source-to-wire preflight
 
 - **Fixed silent text loss in CSV import:** the older CSV/TSV importer trimmed outer spaces from merchant descriptions and reference IDs. Date and amount syntax still accepts surrounding whitespace, but Description, Reference and separately mapped Memo are now preserved **byte-for-byte at the decoded text level** (including quoted leading/trailing spaces and embedded quoted line breaks) through parsing and supported exports. Audit matching may normalize descriptions for duplicate detection without modifying the exported row.

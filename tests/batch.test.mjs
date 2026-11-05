@@ -285,3 +285,38 @@ test('batch generic CSV source-to-wire validation retains payee/reference whites
  assert.ok(!JSON.stringify(result.report).includes('000012'));
  assert.deepEqual(result.report.files.map(f=>f.net),['-1.25','4.00']);
 });
+
+
+test('batch rejects any IIF row-width or AMOUNT/AMT contradiction without producing a partial ZIP',()=>{
+ const qif='!Type:Bank\nD11/04/2026\nT1.00\nPValid first bank\n^\n';
+ const header='!TRNS\tDATE\tAMOUNT\tAMT\tMEMO\n!SPL\tAMOUNT\tAMT\n';
+ const invalid=[
+  header+'TRNS\t11/04/2026\t-1.00\t-1.00\tPRIVATE\tEXTRA\nSPL\t1.00\t1.00\nENDTRNS\n',
+  header+'TRNS\t11/04/2026\t-1.00\t-1.01\tPRIVATE\nSPL\t1.00\t1.00\nENDTRNS\n',
+  header+'TRNS\t11/04/2026\t-1.00\t-1.00\tPRIVATE\nSPL\t1.00\t0.99\nENDTRNS\n',
+ ];
+ for(const [i,text]of invalid.entries()){
+  try{batchConvert([{name:'safe.qif',text:qif},{name:'private.iif',text}],{target:'csv'});
+      assert.fail('Expected to reject corrupt IIF before batch archive');
+  }catch(error){
+    if(error.code==='ERR_ASSERTION')throw error;
+    assert.match(error.message,/Batch file 2:/);
+    assert.match(error.message,i===0?/field\(s\), but its header declares/:/AMOUNT and AMT values disagree/);
+    assert.ok(!error.message.includes('PRIVATE'));
+    assert.ok(!error.message.includes('safe.qif'));
+  }
+ }
+});
+test('valid IIF with dual amount aliases produces unchanged signed cents in batch summary',()=>{
+ const content='!TRNS\tDATE\tAMOUNT\tAMT\tMEMO\tDOCNUM\n!SPL\tAMOUNT\tAMT\n'+
+ 'TRNS\t11/04/2026\t-0.01\t-0.01\tPrivate rent\t0006\n'+
+ 'SPL\t0.01\t0.01\nENDTRNS\n';
+ const r=batchConvert([{name:'private.iif',text:content}],{target:'csv'});
+ assert.equal(r.report.totalFiles,1);
+ assert.equal(r.report.totalTransactions,1);
+ assert.equal(r.report.files[0].net,'-0.01');
+ assert.equal(r.report.files[0].rows,1);
+ const report=JSON.stringify(r.report);
+ assert.ok(!report.includes('Private rent'));
+ assert.ok(!report.includes('0006'));
+});
