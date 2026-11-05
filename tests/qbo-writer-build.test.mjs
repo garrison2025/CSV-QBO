@@ -21,7 +21,7 @@ test('CSV-QBO experimental route remains outside SEO tool registry',()=>{
      assert.ok(page.includes('id="'+id+'"'),id);
    assert.ok(existsSync(path.join(folder,'assets','qbo-writer.mjs')));
    assert.ok(existsSync(path.join(folder,'assets','qbo-writer-ui.mjs')));
-   assert.match(page,/sonomir-synthetic-reference-test-only\\.qbo/);
+   assert.match(page,/sonomir-synthetic-reference-test-only\.qbo/);
    const ref=readFileSync(path.join(folder,'samples','sonomir-synthetic-reference-test-only.qbo'));
    assert.equal(ref.length,923);
    assert.equal(createHash('sha256').update(ref).digest('hex'),'00e5202de9a425ed3d0c4fba337271e54cfe8e48a87538c394c378ae95a74e69');
