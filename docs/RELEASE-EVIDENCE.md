@@ -219,3 +219,12 @@
 - Node core/UI/batch/build and real Chrome E2E cover mapping, quote/newline values, memo output opt-in, malicious formula-like strings, warning/review reset and actual CSV/XLSX/ZIP downloads.
 - QuickBooks target-app acceptance and real-bank provider dialects remain NOT TESTED; technical preview remains noindex and no paid APIs are used.
 - CI/Cloudflare release evidence must be verified independently after merge.
+
+## V2.4 — exact generic CSV export reconciliation and source text fidelity (2026-11-05)
+
+- CSV/TSV source parsing now preserves the exact decoded Description and Reference fields, including outer spaces in quoted cells, rather than silently trimming user/bank text. Date and numeric amount remain syntax-normalized; separate Memo remains untouched.
+- Generic CSV outputs on both single-file and batch ZIP paths now use `genericCSVExportPlan`: re-encode/reparse generated UTF-8, reconcile each source row in source order, compare original date, integer-cent signed amount, full description, ID and optional Memo, and allow only deliberate spreadsheet-formula apostrophe guarding.
+- The validation summary exposes only row/column counts, memo presence/omission counts, guarded-cell counts and true/false reconciliation flags; source bank details are excluded from reports and errors.
+- New tests attack tampered dates, merchant descriptions, IDs, amounts, Memo, headers, row counts, absent formula guards, invalid unicode/NUL, and 1,200 Unicode/multiline records. Chrome file uploads validate exact whitespace preservation in QIF→CSV and quoted CSV→QIF, without an unsupported data conversion.
+- Existing QuickBooks Online 3-column report/CSV export, native Excel typed cells and QIF M records remain as before. Real bank/provider and QuickBooks import UAT NOT RUN; technical preview remains noindex.
+- CI/Cloudflare evidence follows after verified release.
