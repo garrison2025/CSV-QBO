@@ -1,4 +1,4 @@
-import {MAX_FILE_BYTES,decodeFinancialBytes,parseCSV,guessMapping,parseInput,toCSV,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals,escapeHtml} from './core.mjs';
+import {MAX_FILE_BYTES,decodeFinancialBytes,parseCSV,guessMapping,parseInput,genericCSVExportPlan,toQIF,toQuickBooksCSV,quickBooksCSVParts,quickBooksCSVExportPlan,auditTransactions,totals,escapeHtml} from './core.mjs';
 import {toXLSX,toZIP} from './xlsx.mjs';
 import {batchConvert,MAX_BATCH_FILES,MAX_BATCH_BYTES} from './batch.mjs';
 
@@ -366,7 +366,7 @@ if(drop && fileInput){
     const target=formatPicker?formatPicker.value:fixedOutput;
     let content,mime,ext;
     try{
-      if(target==='csv'){content=toCSV(parsed.transactions,['date','description','amount','id',...($('#include-memo').checked?['memo']:[])]);mime='text/csv;charset=utf-8';ext='csv';}
+      if(target==='csv'){content=genericCSVExportPlan(parsed.transactions,{includeMemo:$('#include-memo').checked}).csv;mime='text/csv;charset=utf-8';ext='csv';}
       else if(target==='qb-csv'){
         const {parts,report}=quickBooksCSVExportPlan(parsed.transactions);
         if(parts.length===1){content=parts[0];mime='text/csv;charset=utf-8';ext='csv';}
