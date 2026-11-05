@@ -1,3 +1,12 @@
+## V2.16 — bank-reported OFX balances as unverified metadata (2026-11-05)
+
+- OFX/QBO/QFX read-only import now explicitly inspects optional `LEDGERBAL` (ledger balance) and `AVAILBAL` (available balance) aggregates in both OFX 1.x SGML and OFX 2.x XML, validating their `BALAMT` as exact signed USD cents and their `DTASOF` as a real calendar date. Empty fields, duplicate/truncated balance blocks, impossible dates or malformed amounts **block** the whole source instead of silently discarding malformed financial metadata.
+- Original bank balance *amounts* are validated in the local browser and immediately discarded: the preview/validation JSON records only balance presence, bank-reported as-of dates and `independentReconciliationPerformed:false`. It never publishes bank balances, account identifiers or calculated opening balances.
+- A warning and visible note distinguish **bank-provided closing/available balance metadata** from true financial reconciliation. The sum of the available `STMTTRN` records cannot independently establish the bank's opening balance, complete posting history or exact closing ledger value. No fake "balanced" result is emitted.
+- Ordinary OFX without optional balance elements remains supported; its review explicitly states no balances were supplied. Any change of source file clears old balance preview state and previous download permission.
+- Added independent synthetic OFX SGML/XML data, damaged-balance and inert comment/CDATA fixtures, batch privacy tests and a real Chrome upload/report/CSV/download/refusal acceptance path.
+- Real bank-issued source evidence remains **0**, target QuickBooks import tests remain **0**. Preview retains `noindex,nofollow`; no bank compatibility certification is claimed.
+
 ## V2.15 — account-scoped OFX FITID collision integrity (2026-11-05)
 
 - **Banking specification grounding:** The [OFX 2.2 specification §3.2.3](https://www.financialdataexchange.org/common/Uploaded%20files/OFX%20files/OFX%202.2.pdf) defines `FITID` as a transaction identifier unique **within an account**, primarily used to detect duplicate responses. The converter does not assume identifiers are globally unique across different accounts or institutions.
