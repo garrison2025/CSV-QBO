@@ -20,6 +20,14 @@ A **browser-local financial file conversion site** developed from the user-provi
 
 **Critical distinction:** reading transaction data from a `.qbo` file ≠ generating a bank-compatible `.qbo` file. This code never claims a QuickBooks import was validated.
 
+## V2.4 — CSV source text fidelity and exact source-to-wire preflight
+
+- **Fixed silent text loss in CSV import:** the older CSV/TSV importer trimmed outer spaces from merchant descriptions and reference IDs. Date and amount syntax still accepts surrounding whitespace, but Description, Reference and separately mapped Memo are now preserved **byte-for-byte at the decoded text level** (including quoted leading/trailing spaces and embedded quoted line breaks) through parsing and supported exports. Audit matching may normalize descriptions for duplicate detection without modifying the exported row.
+- **Added generic CSV export preflight:** both single-file and separate-file batch CSV downloads call `genericCSVExportPlan`. The generated CSV is encoded to UTF-8 and reparsed before returning a download; every source row is reconciled in **original order** against ISO date, canonical signed integer-cent amount, complete merchant/payee, reference ID and optional Memo. Spreadsheet formula-guard apostrophes are the sole permitted text transformation; missing or extra rows, shuffled cells, altered descriptions, removed guards, invalid quote structure, NUL and lossy Unicode encoding fail closed.
+- **Private validation metadata:** `validateGenericCSVExport` returns only row and column counts, boolean order/text/amount reconciliation flags, memo-included/omitted row counts and formula-guarded cell count. Errors include at most a source row number and field name, never bank values, filenames or merchant IDs.
+- **Compatibility:** existing 4-column generic CSV and opt-in 5-column CSV structures remain unchanged; QuickBooks manual-upload CSV continues to use its distinct 3-column source reconciliation and is not altered. Excel, QIF and batch source accounts are untouched.
+- **Evidence:** Node tests cover tampered rows with unchanged net totals, text/id/date/memo/amount reorder mismatches, whitespace preservation, formula-safe cells, 1,200-row UTF-8/multiline sources, invalid Unicode, and batch ZIP privacy. Real Chrome uploads synthetic QIF and quoted CSV, then verifies the exact returned CSV/QIF file strings. Preview remains `noindex,nofollow`; no paid API or server-side financial upload.
+
 ## V2.3 — optional independent Memo columns without changing QuickBooks three-column import
 
 - Previously the generic CSV and XLSX export default contained only Date, Description, signed Amount and Reference. For QIF/OFX bank sources that also contain **independent Memo details**, this meant those details were silently excluded even though the parser had preserved them in memory.
