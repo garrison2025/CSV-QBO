@@ -976,6 +976,77 @@ try{
  assert.equal(await page.locator('#export-button').isDisabled(),true);
  console.log('PASS Chrome manual Windows-1252 CSV import, exact accented text/cents, warning gate, BOM precedence and stale download reset');
 
+ // Real Chrome: Excel sep=; is a delimiter hint on physical line 1,
+ // not a transaction row or a reason to skip arbitrary bank statement data.
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ const declaredCSV='sep=;\r\nDate;Description;Amount;Reference\r\n'+
+   '11/04/2026;"Café, Books";-12.50;000123\r\n'+
+   '11/05/2026;Paycheck;20.75;000124\r\n';
+ assert.equal(await page.locator('#source-delimiter').inputValue(),'auto');
+ await page.locator('#file-input').setInputFiles(file('declared-semicolon.csv',declaredCSV));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'2');
+ assert.equal(await page.locator('#summary-net').textContent(),'8.25');
+ assert.equal(await page.locator('#preview-body tr').first().locator('td').nth(1).textContent(),'Café, Books');
+ assert.match(await page.locator('#warning-list').textContent(),/Excel sep= delimiter instruction/);
+ assert.match(await page.locator('#warning-list').textContent(),/source line 1/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const sepReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.deepEqual(sepReport.sourceDialect,{delimiter:';',excelSepDirective:true,manualDelimiterSelected:false});
+ assert.equal(sepReport.transactionCount,2);
+ assert.ok(!JSON.stringify(sepReport).includes('000123'));
+ assert.ok(!JSON.stringify(sepReport).includes('Café, Books'));
+ await page.locator('#warning-ack').check();
+ const declaredDownload=(await dl('#export-button')).content.toString('utf8');
+ assert.match(declaredDownload,/Café, Books/);
+ assert.match(declaredDownload,/-12\.50/);
+ assert.match(declaredDownload,/20\.75/);
+ await page.locator('#source-delimiter').selectOption('comma');
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('sep= delimiter declaration conflicts'));
+ assert.equal(await page.locator('#mapping-panel').isHidden(),true);
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ await page.locator('#source-delimiter').selectOption('semicolon');
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-net').textContent(),'8.25');
+ assert.match(await page.locator('#warning-list').textContent(),/explicitly selected as semicolon/);
+ assert.equal(await page.locator('#warning-ack').isChecked(),false);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const manualSepReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
+ assert.equal(manualSepReport.sourceDialect.manualDelimiterSelected,true);
+ assert.equal(manualSepReport.sourceDialect.excelSepDirective,true);
+ await page.locator('#warning-ack').check();
+ const manualSepCsv=(await dl('#export-button')).content.toString('utf8');
+ assert.match(manualSepCsv,/Café, Books/);
+ console.log('PASS Chrome Excel sep=; marker, signed cents, mismatch refusal and manual selection warning gate');
+
+ // First logical headers with tied comma/semicolon counts cannot choose a
+ // separator safely. User must explicitly select one and map the payee.
+ const tiedCSV='Date;Description,with,commas;Amount\n11/04/2026;Café;-2.75\n';
+ await page.locator('#source-delimiter').selectOption('auto');
+ await page.locator('#file-input').setInputFiles(file('tied-delimiters.csv',tiedCSV));
+ await page.waitForFunction(()=>document.querySelector('#work-status')?.textContent?.includes('ambiguous separators'));
+ assert.equal(await page.locator('#mapping-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#source-delimiter').selectOption('semicolon');
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#map-description').selectOption('1');
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-2.75');
+ assert.match(await page.locator('#warning-list').textContent(),/explicitly selected as semicolon/);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#warning-ack').check();
+ assert.match((await dl('#export-button')).content.toString('utf8'),/Café,-2\.75/);
+ await page.locator('#clear-workspace').click();
+ assert.equal(await page.locator('#source-delimiter').inputValue(),'auto');
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#download-report').isDisabled(),true);
+ console.log('PASS Chrome tied CSV delimiter requires manual selection, no guessed transactions, clear resets state');
+
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
