@@ -22,9 +22,9 @@ The fixture contains Sonomir's test FID/BID 3000 and test account 0000. Those va
 
 | Layer | State | Evidence |
 |---|---|---|
-| Writes a real `.qbo` Web Connect-formatted file | implemented in feature branch | `src/qbo-writer.mjs` |
-| Independent synthetic comparator transactions | automated test implemented; CI result must be checked | `tests/qbo-writer.test.mjs` |
-| Browser upload, preview, download | requires Chrome Actions acceptance | `/lab/csv-to-qbo/` |
+| Writes a real `.qbo` Web Connect-formatted file | merged to `main` (PR #46) | `src/qbo-writer.mjs` |
+| Independent synthetic comparator transactions | passed CI; tested with real competitor-generated 923-byte synthetic QBO fixture | `tests/qbo-writer.test.mjs` |
+| Browser upload, preview, download | Chrome upload/download and source-row reconciliation passed | `/lab/csv-to-qbo/` |
 | Real QuickBooks import | NOT verified (0 observed) | no UAT evidence |
 | Real bank reference authenticity / software version interoperability | NOT verified | no approved evidence |
 | Public `/tools/csv-to-qbo/` SEO release | NOT approved | release gate unchanged |
@@ -37,8 +37,11 @@ Only `syntax_valid_only` is a justified label until target-software import succe
 - Feature-branch full CI and real Chrome [#41991061284](https://github.com/garrison2025/CSV-QBO/actions/runs/41991061284): **success**. Chrome selected fictional CSV and the previously downloaded real Sonomir QBO as reference, downloaded an actual `.qbo`, and verified two ordered transactions and exact net **825 cents**. Replacing a CSV invalidated stale export; local Clear reset both file selections; mobile layout and page JS-error checks passed.
 - Main-branch CI [#41991208644](https://github.com/garrison2025/CSV-QBO/actions/runs/41991208644): **success** after merge.
 - Cloudflare Pages reported successful deployment for merge commit. A separate live fetch confirmed `https://csv-qbo.pages.dev/lab/csv-to-qbo/` returns the pilot page with `robots=noindex,nofollow`. This live fetch checked page content and metadata, not a live browser file upload; the latter was independently exercised against the built site in GitHub Actions Chrome.
+- Validation PR [#47](https://github.com/garrison2025/CSV-QBO/pull/47) merged as `b18400f4ef249d14bfe21dc7b8faf34109d7285f`. Its feature CI [#41992770604](https://github.com/garrison2025/CSV-QBO/actions/runs/41992770604) passed **545 tests (0 failures)**, including extended 1,000-row, 350 KB, FITID cross-account and year-2100 boundaries. Cloudflare deployed the resulting live test-only link, with page-level `noindex,nofollow` preserved.
+- The pinned fictional QBO reference download is at `/samples/sonomir-synthetic-reference-test-only.qbo`; the builder enforces 923 bytes and SHA-256 `00e5202de9a425ed3d0c4fba337271e54cfe8e48a87538c394c378ae95a74e69`. It contains fictional FI/account metadata and must not be used with real QuickBooks company data.
+- Response-header hardening explicitly sets `X-Robots-Tag: noindex, nofollow, noarchive` on the lab and synthetic QBO sample path, including in simulated custom-domain production builds. This is separate from and additional to HTML meta robots.
 - Engineering acceptance is strictly **synthetic comparator data agreement / syntax-valid QBO wire / browser download passed**. Actual QuickBooks import **0 observed**. Original AccountingConverter and DocuClipper outgoing bytes **not obtained**. Never label this target-software compatibility verified.
 
 ## Remaining gate
 
-Verify CI and the real Chrome download before merging this feature branch. Retain the reference's authorized provenance and a separate QuickBooks target-version import record when eventually assessing actual software interoperability. Keep the root site and this pilot unindexed on the pages.dev preview until a real production hostname is explicitly approved.
+Main branch has passed end-to-end Chrome and CI validation. Do not remove the experimental status without scope-specific QuickBooks import evidence. Retain the reference's authorized provenance and a separate QuickBooks target-version import record when eventually assessing actual software interoperability. Keep the root site and this pilot unindexed on the pages.dev preview until a real production hostname is explicitly approved.
