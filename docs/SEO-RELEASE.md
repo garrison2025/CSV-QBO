@@ -22,9 +22,17 @@ The 250 terms are stored in `data/keywords-250.json` with source domain, US volu
 ## Deterministic build gates
 
 - Preview builds: `noindex,nofollow` and `robots.txt` `Disallow: /`; no canonical/sitemap hostname guessed.
-- Production opt-in: `SITE_URL` must be real `https://` custom domain, `PUBLISH_SEO=true`. Only `release=read_only_tested`, nonbrand, KD <=29 pages enter sitemap; `syntax_only` and unverified keywords remain `noindex`.
+- Production opt-in now requires all of: a real HTTPS custom domain in `SITE_URL`, `PUBLISH_SEO=true`, `data/production-release.json` explicitly owner-approved with reviewed date and route slugs, and a matching owner-reviewed REAL BANK export evidence case in `data/uat-public.json` for each approved route. Only nonbrand `read_only_tested` tool routes with Semrush KD <=29 qualify. Zero accepted evidence and zero owner approvals keep **every page** `noindex` and emit no sitemap even if the production environment variables are accidentally set. `syntax_only`, imported-target-unverified and QBO-writing routes cannot be released automatically.
 - Unknown URLs return a real 404 (Cloudflare Pages `404.html`).
 - Source content is in initial static HTML; no JS-only headings or link structure.
 - No fabricated reviews, stars, traffic, income, savings, conversion rate or QuickBooks compatibility.
 - Every production route needs actual parser/serializer tests, independent intent and original format-specific content.
 - Validate production canonical and Search Console after domain confirmation; do not submit pages.dev preview as production.
+
+
+## V2.9 — two independent release conditions (2026-11-05)
+
+1. Complete a genuine bank export acceptance (specific bank, export dialect, region, transaction-level reconciliation, privacy-reviewed evidence). Register only reviewed, sanitized cases in `data/uat-public.json`.
+2. Manually approve each exact nonbrand reader slug in `data/production-release.json` with `approved:true`, `reviewed_at`, `reviewer`, and `approved_routes`. This authorizes search indexing **only for evidence-backed reader directions** and is not bank/Intuit certification.
+
+The current production release file starts unapproved with an empty route list. A developer Sandbox cannot import/export bank files, so target QuickBooks CSV UAT must use an authorized, upload-capable trial/test company and observed manual upload, not sandbox success. See [QuickBooks import UAT](QUICKBOOKS-REAL-IMPORT-UAT.md).
