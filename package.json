@@ -1,6 +1,6 @@
 {
   "name": "finance-file-lab",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "type": "module",
   "description": "Browser-local financial transaction file readers and exports, built for Cloudflare Pages",
@@ -8,7 +8,8 @@
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "npm test && npm run build",
-    "test:browser": "node tests/browser-e2e.mjs"
+    "test:browser": "node tests/browser-e2e.mjs",
+    "uat:check-public": "node scripts/uat-evidence.mjs check-public data/uat-public.json"
   },
   "engines": {
     "node": ">=20"
