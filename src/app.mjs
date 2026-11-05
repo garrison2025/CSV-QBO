@@ -283,6 +283,8 @@ if(drop && fileInput){
     const epoch=++selectionEpoch;
     invalidatePreview();
     file=chosen;table=null;csvEvidence=null;fileText='';fileExt='';fileEncoding='utf-8';$('#mapping-panel').hidden=true;$('#file-name').textContent='';
+    const encodingChoice=$('#encoding-choice');
+    if(encodingChoice)encodingChoice.hidden=!chosen||!['csv','tsv'].includes((chosen.name.split('.').pop()||'').toLowerCase());
     updateMappingAdvice();
     if(!file)return;
     if(file.size>MAX_FILE_BYTES){say('The file is over the 8 MB limit. Try a smaller export.','error');return;}
@@ -291,7 +293,8 @@ if(drop && fileInput){
     if(source!=='any' && source!==ext && !(source==='csv'&&ext==='tsv')){say('This tool expects a .'+source+' input. Choose a matching file or browse another converter.','error');return;}
     $('#file-name').textContent=file.name+' • '+Math.ceil(file.size/1024)+' KB';
     try{
-      const decoded=decodeFinancialBytes(new Uint8Array(await chosen.arrayBuffer()),ext);
+      const decoded=decodeFinancialBytes(new Uint8Array(await chosen.arrayBuffer()),ext,
+        {csvEncoding:['csv','tsv'].includes(ext)?($('#source-encoding')?.value||'auto'):'auto'});
       if(epoch!==selectionEpoch)return; // A superseded async read must not restore old bank data.
       const {text,encoding}=decoded;
       fileText=text;fileExt=ext;fileEncoding=encoding;
@@ -299,10 +302,17 @@ if(drop && fileInput){
         const csvRows=parseCSV(text,ext==='tsv'?'\t':undefined);
         csvEvidence=csvColumnEvidence(csvRows);
         updateMapping(csvRows[0]);
-        say('Select column mappings, then choose Preview transactions.');
+        say((encoding==='windows-1252'?'Windows-1252 selected manually. Verify all accented names and transaction values. ':'')+'Select column mappings, then choose Preview transactions.');
       }else{parsed=withEncodingWarning(parseInput(text,ext,{dateFormat:$('#date-format').value}),encoding);renderResult(parsed);}
     }catch(err){if(epoch===selectionEpoch){invalidatePreview();say(err.message||'Could not read file.','error');}}
   }
+  // Encoding changes must re-read the ORIGINAL bytes (not re-encode stale
+  // decoded strings), clear mapping and invalidate any accepted preview.
+  $('#source-encoding')?.addEventListener('change',()=>{
+    if(!file){invalidatePreview();return;}
+    if(!['csv','tsv'].includes((file.name.split('.').pop()||'').toLowerCase()))return;
+    prepare(file);
+  });
   const batchPicker=$('#batch-input'),batchSelect=$('#batch-choose'),batchExport=$('#batch-export');
   function batchReset(){
     batchArchive=null;batchInfo=null;batchHasWarnings=false;
@@ -382,6 +392,8 @@ if(drop && fileInput){
     batchSay('Batch files and generated ZIP cleared from the workspace.');
     invalidatePreview();
     file=null;table=null;csvEvidence=null;fileText='';fileExt='';fileEncoding='utf-8';
+    if($('#source-encoding'))$('#source-encoding').value='auto';
+    if($('#encoding-choice'))$('#encoding-choice').hidden=source==='any';
     updateMappingAdvice();
     fileInput.value='';
     $('#file-name').textContent='';
@@ -409,7 +421,7 @@ if(drop && fileInput){
     if(!file||!fileText)return;
     invalidatePreview();
     try{
-      const next=parseInput(fileText,fileExt,{mapping:mapping(),dateFormat:$('#date-format').value});
+      const next=withEncodingWarning(parseInput(fileText,fileExt,{mapping:mapping(),dateFormat:$('#date-format').value}),fileEncoding);
       parsed=next;
       renderResult(next);
     }catch(err){
