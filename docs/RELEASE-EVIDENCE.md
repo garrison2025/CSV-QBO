@@ -375,3 +375,9 @@
 - New independent unit tests confirm the local three-column output against Intuit's published example and fail-closed behavior for **reconstructed documentation layouts** from Citi (GBP report currency) and Co-operative Bank (statement preamble/footer). Neither fixture is an original bank download, and no real QuickBooks import is observed.
 - The one-time Test Drive probe trigger was removed from the continuing CI workflow; normal finance, browser and SEO tests remain.
 - Real bank originals accepted **0**. Actual QuickBooks imports accepted **0**. Public UAT registry remains empty. Details: [INTUIT-REAL-IMPORT-UAT-BLOCKERS-20261105.md](./INTUIT-REAL-IMPORT-UAT-BLOCKERS-20261105.md).
+
+## 2026-11-05 — original competitor AccountingConverter black-box differential attempt
+
+- Executed actual Chrome probes with **only fictional synthetic CSV rows**; runner [41982899982](https://github.com/garrison2025/CSV-QBO/actions/runs/41982899982) loaded AccountingConverter CSV→QBO and selected the file. Page displayed **Forbidden**, produced no downloadable QBO; first probe [41982647011](https://github.com/garrison2025/CSV-QBO/actions/runs/41982647011) similarly produced no download. The possible reason for external Forbidden is not certified. No unsafe bypass, private bank data or user account credentials.
+- Our local QuickBooks **manual-upload CSV** re-parsed the same 2 fictional dates, ± amounts and +8.25 net exactly. This checks **our local output only**. Competitor Web Connect QBO bytes not obtained, so **no cross-vendor semantic agreement was observed**; competitor's marketing statements do not prove a real target-account QuickBooks import.
+- One-time external probe removed from normal CI. [Full comparison and evidence-grade matrix](./COMPETITOR-ACCOUNTINGCONVERTER-DIFFERENTIAL-20261105.md). Authentic bank exports UAT **0**; observed QuickBooks target imports **0**. Never infer D/E-level real-product acceptance from published competitor pages.
