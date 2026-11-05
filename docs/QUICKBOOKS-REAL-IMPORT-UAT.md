@@ -29,7 +29,7 @@ Open the authorized QuickBooks Online company. As documented by Intuit (menus ma
 6. Confirm the upload only inside the approved test account; after completion inspect actual recorded amounts, signs and transactions in QuickBooks. Compare to the original bank statement, not just the exporter report.
 7. In a separate disposable account/testing period, evaluate a repeated import only if you can do so without contaminating real books. Record whether duplicates are prevented or possible. Do not assume any default duplicate protection.
 
-Official USA QuickBooks Online help says transaction-list manual uploads support up to **1,000 transactions per upload**. Some regional help describes **350 KB**. The existing website splits single 3-column CSV to 1,000 records / 350 KB per file; this is a conservative generator limit, **not** proof of regional UI acceptance. For more than one generated part, test each upload independently and reconcile imported totals across parts.
+Official USA QuickBooks Online help says transaction-list manual uploads support up to **1,000 transactions per upload**. Some regional help describes **350 KB**. The existing website splits single 3-column CSV to 1,000 records / 350 KB per file; this is a conservative generator limit, **not** proof of regional UI acceptance. For more than one generated part, the local V2.11 ZIP inspector verifies **every serialized CSV part and the included validation report** against the original transactions. That proves the downloaded archive's internal integrity, not QuickBooks acceptance. Manually test each upload independently in an authorized test company, and reconcile imported totals across all parts.
 
 ## 4. Manual audit checklist (keep private)
 
