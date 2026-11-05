@@ -228,3 +228,12 @@
 - New tests attack tampered dates, merchant descriptions, IDs, amounts, Memo, headers, row counts, absent formula guards, invalid unicode/NUL, and 1,200 Unicode/multiline records. Chrome file uploads validate exact whitespace preservation in QIF→CSV and quoted CSV→QIF, without an unsupported data conversion.
 - Existing QuickBooks Online 3-column report/CSV export, native Excel typed cells and QIF M records remain as before. Real bank/provider and QuickBooks import UAT NOT RUN; technical preview remains noindex.
 - CI/Cloudflare evidence follows after verified release.
+
+## V2.5 — strict IIF transaction schema and duplicate money aliases (2026-11-05)
+
+- Prior IIF `fields()` silently ignored extra tab-separated TRNS/SPL cells and invented empty trailing values when a data row was shorter than its `!TRNS`/`!SPL` header. These malformed files could look successful while losing bank/accounting fields.
+- Parser now rejects all declared header/row width mismatches, empty column names and additional ENDTRNS fields with source row count but never private values.
+- When AMOUNT and AMT are both populated, exact signed integer cents must agree; one alias may be blank, or a file may use AMT alone. A mismatch blocks the whole file/ZIP, never a partial output.
+- Node tests cover missing/extra columns, alias mismatch for both transaction and split records, cent accuracy, malformed terminators, header errors, and atomic batch rejection; Chrome E2E checks actual XLSX output and stale download blocking after invalid file upload.
+- Both IIF tools disclose that they export only validated TRNS summaries, not reconstructed ledgers or verified QuickBooks imports.
+- No paid API, backend bank uploads or premature production indexing. Record GitHub and Cloudflare evidence after release verification.
