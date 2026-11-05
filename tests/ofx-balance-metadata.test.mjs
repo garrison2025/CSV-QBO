@@ -20,7 +20,7 @@ const xml=(suffix='',tx=xmlTx)=>'<?xml version="1.0"?><OFX><STMTRS><CURDEF>USD</
   '</BANKTRANLIST>'+suffix+'</STMTRS></OFX>';
 const review={ledgerBalancePresent:true,availableBalancePresent:true,
   ledgerAsOfDate:'2026-11-05',availableAsOfDate:'2026-11-05',
-  independentReconciliationPerformed:false};
+  independentReconciliationPerformed:false,statementScoped:true};
 
 test('OFX 1.x ledger/available balance metadata checked without leaking amounts or faking reconciliation',()=>{
   const source=sgml(ledger+available);
@@ -50,7 +50,7 @@ test('absence or partial presence of source balance blocks is explicitly disting
   assert.deepEqual(absent.integrity.balanceReview,{
     ledgerBalancePresent:false,availableBalancePresent:false,
     ledgerAsOfDate:null,availableAsOfDate:null,
-    independentReconciliationPerformed:false
+    independentReconciliationPerformed:false,statementScoped:false
   });
   assert.ok(!absent.warnings.some(x=>x.includes('bank-reported balance metadata')));
   const ledgerOnly=parseOFX(sgml(ledger)).integrity.balanceReview;
@@ -128,4 +128,67 @@ test('batch report contains only presence and as-of dates, never raw bank balanc
   assert.match(result.report.files[0].warnings.join(' '),/NOT independently reconciled/);
   assert.equal(result.report.autoMergedAccounts,false);
   assert.equal(result.report.autoDeletedTransactions,false);
+});
+
+test('balance tags outside STMTRS/CCSTMTRS cannot be attributed to a valid bank response',()=>{
+  const variants=[
+    '<OFX>'+ledger+'<STMTRS><CURDEF>USD<BANKTRANLIST>'+fakeTx+
+      '</BANKTRANLIST></STMTRS></OFX>',
+    '<OFX><STMTRS><CURDEF>USD<BANKTRANLIST>'+fakeTx+
+      '</BANKTRANLIST></STMTRS>'+ledger+'</OFX>',
+    '<OFX><CURDEF>USD<BANKTRANLIST>'+fakeTx+
+      '</BANKTRANLIST>'+ledger+'</OFX>',
+    '<OFX><STMTRS><CURDEF>USD<BANKTRANLIST>'+fakeTx+
+      '</BANKTRANLIST>'+ledger+'</OFX>',
+    '<OFX><STMTRS><CURDEF>USD<BANKTRANLIST>'+fakeTx+
+      '</BANKTRANLIST>'+ledger+'</CCSTMTRS></OFX>',
+  ];
+  for(const source of variants){
+    assert.throws(()=>parseOFX(source),error=>{
+      assert.match(error.message,/balance metadata (?:requires|appears)/);
+      assert.ok(!error.message.includes('1234.56'));
+      assert.ok(!error.message.includes('PRIVATE-TX-00017'));
+      return true;
+    });
+  }
+});
+test('balance metadata within BANKTRANLIST is not mistakenly attributed as a statement-level balance',()=>{
+  const input=sgml().replace(fakeTx+'</BANKTRANLIST>',
+    fakeTx+ledger+'</BANKTRANLIST>');
+  assert.throws(()=>parseOFX(input),/balance metadata is incorrectly nested inside BANKTRANLIST/);
+  const xmlInput=xml().replace(xmlTx+'</BANKTRANLIST>',
+    xmlTx+xmlLedger+'</BANKTRANLIST>');
+  assert.throws(()=>parseOFX(xmlInput),/balance metadata is incorrectly nested inside BANKTRANLIST/);
+});
+test('one balance-bearing statement must include its own complete BANKTRANLIST',()=>{
+  const outer=sgml(ledger);
+  assert.throws(()=>parseOFX(outer.replace('<BANKTRANLIST>','<MISSINGBANKLIST>').replace('</BANKTRANLIST>','</MISSINGBANKLIST>')),
+    /balance metadata requires a complete BANKTRANLIST/);
+  const stray=sgml(ledger).replace('<STMTRS><CURDEF>USD<BANKTRANLIST>',
+    '<BANKTRANLIST><STMTRS><CURDEF>USD');
+  assert.throws(()=>parseOFX(stray),/balance metadata requires a complete BANKTRANLIST/);
+});
+test('ledger as-of dates before some postings raise an explicit review, preserve all signed cents',()=>{
+  const tx2=fakeTx.replace('20261104','20261107')
+    .replace('PRIVATE-TX-00017','PRIVATE-TX-00018')
+    .replace('-12.50','20.75');
+  const input=sgml(ledger,fakeTx+tx2);
+  const parsed=parseOFX(input);
+  assert.equal(parsed.integrity.balanceReview.statementScoped,true);
+  assert.equal(parsed.integrity.postedAfterLedgerAsOfCount,1);
+  assert.match(parsed.warnings.join(' '),/posting dates later than the ledger balance as-of date/);
+  assert.match(parsed.warnings.join(' '),/No rows were removed and no reconciliation is claimed/);
+  assert.deepEqual(parsed.transactions.map(t=>t.amount),['-12.50','20.75']);
+  assert.equal(parsed.integrity.recordCount,2);
+  assert.equal(totals(parsed.transactions).net,'8.25');
+  const noLedger=parseOFX(sgml(available,fakeTx+tx2));
+  assert.equal(noLedger.integrity.postedAfterLedgerAsOfCount,0);
+});
+test('explicit single CCSTMTRS balance and account response is supported, with no bank-source assumptions',()=>{
+  const source=xml(xmlLedger+xmlAvailable)
+    .replace('<STMTRS>','<CCSTMTRS>').replace('</STMTRS>','</CCSTMTRS>');
+  const parsed=parseOFX(source);
+  assert.equal(parsed.integrity.balanceReview.statementScoped,true);
+  assert.equal(parsed.integrity.balanceReview.ledgerBalancePresent,true);
+  assert.equal(parsed.transactions.length,1);
 });
