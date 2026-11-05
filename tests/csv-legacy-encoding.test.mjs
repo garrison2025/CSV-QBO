@@ -63,7 +63,7 @@ test('Windows-1252 undefined byte mappings and NUL still block conversion rather
   const bytes=makeLegacy();
   const corrupted=new Uint8Array(bytes);
   corrupted[corrupted.indexOf(0xe9)]=0x81; // undefined Windows-1252 code point -> U+FFFD
-  assert.throws(()=>decodeFinancialBytes(corrupted,'csv',{csvEncoding:'windows-1252'}),/replacement characters/);
+  assert.throws(()=>decodeFinancialBytes(corrupted,'csv',{csvEncoding:'windows-1252'}),/undefined control byte values/);
   const nul=new Uint8Array(bytes);
   nul[nul.indexOf(0xe9)]=0;
   assert.throws(()=>decodeFinancialBytes(nul,'csv',{csvEncoding:'windows-1252'}),/null byte/);
