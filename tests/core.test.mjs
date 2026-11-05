@@ -974,3 +974,70 @@ test('XML leaf mixed text must not be silently cut short by comments or CDATA',(
  assert.throws(()=>parseOFX(front+'<NAME>one<OTHER>two</OTHER></NAME>'+rear),
   /Missing XML closing tag for OFX NAME/);
 });
+
+
+test('CSV mapping reads a distinct Memo column without trimming multiline note content',()=>{
+ const input='Date,Description,Memo,Amount,Reference\r\n'+
+  '11/04/2026,Cafe,"  second floor,\r\n""special"" memo  ",-12.34,00019\r\n'+
+  '11/05/2026,Salary,"Paid by employer",100.00,00020\r\n';
+ const rows=parseCSV(input);
+ const mapping=guessMapping(rows[0]);
+ assert.equal(mapping.description,1);
+ assert.equal(mapping.memo,2);
+ const output=csvTransactions(rows,mapping);
+ assert.equal(output.transactions.length,2);
+ assert.equal(output.transactions[0].memo,'  second floor,\r\n"special" memo  ');
+ assert.equal(output.transactions[0].id,'00019');
+ assert.equal(output.transactions[1].memo,'Paid by employer');
+ assert.equal(output.transactions[0].amount,'-12.34');
+ assert.equal(output.transactions[1].amount,'100.00');
+ const defaultCSV=toCSV(output.transactions);
+ assert.equal(parseCSV(defaultCSV)[0].length,4,'legacy four-column output is unchanged');
+ const withMemo=toCSV(output.transactions,['date','description','amount','id','memo']);
+ const parsed=parseCSV(withMemo);
+ assert.equal(parsed[0][4],'memo');
+ assert.equal(parsed[1][4],'  second floor,\r\n"special" memo  ');
+ assert.equal(parsed[2][4],'Paid by employer');
+ assert.equal(parsed[1][2],'-12.34');
+ assert.equal(parsed[2][3],'00020');
+});
+test('CSV containing a single Memo used as Description must not duplicate it as a second field',()=>{
+ const rows=parseCSV('Date,Memo,Amount\n11/04/2026,Coffee,-0.01\n');
+ const guess=guessMapping(rows[0]);
+ assert.equal(guess.description,1);
+ assert.equal(guess.memo,-1);
+ const records=csvTransactions(rows);
+ assert.equal(records.transactions[0].description,'Coffee');
+ assert.equal(records.transactions[0].memo,'');
+ assert.throws(()=>csvTransactions(rows,{...guess,memo:1}),/assigned to both description and memo/);
+});
+test('optional CSV Memo output retains quoted text and guards spreadsheet formulas',()=>{
+ const data=[{date:'2026-11-04',description:'Cafe',amount:'1.00',id:'A',memo:'=HYPERLINK("bad")'},
+             {date:'2026-11-05',description:'Store',amount:'-2.00',id:'B',memo:'first,\r\nsecond "line"'}];
+ const wire=toCSV(data,['date','description','amount','id','memo']);
+ const parsed=parseCSV(wire);
+ assert.equal(parsed[0].join(','),'date,description,amount,id,memo');
+ assert.equal(parsed[1][4],"'"+data[0].memo,'memo formula must remain inert after opening CSV');
+ assert.equal(parsed[2][4],data[1].memo,'safe multiline memo must retain exact characters');
+ assert.deepEqual(parsed.slice(1).map(r=>r[2]),['1.00','-2.00']);
+ const legacy=toCSV(data);
+ assert.equal(parseCSV(legacy)[0].length,4);
+});
+test('opt-in Excel Memo column is text-only and defaults to the existing four columns',()=>{
+ const src=[{date:'2026-11-04',description:'Cafe',amount:'-0.01',id:'000123',memo:'Payment =SUM(1,2)\r\n"receipt"'}];
+ const defaultParts=readStoredXlsxParts(toXLSX(src));
+ const legacy=defaultParts.get('xl/worksheets/sheet1.xml');
+ assert.match(legacy,/<dimension ref="A1:D2"\/>/);
+ assert.match(legacy,/<autoFilter ref="A1:D2"\/>/);
+ assert.ok(!legacy.includes('r="E2"'));
+ const memo=readStoredXlsxParts(toXLSX(src,{includeMemo:true})).get('xl/worksheets/sheet1.xml');
+ assert.match(memo,/<dimension ref="A1:E2"\/>/);
+ assert.match(memo,/<autoFilter ref="A1:E2"\/>/);
+ assert.match(memo,/<c r="E1" t="inlineStr"><is><t>Memo<\/t><\/is><\/c>/);
+ assert.match(memo,/<c r="E2" t="inlineStr"><is><t xml:space="preserve">Payment =SUM\(1,2\)&#13;\n&quot;receipt&quot;<\/t><\/is><\/c>/);
+ assert.match(memo,/<c r="C2" s="1"><v>-0.01<\/v><\/c>/);
+ assert.match(memo,/<c r="D2" t="inlineStr"><is><t xml:space="preserve">000123<\/t><\/is><\/c>/);
+ assert.ok(!memo.includes('<f>'),'memo text must never execute as spreadsheet formulas');
+ assert.throws(()=>toXLSX(src,{includeMemo:'yes'}),/Invalid Excel Memo export option/);
+ assert.throws(()=>toXLSX([{...src[0],memo:'private\u0001line'}],{includeMemo:true}),/unsupported control character or invalid text in Memo/);
+});
