@@ -1,7 +1,8 @@
 // Real Chrome browser acceptance for the UNINDEXED writer pilot.
 // All transactions and reference account numbers are fictional.
 import assert from 'node:assert/strict';
-import {readFile,readFileSync,existsSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
+import {readFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
