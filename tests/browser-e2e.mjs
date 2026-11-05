@@ -169,6 +169,29 @@ try{
  assert.equal(paddedCSV.split(/\r\n/).length,3);
  console.log('PASS Chrome generic CSV reparse preflight preserves original payee/reference/Memo whitespace');
 
+ // Parentheses are debit notation; combining them with a minus is a
+ // malformed double-sign and must not silently flip a bank debit to credit.
+ await page.goto(base+'/tools/qif-to-csv/');
+ const parenthesesQIF='!Type:Bank\nD11/04/2026\nT(12.34)\nPTest merchant\nNREF-CREDIT-SAFETY\n^\n';
+ await page.locator('#file-input').setInputFiles(file('parentheses-debit.qif',parenthesesQIF));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-net').textContent(),'-12.34');
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/2026-11-04,Test merchant,-12\.34,REF-CREDIT-SAFETY/);
+ console.log('PASS Chrome unambiguous QIF parentheses debit stays negative in CSV download');
+
+ const conflictingQIF=parenthesesQIF.replace('T(12.34)','T(-12.34)');
+ await page.locator('#file-input').setInputFiles(file('ambiguous-double-negative.qif',conflictingQIF));
+ await page.locator('#work-status[data-state="error"]').waitFor({state:'visible'});
+ assert.equal(await page.locator('#preview-panel').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ const badMoneyMessage=await page.locator('#work-status').textContent();
+ assert.match(badMoneyMessage,/Conflicting amount signs/);
+ assert.ok(!badMoneyMessage.includes('Test merchant'));
+ assert.ok(!badMoneyMessage.includes('REF-CREDIT-SAFETY'));
+ console.log('PASS Chrome ambiguous parenthesized double-negative is rejected without stale downloads');
+
+
 
  // QuickBooks Online bank-upload format stays strictly three columns. A CSV
  // source with independent Memo explicitly discloses exclusion before download.
