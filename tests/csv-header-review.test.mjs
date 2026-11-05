@@ -26,11 +26,13 @@ test('two date headings are disclosed without silently changing transaction vs p
   const rows=parseCSV(source);
   const parsed=csvTransactions(rows);
   assert.equal(parsed.headerReview.dateCandidates,2);
-  assert.equal(parsed.transactions[0].date,'2026-11-01');
+  // Existing guessMapping prefers Posted Date to Transaction Date. The
+  // warning explains that this is a heuristic rather than a verified choice.
+  assert.equal(parsed.transactions[0].date,'2026-11-03');
   assert.match(parsed.warnings.join(' '),/2 possible Date columns/);
-  const posted=csvTransactions(rows,{date:1});
-  assert.equal(posted.transactions[0].date,'2026-11-03');
-  assert.equal(posted.transactions[0].amount,'-15.25');
+  const transDate=csvTransactions(rows,{date:0});
+  assert.equal(transDate.transactions[0].date,'2026-11-01');
+  assert.equal(transDate.transactions[0].amount,'-15.25');
 });
 test('repeated case/whitespace-normalized header labels produce counts without source data in review',()=>{
   const source='Date,Description,Amount, amount \n2026-11-04,Secret merchant,-9.99,-999.99\n';
