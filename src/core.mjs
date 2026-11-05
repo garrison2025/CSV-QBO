@@ -132,7 +132,7 @@ export function validateGenericCSVExport(transactions,csvText,{includeMemo=false
   let data;
   try{
     const encoded=new TextEncoder().encode(String(csvText));
-    const decoded=new TextDecoder('utf-8',{fatal:true}).decode(encoded);
+    const decoded=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(encoded);
     if(decoded!==csvText)fail('CSV encoding changed invalid Unicode characters.');
     data=parseCSV(decoded);
   }catch{
