@@ -1,5 +1,33 @@
 # Real-bank compatibility and QuickBooks UAT
 
+## V2.8: Local verification of actual bank export files
+
+This is an executable, local-only source-versus-export comparison. It does NOT authenticate the bank file or test QuickBooks imports. It never uploads source data.
+
+**Currently covered:** QBO/QFX/OFX/QIF/IIF to generic CSV; explicitly mapped bank CSV to one QuickBooks Online 3-column CSV file; CSV to QIF. It compares date, signed cents, payee, reference, Memo when supported, row count and source order, and records SHA-256 of the actual files. Import target acceptance requires a separate QuickBooks/Quicken manual UAT.
+
+**Not covered by this checker:** XLSX independent file inspection, multi-part QuickBooks CSV ZIP, Web Connect .qbo creation, CSV to IIF, independent verification of bank authenticity. It rejects those unsupported outputs instead of displaying a false PASS.
+
+### Windows / PowerShell workflow
+
+1. Keep the authentic bank download, converted output, manifest and report in a PRIVATE directory outside the cloned repository. Install Node.js 20+ on your own PC. Do not upload private originals or screenshots to GitHub, CI, or this chat.
+2. Copy docs/local-preflight-manifest.example.json into your private directory and fill the file paths, route_slug, source date order and (for CSV) the seven explicit column indexes. Indexes are ZERO-based; use -1 for absent fields. For example Date,Description,Amount,Reference maps to date=0, description=1, amount=2, id=3, debit=-1, credit=-1, memo=-1.
+3. If independently recorded in the bank portal/statement, fill expected_rows and expected_net_cents as exact signed integer cents. Otherwise leave null rather than guessing these values from the converter.
+4. In the checked-out repo run this exact command from PowerShell:
+
+       node scripts/uat-local-check.mjs "C:\private\case-manifest.json"
+
+5. If successful, a private JSON draft is written to report_file, outside the repository. The tool never overwrites an existing report. A local technical match is NOT QuickBooks import validation.
+6. Independently compare the original bank export against the bank's displayed transaction records, including independent totals, date/signs, references, duplicates and fields not represented by the output. Screenshots stay private and should be redacted.
+7. For QuickBooks Online CSV, manually import into a disposable test company/account, and record actual row count, sign/amount, target version, account type and repeat-import behavior; the application may differ by region/account. For QIF use a disposable Quicken data file.
+8. After source authenticity and target-import UAT are independently reviewed, complete the separate PRIVATE UAT registry and run the validation commands in the rest of this document. The draft intentionally cannot be published: source_kind is PENDING_AUTHENTICITY_REVIEW, owner_approved is false, and target_import_result remains NOT_RUN.
+
+**Privacy guardrails:** File paths inside the repository are refused, parser errors are not echoed with potentially sensitive bank values, and the exported draft's hashes and aggregate financial totals are confidential. Never copy the draft directly into data/uat-public.json. IIF extraction represents TRNS summaries only, not SPL allocations; QuickBooks three-column CSV intentionally omits source reference/Memo fields.
+
+**Shared-parser limitation:** This script reuses the application's parsing and export-validation code, so a shared bug could escape. It is not a substitute for independent bank statements and manual downstream import verification.
+
+---
+
 **Initial state: 0 authenticated real-bank evidence cases and 0 observed QuickBooks imports.** Synthetic Node and Chrome tests are engineering checks, not proof that any bank/export or QuickBooks account will accept a converted file. The independent website must not imply official Intuit/bank certification.
 
 ## Two distinct acceptance tracks
