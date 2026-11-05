@@ -102,6 +102,8 @@ export async function writeWebConnectQBO(transactions,profile,{serverTime}={}){
   }
   wire.push('</BANKTRANLIST>','</STMTRS>','</STMTTRNRS>','</BANKMSGSRSV1>','</OFX>','');
   const output=wire.join('\r\n');
+  if(new TextEncoder().encode(output).byteLength>350000)
+    fail('Generated QBO exceeds this pilot\'s 350 KB conservative per-file limit. Split the source by account and date; no output was downloaded.');
   const check=parseInput(output,'qbo');
   if(check.transactions.length!==rows.length)fail('QBO self-check failed: row count differs.');
   for(let i=0;i<rows.length;i++){
