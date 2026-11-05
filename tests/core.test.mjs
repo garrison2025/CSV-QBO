@@ -1141,3 +1141,71 @@ test('1200-row generic CSV with embedded Unicode quotes and Memo preserves order
  }
  assert.equal(totals(input).net,totals(rows.slice(1).map(r=>({date:r[0],description:r[1],amount:r[2],id:r[3],memo:r[4]}))).net);
 });
+
+
+test('IIF enforces every declared TRNS and SPL field count instead of silently dropping overflow',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tMEMO\tDOCNUM\n!SPL\tAMOUNT\tMEMO\n';
+ const good=h+'TRNS\t11/04/2026\t-4.00\tBookstore\t000100\nSPL\t4.00\tExpense\nENDTRNS\n';
+ assert.equal(parseIIF(good).transactions[0].id,'000100');
+ const bad=[
+  [h+'TRNS\t11/04/2026\t-4.00\tBookstore\t000100\tPRIVATE EXTRA\nSPL\t4.00\tExpense\nENDTRNS\n',/IIF line 3: TRNS contains 5 field\(s\), but its header declares 4/],
+  [h+'TRNS\t11/04/2026\t-4.00\tBookstore\nSPL\t4.00\tExpense\nENDTRNS\n',/IIF line 3: TRNS contains 3 field\(s\), but its header declares 4/],
+  [h+'TRNS\t11/04/2026\t-4.00\tBookstore\t000100\nSPL\t4.00\tExpense\tEXTRA SPL\nENDTRNS\n',/IIF line 4: SPL contains 3 field\(s\), but its header declares 2/],
+  [h+'TRNS\t11/04/2026\t-4.00\tBookstore\t000100\nSPL\t4.00\nENDTRNS\n',/IIF line 4: SPL contains 1 field\(s\), but its header declares 2/],
+  [h+'TRNS\t11/04/2026\t-4.00\tBookstore\t000100\nSPL\t4.00\tExpense\nENDTRNS\tPRIVATE END\n',/IIF line 5: ENDTRNS contains unexpected fields/]
+ ];
+ for(const [source,pattern] of bad){
+   try{parseIIF(source);assert.fail('Expected incomplete or extra IIF field rejection');}
+   catch(error){
+     if(error.code==='ERR_ASSERTION')throw error;
+     assert.match(error.message,pattern);
+     assert.ok(!error.message.includes('PRIVATE'));
+     assert.ok(!error.message.includes('Bookstore'));
+   }
+ }
+});
+test('IIF dual AMOUNT and AMT fields must represent identical signed cents in TRNS and SPL',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tAMT\tMEMO\tDOCNUM\n!SPL\tAMOUNT\tAMT\tMEMO\n';
+ const valid=h+'TRNS\t11/04/2026\t-2.00\t-$2.00\tRent\t0001\n'+
+  'SPL\t2.00\t$2.00\tRent expense\nENDTRNS\n';
+ const r=parseIIF(valid);
+ assert.equal(r.transactions.length,1);
+ assert.equal(r.transactions[0].amount,'-2.00');
+ assert.equal(r.transactions[0].id,'0001');
+ assert.equal(r.integrity.balancedGroups,1);
+ const malformed=[
+  [valid.replace('TRNS\t11/04/2026\t-2.00\t-$2.00','TRNS\t11/04/2026\t-2.00\t-2.01'),/IIF TRNS line 3: AMOUNT and AMT values disagree/],
+  [valid.replace('SPL\t2.00\t$2.00','SPL\t2.00\t2.01'),/IIF SPL line 4: AMOUNT and AMT values disagree/],
+ ];
+ for(const [source,pattern] of malformed){
+  try{parseIIF(source);assert.fail('Expected contradictory IIF money fields rejection');}
+  catch(error){if(error.code==='ERR_ASSERTION')throw error;
+   assert.match(error.message,pattern);
+   assert.ok(!error.message.includes('0001'));
+  }
+ }
+});
+test('IIF may use only AMT or a single populated amount alias without losing cents',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tAMT\tMEMO\tDOCNUM\n!SPL\tAMOUNT\tAMT\tMEMO\n';
+ const source=h+'TRNS\t11/04/2026\t\t-0.01\tBank cent\t00001\n'+
+   'SPL\t0.01\t\tOther side\nENDTRNS\n'+
+   'TRNS\t11/05/2026\t+2.40\t\tRefund\t00002\n'+
+   'SPL\t\t-2.40\tOther side\nENDTRNS\n';
+ const r=parseIIF(source);
+ assert.deepEqual(r.transactions.map(t=>t.amount),['-0.01','2.40']);
+ assert.deepEqual(r.transactions.map(t=>t.id),['00001','00002']);
+ assert.equal(r.integrity.balancedGroups,2);
+ assert.equal(r.integrity.splitRows,2);
+ assert.equal(totals(r.transactions).net,'2.39');
+});
+test('IIF rejects invalid/empty header columns and missing or corrupted money aliases',()=>{
+ const h='!TRNS\tDATE\tAMOUNT\tAMT\tMEMO\n!SPL\tAMOUNT\tAMT\n';
+ assert.throws(()=>parseIIF('!TRNS\tDATE\tAMOUNT\t\n'),/empty column name in declared header/);
+ assert.throws(()=>parseIIF('!SPL\tAMOUNT\t \n'),/empty column name in declared header/);
+ const rows=[
+  [h+'TRNS\t11/04/2026\t\t\tShop\nSPL\t1.00\t1.00\nENDTRNS\n',/missing amount value/],
+  [h+'TRNS\t11/04/2026\t1.00\tbad\tShop\nSPL\t-1.00\t-1.00\nENDTRNS\n',/Invalid amount/],
+  [h+'TRNS\t11/04/2026\t1.00\t1.00\tShop\nSPL\t\t\nENDTRNS\n',/missing amount value/]
+ ];
+ for(const [source,pattern]of rows)assert.throws(()=>parseIIF(source),pattern);
+});
