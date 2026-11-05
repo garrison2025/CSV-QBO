@@ -5,7 +5,7 @@
  * Returns an OBSERVED result, not a claimed Intuit import acceptance.
  */
 import {chromium} from 'playwright-core';
-import {writeFile} from 'node:fs/promises';
+import {writeFile,readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 
 const sample='Date,Description,Amount\n10/14/2026,Fictional Espresso,-12.50\n10/15/2026,Fictional Refund,20.75\n';
@@ -107,7 +107,7 @@ try{
       info.marketingNoDirectUpload=info.fileInputs===0;
     }
     if(downloads.length){
-      const d=downloads[0],f=await import('node:fs/promises').then(x=>x.readFile(d.path()));
+      const d=downloads[0],f=await readFile(await d.path());
       info.downloadObserved=true;
       info.downloadBytes=f.length;
       info.downloadExtension=d.suggestedFilename().split('.').pop()?.toLowerCase()||null;
