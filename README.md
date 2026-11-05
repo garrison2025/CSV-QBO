@@ -1,3 +1,10 @@
+## V2.9 — evidence-backed publication gate and correct QuickBooks target UAT (2026-11-05)
+
+- Discovered an important target-test restriction from Intuit: **QuickBooks Online Developer Sandbox cannot import or export data files**. The Test Drive demo does not establish a real manual banking import. Genuine CSV target acceptance requires an authorized upload-capable company or trial and recorded QuickBooks UI result; zero such imports have been performed.
+- Added [real QuickBooks import UAT worksheet](docs/QUICKBOOKS-REAL-IMPORT-UAT.md) and corrected the [real-bank acceptance protocol](docs/REAL-BANK-UAT.md) and compatibility page.
+- Hardened SEO release: custom domain + `PUBLISH_SEO=true` alone are **insufficient**. Publishing now requires approved `data/production-release.json` AND matching reviewed real-bank UAT cases for each route; KD must be <=29 and direction must be a tested read-only tool. The release config starts unapproved and keeps all pages noindex, with no production sitemap.
+- Source bank originals, signed cent totals, sensitive hashes and screenshots remain private. Public reviewed evidence alone is NOT third-party certification.
+
 ## V2.8 — local reconciliation of actual bank source and downloaded output (2026-11-05)
 
 - Added `scripts/uat-local-check.mjs`: a local-only preflight comparing **two separate files** (original bank export and actual downloaded output), without uploading either to a server.
@@ -266,7 +273,7 @@ Open `dist/index.html` through a local static HTTP server (`python -m http.serve
 - Build output directory: `dist`
 - Node version: `22` (or any supported Node >=20)
 - Preview deployment: **noindex and robots disallow** by design; do not submit preview URL to Search Console.
-- When a custom production domain is purchased, set `SITE_URL=https://your-owned-domain.example` and `PUBLISH_SEO=true` **only after QA gates and review**. The production build will create canonicals and sitemap entries only for genuine, tested, nonbrand KD≤29 tool pages.
+- A custom domain plus `SITE_URL` and `PUBLISH_SEO=true` are NOT enough to enable SEO. An explicit owner publication approval AND matching genuine reviewed bank evidence for each KD≤29 tool slug are also required. See [docs/SEO-RELEASE.md](docs/SEO-RELEASE.md).
 
 The sample domain above is a placeholder, not an owned URL. No domain or payment provider is configured in this repository.
 
