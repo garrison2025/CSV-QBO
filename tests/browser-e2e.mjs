@@ -6,6 +6,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright-core';
 import {externalSamples} from './external-bank-fixtures.mjs';
+import {parseInput} from '../src/core.mjs';
+import {inspectExactXLSX,inspectQuickBooksZIP} from '../scripts/uat-archive-inspect.mjs';
 const dist=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../dist');
 const mime={'.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml'};
 const server=createServer(async(req,res)=>{
@@ -105,6 +107,7 @@ try{
  if(await page.locator('#warning-ack-label').isVisible())await page.locator('#warning-ack').check();
  output=await dl('#export-button');
  assert.ok(output.name.endsWith('.xlsx'));
+ assert.equal(inspectExactXLSX(output.content,parseInput(tinyQif,'qif').transactions).rows,1);
  const cells=storedZip(output.content).get('xl/worksheets/sheet1.xml').toString('utf8');
  assert.match(cells,/<c r="A2" s="2"><v>46330<\/v><\/c>/);
  assert.match(cells,/<c r="C2" s="1"><v>-0.01<\/v><\/c>/);
@@ -496,6 +499,8 @@ try{
  assert.equal(await page.locator('#preview-body tr').count(),25);
  output=await dl('#export-button');
  assert.ok(output.name.endsWith('.zip'));
+ const mappedRows=parseInput(manyCSV,'csv',{mapping:{date:0,description:1,amount:2,debit:-1,credit:-1,id:3,memo:-1}}).transactions;
+ assert.deepEqual({rows:inspectQuickBooksZIP(output.content,mappedRows).rows,parts:2},{rows:1001,parts:2});
  const split=storedZip(output.content);
  const first=split.get('quickbooks-online-part-001.csv');
  const second=split.get('quickbooks-online-part-002.csv');
