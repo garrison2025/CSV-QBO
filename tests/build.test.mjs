@@ -329,3 +329,19 @@ test('IIF converter pages disclose strict columns and dual signed-amount validat
  assert.match(parser,/AMOUNT and AMT values disagree/);
  assert.match(parser,/ENDTRNS contains unexpected fields/);
 });
+
+
+test('twelve finance tools disclose fail-closed ambiguous accounting signs and remain noindex',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ assert.equal(tools.length,12);
+ for(const tool of tools){
+  const html=read('tools/'+tool.slug+'/index.html');
+  assert.match(html,/conflicting forms such as \(-12\.34\) are rejected/);
+  assert.match(html,/No exchange-rate or currency conversion is performed/);
+  assert.match(html,/noindex,nofollow/);
+ }
+ const parser=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ assert.match(parser,/Conflicting amount signs. Use either parentheses or a leading sign/);
+ assert.match(parser,/Conflicting amount signs. Use one leading sign/);
+ assert.ok(!parser.includes("negative = !negative;"),'accounting negative conventions must never cancel each other');
+});
