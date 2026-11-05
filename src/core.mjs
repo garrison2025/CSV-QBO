@@ -96,7 +96,7 @@ export function parseCSV(text, delimiter) {
     if (quoted) {
       if (c === '"' && s[i + 1] === '"') { cell += '"'; i++; }
       else if (c === '"') { quoted = false; closed = true; }
-      else { cell += c; if (c === '\n') line++; }
+      else { cell += c; if (c === '\n' || (c === '\r' && s[i+1] !== '\n')) line++; }
     } else if (c === '"') {
       if (cell !== '' || closed) fail('Unexpected CSV quote at line ' + line + '.');
       quoted = true;
@@ -119,7 +119,12 @@ export function parseCSV(text, delimiter) {
       fail('CSV line ' + record.line + ': expected ' + width + ' columns, found ' + record.fields.length + '. Fix the source file before converting.');
     }
   }
-  return records.map(record => record.fields);
+  return records.map(record => {
+    // Non-enumerable physical start line: used for diagnostics only. Quoted
+    // newlines and skipped blank records must not move financial row values.
+    Object.defineProperty(record.fields,'sourceLine',{value:record.line,enumerable:false});
+    return record.fields;
+  });
 }
 function needsCsvFormulaGuard(value) {
   const s=String(value ?? '');
@@ -210,6 +215,32 @@ const FIELD_SYNONYMS = {
  id:['id','fitid','reference','transaction id','check number','check or slip #','check or slip number','ref #'],
  memo:['memo','memo text','transaction memo','notes','note','bank memo']
 };
+/**
+ * Counts ambiguous source CSV headings without returning account/transaction
+ * data. Multiple synonyms for a single financial role need explicit review:
+ * a plausible guess is not a bank-confirmed column meaning.
+ */
+export function csvHeaderReview(header){
+  if(!Array.isArray(header))fail('CSV headers must be a row of column labels.');
+  const labels=header.map(h=>String(h??'').trim().toLowerCase().replace(/[_-]+/g,' '));
+  const countAliases=field=>{
+    const names=new Set(FIELD_SYNONYMS[field]);
+    return labels.filter(label=>names.has(label)).length;
+  };
+  const seen=new Set();
+  let duplicateHeaderLabels=0;
+  for(const label of labels){
+    if(!label)continue;
+    if(seen.has(label))duplicateHeaderLabels++;
+    else seen.add(label);
+  }
+  return {
+    duplicateHeaderLabels,
+    dateCandidates:countAliases('date'),
+    amountCandidates:countAliases('amount'),
+    requiresReview:duplicateHeaderLabels>0||countAliases('date')>1||countAliases('amount')>1
+  };
+}
 export function guessMapping(header) {
   const lowered=header.map(x=>String(x).trim().toLowerCase().replace(/[_-]+/g,' '));
   const guessed=Object.fromEntries(Object.entries(FIELD_SYNONYMS).map(([field,choices])=>[field, choices.map(c=>lowered.indexOf(c)).find(index=>index>=0) ?? -1]));
@@ -264,6 +295,7 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   const rows=typeof data==='string' ? parseCSV(data) : data;
   if (rows.length<2) fail('CSV has no transaction rows.');
   const guesses=guessMapping(rows[0]);
+  const headerReview=csvHeaderReview(rows[0]);
   const map={...guesses,...mapping};
   if (map.date<0 || map.description<0) fail('Choose Date and Description columns.');
   if (map.amount<0 && (map.debit<0 || map.credit<0)) fail('Choose Amount or both Debit and Credit columns.');
@@ -302,16 +334,25 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
       const date=isoDate(dateRaw,dateFormat);
       if(isAmbiguousNumericDate(dateRaw))ambiguousDateRows++;
       transactions.push({date,description:getRaw('description'),amount:fromMinorUnits(amount),id:getRaw('id'),memo});
-    } catch (e) { fail('CSV row '+(i+1)+': '+e.message); }
+    } catch (e) {
+      const line=Number.isInteger(r.sourceLine)?' Source file line '+r.sourceLine+'.':'';
+      fail('CSV row '+(i+1)+': '+e.message+line);
+    }
   }
   if(!transactions.length) fail('No transactions found.');
   const warnings=[];
+  if(headerReview.duplicateHeaderLabels)
+    warnings.push('CSV source has '+headerReview.duplicateHeaderLabels+' repeated nonempty column label(s). In the mapping selectors, choose by COLUMN POSITION; identically named columns may hold different financial values. No mapping was automatically corrected.');
+  if(headerReview.amountCandidates>1)
+    warnings.push('CSV source has '+headerReview.amountCandidates+' possible signed Amount columns. Confirm which monetary column represents each actual transaction rather than a balance, subtotal, or alternative currency; the selected mapping was used without any automatic replacement.');
+  if(headerReview.dateCandidates>1)
+    warnings.push('CSV source has '+headerReview.dateCandidates+' possible Date columns. Confirm whether the selected date is transaction date or bank posting date; the selection was used without switching date meaning.');
   if(ambiguousDateRows){
     const selected=dateFormat==='us'?'US month-first (MM/DD/YYYY)':'day-first (DD/MM/YYYY)';
     warnings.push(ambiguousDateRows+' of '+transactions.length+' numeric date(s) are valid but DIFFERENT in US and day-first order. '+
       'The '+selected+' selection was applied exactly as chosen; confirm the original bank date order before downloading. No date order was guessed.');
   }
-  return {transactions,warnings,source:'CSV',dateReview:{ambiguousDateRows,selectedDateFormat:dateFormat}};
+  return {transactions,warnings,source:'CSV',headerReview,dateReview:{ambiguousDateRows,selectedDateFormat:dateFormat}};
 }
 
 /**
