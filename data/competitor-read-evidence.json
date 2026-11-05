@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "description": "Independently downloaded competitor-generated fictional QBO evidence for source-specific read-only conversion; NOT actual QuickBooks import or bank issuer certification.",
+  "cases": [
+    {
+      "case_id": "sonomir-fictional-qbo-read-20261105",
+      "competitor_name": "Sonomir",
+      "competitor_url": "https://sonomir.com/csv-to-qbo",
+      "verified_at": "2026-11-05",
+      "github_run_url": "https://github.com/garrison2025/CSV-QBO/actions/runs/41984953445",
+      "input_sha256": "fcd3ccce6ad75502788e588ac78765954fa16e02d88b409d83f6317ce5de2cd9",
+      "downloaded_qbo_sha256": "00e5202de9a425ed3d0c4fba337271e54cfe8e48a87538c394c378ae95a74e69",
+      "downloaded_qbo_bytes": 923,
+      "source_transaction_count": 2,
+      "source_net_cents": "825",
+      "fixture_path": "tests/fixtures/sonomir-synthetic-qbo-20261105.base64",
+      "verified_routes": [
+        "qbo-to-csv",
+        "qbo-to-excel"
+      ],
+      "dates_and_amounts_match": true,
+      "csv_wire_reconciled": true,
+      "xlsx_wire_reconciled": true,
+      "source_data_fictional": true,
+      "real_bank_original_used": false,
+      "actual_quickbooks_import_observed": false,
+      "outgoing_csv_to_qbo_verified": false
+    }
+  ]
+}
