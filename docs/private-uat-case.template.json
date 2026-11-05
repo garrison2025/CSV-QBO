@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "replace-with-real-case-id",
+      "route_slug": "quickbooks-csv-formatter",
+      "input_format": "csv",
+      "output_format": "qb-csv",
+      "source_kind": "NOT_REAL_YET",
+      "owner_authorized": false,
+      "redaction_reviewed": false,
+      "public_bank_label": "Owner Approved Bank Label",
+      "source_variant": "Replace with actual export type and date/schema version",
+      "region": "US",
+      "source_sha256": "REPLACE_WITH_64_HEX",
+      "output_sha256": "REPLACE_WITH_64_HEX",
+      "expected_rows": 1,
+      "parsed_rows": 1,
+      "exported_rows": 1,
+      "expected_net_cents": "0",
+      "parsed_net_cents": "0",
+      "exported_net_cents": "0",
+      "source_order_fields_match": false,
+      "parser_commit": "REPLACE_WITH_GIT_SHA",
+      "tested_at": "2026-11-05",
+      "operator_code": "operator",
+      "reviewer_code": "reviewer",
+      "owner_approved": false,
+      "private_evidence_location": "private:/replace-this-folder",
+      "screenshot_redacted": false,
+      "target_product": "QuickBooks Online",
+      "target_version": "REPLACE_WITH_ACTUAL_REGION_UI_VERSION",
+      "target_account_type": "Checking - test company only",
+      "target_import_result": "NOT_RUN",
+      "imported_rows": null,
+      "imported_net_cents": null,
+      "reimport_result": "NOT_TESTED"
+    }
+  ]
+}

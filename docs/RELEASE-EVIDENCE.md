@@ -245,3 +245,11 @@
 - Node tests verify acceptable negatives, protected malformed variants, all four parser families, and all-or-nothing batches. Chrome acceptance downloads valid negative CSV and verifies an invalid QIF source removes stale preview/export.
 - All 12 landing pages disclose the amount-sign rule; `noindex,nofollow` remains the preview policy. Real bank provider and QuickBooks import acceptance are not claimed.
 - GitHub CI and Cloudflare deployment evidence to be confirmed after merge.
+
+## V2.7 — evidence pipeline, NOT a real bank import result (2026-11-05)
+
+- Implemented a privacy-allow-listed registry and case validator for future genuine bank-export UAT and QuickBooks/Quicken target imports. Documentation: [REAL-BANK-UAT.md](REAL-BANK-UAT.md).
+- Initial public registry: **0** owner-reviewed real-bank source cases, **0** QuickBooks target imports, **0** Quicken target imports. Tests of the registry guard are artificial and do not increase those numbers.
+- Public compatibility page now derives its evidence ledger from the registry and refuses unsupported status claims; private originals, transaction aggregates, file hashes and screenshots must never be committed.
+- New CI validation checks the public registry schema and scope. The correct evidence claims remain **NOT TESTED**, even if CI/Chrome passes. Cloudflare Pages deployment of V2.7 requires verification after merge.
+- Open release blockers: real authorized bank exports, per-row private reconciliation, actual QuickBooks test-company import screenshots/row-cents confirmation and duplicate reimport observation, target-specific .qbo writing (not implemented).
