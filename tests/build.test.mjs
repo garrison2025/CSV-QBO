@@ -345,3 +345,15 @@ test('twelve finance tools disclose fail-closed ambiguous accounting signs and r
  assert.match(parser,/Conflicting amount signs. Use one leading sign/);
  assert.ok(!parser.includes("negative = !negative;"),'accounting negative conventions must never cancel each other');
 });
+
+test('experimental QBO pilot and fictional reference have explicit nonindexing response headers',()=>{
+ const headers=read('_headers');
+ assert.match(headers,/\/lab\/csv-to-qbo\/\*\n  X-Robots-Tag: noindex, nofollow, noarchive/);
+ assert.match(headers,/\/samples\/sonomir-synthetic-reference-test-only\.qbo\n  X-Robots-Tag: noindex, nofollow, noarchive/);
+ const lab=read('lab/csv-to-qbo/index.html');
+ assert.match(lab,/<meta name="robots" content="noindex,nofollow">/);
+ assert.equal(existsSync(path.join(root,'dist','tools','csv-to-qbo','index.html')),false);
+ assert.equal(existsSync(path.join(root,'dist','sitemap.xml')),false);
+ const reference=readFileSync(path.join(root,'dist','samples','sonomir-synthetic-reference-test-only.qbo'));
+ assert.equal(reference.length,923);
+});
