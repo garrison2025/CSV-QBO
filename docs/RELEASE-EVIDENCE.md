@@ -283,3 +283,10 @@
 - Previously unsupported private input-original → downloaded XLSX now has independent strict ZIP central/local, stored member, CRC32, inline text and XML worksheet inspection. Exact dates, numeric signed cents, references, descriptions, order and opt-in Memo must match the parsed original. A missing nonempty source Memo blocks approval. Tampered data and unexpected formula content are rejected.
 - QuickBooks multipart ZIP is checked across all consecutively numbered CSV parts and bundled manifest, including row/cent/source order. No missing parts, silent shifts or report alterations are permitted. No Web Connect .qbo writing is claimed.
 - These checks require original downloaded bytes, not files re-saved in an unrelated compression dialect. Existing original-banking and target-software acceptance **remain 0 observed**. Search publication remains blocked until real-bank owner-reviewed evidence.
+
+## V2.12 — CSV-mapping usability safety (2026-11-05)
+
+- An externally authored Wells Fargo-style fictional CSV has an entirely blank Payee column but a filled Memo column. Previously the generic parser correctly stopped with Description empty, but did not explain the common mapping remedy. The site now provides an **explicit** user-operated remap button when every nonempty source row meets that condition. No automatic data rewriting or payee inference occurs.
+- The validator scans the all-row column fill summary in memory and retains counts, not source transaction strings, for the mapping hint. Advice disappears as soon as mappings change or a different file is opened; a fresh preview is mandatory before exporting.
+- CSV headers with multiple Transaction/Posted Date choices now show a date review warning. Summary labels no longer assert that positive charges mean money in; they refer to signed positive/negative totals.
+- Independently sourced mock shapes and real Chrome upload/preview/download tests are technical evidence only: genuine bank UAT = **0**; actual QuickBooks imports = **0**.

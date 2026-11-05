@@ -39,3 +39,7 @@ Independent sources:
 - Any claim that the QuickBooks 3-column CSV output is itself a Web Connect `.qbo` file.
 
 **Do not turn the six illustrative bank labels into 'supported banks' badges or change `data/uat-public.json` until source provenance and real application UAT are verified.**
+
+## V2.12 — observed UX mapping failure and corrected guidance
+
+The external Wells Fargo-style fictional sample has a blank Payee and populated Memo on all five records. An automatic column-header guess selects Payee as Description and therefore correctly refuses preview; it must NOT silently take Memo without an operator decision. The browser now displays a privacy-preserving all-row fill audit and a **Use Memo as Description** action. On explicit click, the file remains untouched, Description is remapped to Memo, duplicate Memo mapping is cleared, and export remains disabled until Preview completes. Positive/negative amount labels are neutral so American Express/Discover-like source sign conventions are not mislabeled as deposits or withdrawals. Target QuickBooks bank vs credit-card account polarity remains unverified.

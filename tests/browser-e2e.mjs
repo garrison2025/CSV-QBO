@@ -595,11 +595,56 @@ try{
    assert.equal(rowCount,sample.count,'download records for '+sample.name);
    assert.match(exported,/Date|date/);
  }
+
+ // The Wells-style public mock has an empty Payee field and the entire
+ // description in Memo. Do not silently pick the alternative; show a
+ // deliberate one-click mapping change and require preview of resulting rows.
+ const wells=externalSamples.find(x=>x.requiresExplicitDescriptionRemap);
+ await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ await page.locator('#file-input').setInputFiles(file('wells-fargo-style-synthetic.csv',wells.text));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#map-description').inputValue(),'3');
+ assert.equal(await page.locator('#map-memo').inputValue(),'4');
+ assert.equal(await page.locator('#mapping-advice').isVisible(),true);
+ assert.match(await page.locator('#mapping-advice').textContent(),/all 5 transaction row/);
+ assert.equal(await page.locator('#apply-memo-description').isVisible(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.match(await page.locator('#work-status').textContent(),/Description is empty/);
+ await page.locator('#apply-memo-description').click();
+ assert.equal(await page.locator('#map-description').inputValue(),'4');
+ assert.equal(await page.locator('#map-memo').inputValue(),'-1');
+ assert.equal(await page.locator('#mapping-advice').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ await page.locator('#preview-button').click();
+ assert.equal(await page.locator('#summary-count').textContent(),'5');
+ assert.equal(await page.locator('#summary-net').textContent(),'1119.22');
+ assert.equal(await page.locator('#export-button').isEnabled(),true);
+ let wellsDownload=await dl('#export-button');
+ assert.match(wellsDownload.content.toString('utf8'),/GAS STATION 4471 PURCHASE AUTHORIZED,-45\.20/);
+ console.log('PASS Chrome explicit blank Payee/Memo mapping suggestion, unchanged signed totals and safe disabled export');
+
+ // Multiple transaction/posted dates must be called out. We select a posted
+ // date by header preference, but user still confirms which date is intended.
+ const capital=externalSamples.find(x=>x.name.startsWith('Capital One'));
+ await page.locator('#file-input').setInputFiles(file('capital-one-style-synthetic.csv',capital.text));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#mapping-date-advice').isVisible(),true);
+ assert.match(await page.locator('#mapping-date-advice').textContent(),/Multiple date columns/);
+ assert.equal(await page.locator('#map-date').inputValue(),'1');
+ assert.equal(await page.locator('#mapping-advice').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),true);
+ console.log('PASS Chrome multiple transaction/posted date mapping caution without silent sign inversion');
+
  console.log('PASS Chrome seven independently-authored fictional bank-format inputs, previews, exact signed totals and downloads');
 
  // Responsive smoke check: functionality remains usable at a typical phone width.
  await page.setViewportSize({width:390,height:844});
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
+ assert.match(await page.locator('.mini-stats').textContent(),/Negative total/);
+ assert.match(await page.locator('.mini-stats').textContent(),/Positive total/);
+ assert.match(await page.locator('.preview-panel').textContent(),/credit-card exports/);
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-window.innerWidth);
  assert.ok(overflow<=2,'mobile page must not overflow horizontally by '+overflow+'px');
  console.log('PASS 390px mobile layout without horizontal overflow');
