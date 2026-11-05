@@ -7,7 +7,9 @@
 import {chromium} from 'playwright-core';
 import {writeFile,readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
-import {parseInput,quickBooksCSVExportPlan} from '../src/core.mjs';
+import {parseInput,parseCSV,quickBooksCSVExportPlan,genericCSVExportPlan,toMinorUnits} from '../src/core.mjs';
+import {toXLSX} from '../src/xlsx.mjs';
+import {inspectExactXLSX} from './uat-archive-inspect.mjs';
 
 const cases=[
  {url:'https://sonomir.com/csv-to-qbo',id:'sonomir'},
@@ -105,7 +107,31 @@ for(const site of cases){
            idPresent:t.length===2&&t.every(v=>String(v.id||'').length>0)
          };
          p.crossVendorQboReconciled=Object.values(p.comparison).every((v,i)=>i===0||v===true);
-         p.status=p.crossVendorQboReconciled?'synthetic_competitor_qbo_semantic_match':'synthetic_competitor_qbo_difference';
+         // Verify both of our released read-only QBO routes against the same
+         // *actual competitor-generated .qbo bytes*, not a hand-coded fixture.
+         if(p.crossVendorQboReconciled){
+           const csvPlan=genericCSVExportPlan(t);
+           const exportedRows=parseCSV(csvPlan.csv).slice(1);
+           const csvMatches=exportedRows.length===expected.transactions.length&&
+             exportedRows.every((row,i)=>
+               row[0]===expected.transactions[i].date&&
+               row[1]===expected.transactions[i].description&&
+               toMinorUnits(row[2])===toMinorUnits(expected.transactions[i].amount));
+           const xlsxResult=inspectExactXLSX(toXLSX(t),t);
+           p.ourReadOnlyRouteEvidence={
+             qboToCsvCsvRowsMatch:csvMatches,
+             qboToCsvLocalPreflight:csvPlan.report.orderedRowsReconciled&&csvPlan.report.signedAmountsReconciled,
+             qboToExcelRowsMatch:xlsxResult.rows===expected.transactions.length,
+             qboToExcelSignedNetMatch:xlsxResult.netCents==='825',
+             ourOutputWebConnectQboWriterReleased:false,
+             comparisonUsesCompetitorActualQboBytes:true
+           };
+           p.ourReadOnlyRoutesPass=Object.values(p.ourReadOnlyRouteEvidence)
+             .every((v,i)=>i===4?v===false:v===true);
+         }else p.ourReadOnlyRoutesPass=false;
+         p.status=p.crossVendorQboReconciled&&p.ourReadOnlyRoutesPass?
+            'external_qbo_file_validated_against_our_csv_and_excel_readers':
+            'synthetic_competitor_qbo_semantic_difference_or_reader_failure';
        }catch(e){p.status='external_output_not_parseable_in_our_reader';p.parseError=String(e.message||'error').slice(0,130);}
      }
    }else{
