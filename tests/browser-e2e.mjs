@@ -330,6 +330,22 @@ try{
  assert.match(output.content.toString('utf8'),/D11\/04\/2026\r\nT-12\.50\r\nPSample bookstore/);
  console.log('PASS browser CSV -> experimental QIF syntax download');
 
+ // CSV source columns must map Memo to a QIF M field independently of Payee,
+ // Amount and Reference, without mutating the source transaction.
+ const memoSource='Date,Description,Memo,Amount,Reference\n'+
+ '11/04/2026,Bookshop,Separate source Memo,-4.25,000891\n';
+ await page.locator('#file-input').setInputFiles(file('source-memo.csv',memoSource));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#map-memo').inputValue(),'2');
+ await page.locator('#preview-button').click();
+ assert.match(await page.locator('#memo-coverage').textContent(),/QIF Bank export retains supported Memo values as M records/);
+ output=await dl('#export-button');
+ const qifMemoDownload=output.content.toString('utf8');
+ assert.match(qifMemoDownload,/PBookshop\r\nN000891\r\nMSeparate source Memo\r\n\^\r\n/);
+ assert.match(qifMemoDownload,/D11\/04\/2026\r\nT-4\.25\r\n/);
+ console.log('PASS Chrome CSV mapped Memo exports as separate QIF M field with identical date and cents');
+
+
  // QIF fields are line-oriented; source payee newlines must fail rather than
  // silently changing the transaction and serving a corrupt accounting file.
  const caretCSV='Date,Description,Amount,Reference\n11/04/2026,Bookstore ^ café,-5.25,REF^A\n';
