@@ -33,7 +33,7 @@ for(const sample of externalSamples){
         source_bytes:b(sample.text),output_bytes:b(csv),
         mapping:sample.mapping,date_format:'us',
         expected_rows:sample.count,
-        expected_net_cents:BigInt(Math.round(Number(sample.net)*100)).toString()
+        expected_net_cents:BigInt(sample.net.replace('.','')).toString()
       });
       assert.equal(preflight.target_import_observed,false);
       assert.equal(preflight.source_authenticity_verified,false);
