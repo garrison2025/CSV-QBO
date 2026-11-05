@@ -553,6 +553,7 @@ export function parseIIF(text,dateFormat='us'){
   const transactions=[];
   const parseHeader=(row,required,atLine)=>{
     const names=row.slice(1).map(name=>name.trim().toUpperCase());
+    if(!names.length||names.some(name=>!name))fail('IIF line '+atLine+': empty column name in declared header.');
     if(new Set(names).size!==names.length)fail('IIF line '+atLine+': duplicate column names.');
     for(const key of required){
       if(key==='AMOUNT'){if(!names.includes('AMOUNT')&&!names.includes('AMT'))fail('IIF line '+atLine+': missing AMOUNT/AMT column.');}
@@ -560,10 +561,25 @@ export function parseIIF(text,dateFormat='us'){
     }
     return names;
   };
-  const fields=(row,header)=>{
+  const fields=(row,header,atLine,tag)=>{
+    // The declared !TRNS/!SPL column widths are a contract. Excess fields
+    // (including extra tabs) must not be discarded, and missing tail fields
+    // must not be silently invented. Both can conceal financial information.
+    if(row.length!==header.length+1)
+      fail('IIF line '+atLine+': '+tag+' contains '+(row.length-1)+' field(s), but its header declares '+header.length+'. No rows were exported.');
     const values={};
-    for(let i=0;i<header.length;i++)values[header[i]]=String(row[i+1]??'');
+    for(let i=0;i<header.length;i++)values[header[i]]=String(row[i+1]);
     return values;
+  };
+  const rowAmount=(record,atLine,tag)=>{
+    const primary=String(record.AMOUNT??'').trim(),alternate=String(record.AMT??'').trim();
+    if(!primary&&!alternate)fail('IIF '+tag+' line '+atLine+': missing amount value.');
+    let first=null,second=null;
+    if(primary)first=toMinorUnits(primary);
+    if(alternate)second=toMinorUnits(alternate);
+    if(first!==null&&second!==null&&first!==second)
+      fail('IIF '+tag+' line '+atLine+': AMOUNT and AMT values disagree. No rows were exported.');
+    return first??second;
   };
   for(let i=0;i<lines.length;i++){
     const line=lines[i];
@@ -579,10 +595,10 @@ export function parseIIF(text,dateFormat='us'){
     if(tag==='TRNS'){
       if(!trnsHeader)fail('IIF line '+number+': TRNS is missing a !TRNS header.');
       if(active)fail('IIF line '+number+': previous TRNS is missing ENDTRNS.');
-      const record=fields(row,trnsHeader);
+      const record=fields(row,trnsHeader,number,'TRNS');
       try{
         const date=isoDate(record.DATE,dateFormat);
-        const value=toMinorUnits(record.AMOUNT||record.AMT);
+        const value=rowAmount(record,number,'TRNS');
         const description=(record.MEMO||record.NAME||record.ACCNT||'').trim();
         if(!description)fail('TRNS has no memo, name or account label.');
         active={line:number,amount:value,splitSum:0n,splits:0,
@@ -593,13 +609,14 @@ export function parseIIF(text,dateFormat='us'){
     if(tag==='SPL'){
       if(!active)fail('IIF line '+number+': orphan SPL without a TRNS.');
       if(!splHeader)fail('IIF line '+number+': SPL is missing a !SPL header.');
-      const record=fields(row,splHeader);
-      try{active.splitSum+=toMinorUnits(record.AMOUNT||record.AMT);}
+      const record=fields(row,splHeader,number,'SPL');
+      try{active.splitSum+=rowAmount(record,number,'SPL');}
       catch(e){fail('IIF SPL line '+number+': '+e.message);}
       active.splits++;splitRows++;
       continue;
     }
     if(tag==='ENDTRNS'){
+      if(row.length!==1)fail('IIF line '+number+': ENDTRNS contains unexpected fields.');
       if(!active)fail('IIF line '+number+': ENDTRNS without TRNS.');
       if(!active.splits)fail('IIF TRNS line '+active.line+': no SPL entries before ENDTRNS.');
       if(active.amount+active.splitSum!==0n)fail('IIF TRNS line '+active.line+': TRNS and SPL amounts do not balance to zero.');
