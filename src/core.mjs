@@ -15,9 +15,8 @@ export function toMinorUnits(input) {
   let s = original;
   if (!s) fail('Amount is empty.');
   let negative = false;
-  // Accounting parentheses are a single negative sign, not an operation
-  // that can cancel another sign. In particular "(-12.34)" previously became
-  // POSITIVE 12.34, which could invert a debit during conversion.
+  // Parentheses are a negative sign, NOT an arithmetic operation that
+  // cancels a second sign. "(-12.34)" must never become positive 12.34.
   if (s.startsWith('(') || s.endsWith(')')) {
     if (!/^\(.*\)$/.test(s))
       fail('Invalid amount parentheses. Use one signed-amount convention.');
