@@ -89,6 +89,8 @@ if(drop && fileInput){
     for(const key of ['count','net','debit','credit'])$('#summary-'+key).textContent='0';
     const statement=$('#statement-coverage');
     if(statement){statement.hidden=true;statement.textContent='';}
+    const currency=$('#currency-coverage');
+    if(currency){currency.hidden=true;currency.textContent='';}
     const balance=$('#balance-coverage');
     if(balance){balance.hidden=true;balance.textContent='';}
     $('#warning-ack-label').hidden=true;
@@ -226,6 +228,18 @@ if(drop && fileInput){
     $('#summary-credit').textContent=t.credit;
 
 
+    const currency=$('#currency-coverage'),currencyReview=data.currencyReview;
+    if(currency){
+      currency.hidden=!currencyReview;
+      currency.textContent=currencyReview
+        ?currencyReview.recognizedCurrencyColumnCount
+          ? 'CSV currency check: '+currencyReview.recognizedCurrencyColumnCount+
+            ' recognized currency column(s) explicitly declare USD on '+
+            currencyReview.checkedTransactionRows+
+            ' transaction row(s). This does NOT independently verify account currency or bank authenticity.'
+          : 'No recognized CSV currency column. Confirm every transaction amount is already USD; no currency conversion is performed.'
+        :'';
+    }
     const statement=$('#statement-coverage'),window=data.integrity?.statementRange;
     if(statement) {
       const start=window?.startInclusive||'not supplied';
@@ -426,7 +440,7 @@ if(drop && fileInput){
   $('#download-report')?.addEventListener('click',()=>{
     if(!parsed||!audit)return;
     const dates=parsed.transactions.map(transaction=>transaction.date).sort();
-    const report={reportType:'Finance File Lab local validation summary v3',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,dateReview:parsed.dateReview||null,headerReview:parsed.headerReview||null,sourceDialect:parsed.sourceDialect||null,outputIsLedger:false,csvEscapedDescriptionCount:audit.csvFormulaGuardCount,zeroAmountReviewCount:audit.zeroAmountCount,largeAmountReviewCount:audit.largeAmountCount,requiresUserWarningAcknowledgement:(parsed.warnings.length+audit.warnings.length)>0,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
+    const report={reportType:'Finance File Lab local validation summary v3',sourceFormat:parsed.source,transactionCount:audit.summary.count,totalIn:audit.summary.credit,totalOut:audit.summary.debit,net:audit.summary.net,dateRange:{first:dates[0],last:dates[dates.length-1]},parserIntegrity:parsed.integrity||null,dateReview:parsed.dateReview||null,headerReview:parsed.headerReview||null,sourceDialect:parsed.sourceDialect||null,currencyReview:parsed.currencyReview||null,outputIsLedger:false,csvEscapedDescriptionCount:audit.csvFormulaGuardCount,zeroAmountReviewCount:audit.zeroAmountCount,largeAmountReviewCount:audit.largeAmountCount,requiresUserWarningAcknowledgement:(parsed.warnings.length+audit.warnings.length)>0,repeatedReferences:audit.duplicateIds.map(x=>({row:x.row,firstRow:x.firstRow})),possibleDuplicates:audit.possibleDuplicates,notes:[...parsed.warnings,...audit.warnings],quickBooksImportTested:false,containsTransactionDescriptions:false};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json;charset=utf-8'});
     saveBlob(blob,'validation-summary.json');
     say('Validation summary downloaded (no account numbers or transaction descriptions).','success');
