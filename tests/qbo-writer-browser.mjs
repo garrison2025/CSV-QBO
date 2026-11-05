@@ -1,7 +1,7 @@
 // Real Chrome browser acceptance for the UNINDEXED writer pilot.
 // All transactions and reference account numbers are fictional.
 import assert from 'node:assert/strict';
-import {readFile,readFileSync} from 'node:fs';
+import {readFile,readFileSync,existsSync} from 'node:fs';
 import {createServer} from 'node:http';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -33,8 +33,10 @@ try{
  const errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  const url='http://127.0.0.1:'+server.address().port+'/lab/csv-to-qbo/';
- await page.goto(url,{waitUntil:'networkidle'});
- assert.match(await page.locator('meta[name="robots"]').getAttribute('content'),/noindex,nofollow/);
+ assert.ok(existsSync(path.join(dist,'lab','csv-to-qbo','index.html')),'Lab HTML must be generated in actual dist before Chrome starts');
+ const response=await page.goto(url,{waitUntil:'networkidle'});
+ assert.equal(response.status(),200,'Lab route must return HTTP 200, received: '+(await page.content()).slice(0,240));
+ assert.match(await page.locator('head meta[name="robots"]').getAttribute('content'),/noindex,nofollow/);
  assert.equal(await page.locator('#lab-preview').isDisabled(),true);
  await page.locator('#lab-csv').setInputFiles({name:'fictional.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
  await page.locator('#lab-reference').setInputFiles({name:'fictional-reference.qbo',mimeType:'application/x-ofx',buffer:reference});
