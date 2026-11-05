@@ -31,6 +31,14 @@ The fixture contains Sonomir's test FID/BID 3000 and test account 0000. Those va
 
 Only `syntax_valid_only` is a justified label until target-software import succeeds on named bank, account and QuickBooks configurations. The existing owner-selected competitor-output acceptance criterion supports exact functional validation of generated transaction data, not official compatibility claims.
 
+## Executed acceptance and deployment evidence — 2026-11-05
+
+- Feature PR [#46](https://github.com/garrison2025/CSV-QBO/pull/46) squash-merged to `main` commit `80ee48ccf05b9e6a11cd8a412bb42acc0a692fa1`.
+- Feature-branch full CI and real Chrome [#41991061284](https://github.com/garrison2025/CSV-QBO/actions/runs/41991061284): **success**. Chrome selected fictional CSV and the previously downloaded real Sonomir QBO as reference, downloaded an actual `.qbo`, and verified two ordered transactions and exact net **825 cents**. Replacing a CSV invalidated stale export; local Clear reset both file selections; mobile layout and page JS-error checks passed.
+- Main-branch CI [#41991208644](https://github.com/garrison2025/CSV-QBO/actions/runs/41991208644): **success** after merge.
+- Cloudflare Pages reported successful deployment for merge commit. A separate live fetch confirmed `https://csv-qbo.pages.dev/lab/csv-to-qbo/` returns the pilot page with `robots=noindex,nofollow`. This live fetch checked page content and metadata, not a live browser file upload; the latter was independently exercised against the built site in GitHub Actions Chrome.
+- Engineering acceptance is strictly **synthetic comparator data agreement / syntax-valid QBO wire / browser download passed**. Actual QuickBooks import **0 observed**. Original AccountingConverter and DocuClipper outgoing bytes **not obtained**. Never label this target-software compatibility verified.
+
 ## Remaining gate
 
 Verify CI and the real Chrome download before merging this feature branch. Retain the reference's authorized provenance and a separate QuickBooks target-version import record when eventually assessing actual software interoperability. Keep the root site and this pilot unindexed on the pages.dev preview until a real production hostname is explicitly approved.
