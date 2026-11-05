@@ -20,6 +20,13 @@ jobs:
           grep -q 'noindex,nofollow' dist/index.html
           grep -q 'Disallow: /' dist/robots.txt
           test ! -f dist/sitemap.xml
+      - name: Reject accidental production indexing without real-bank UAT approval
+        run: |
+          SITE_URL=https://example-finance-tool.com PUBLISH_SEO=true npm run build
+          grep -q 'noindex,nofollow' dist/index.html
+          grep -q 'Disallow: /' dist/robots.txt
+          test ! -f dist/sitemap.xml
+          npm run build
       - name: Independently validate synthetic XLSX with Python OOXML reader
         run: |
           node --input-type=module <<'NODE'
