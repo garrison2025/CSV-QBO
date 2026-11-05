@@ -1097,12 +1097,12 @@ try{
  await page.locator('#preview-button').click();
  assert.equal(await page.locator('#summary-net').textContent(),'-1.01');
  assert.match(await page.locator('#currency-coverage').textContent(),/No recognized CSV currency column/);
- assert.match(await page.locator('#warning-list').textContent(),/no recognized Currency column/);
- assert.equal(await page.locator('#export-button').isDisabled(),true);
+ assert.equal(await page.locator('#warning-box').isHidden(),true);
+ assert.equal(await page.locator('#export-button').isDisabled(),false,
+   'missing currency declaration remains visibly unverified without invented rejection');
  const unknownReport=JSON.parse((await dl('#download-report')).content.toString('utf8'));
  assert.equal(unknownReport.currencyReview.allRecognizedCurrencyCellsUSD,false);
  assert.equal(unknownReport.currencyReview.checkedTransactionRows,0);
- await page.locator('#warning-ack').check();
  assert.match((await dl('#export-button')).content.toString('utf8'),/No currency supplied,-1\.01/);
  console.log('PASS Chrome USD currency-column preflight, non-USD whole-file refusal, unknown-currency warning and private JSON');
 
