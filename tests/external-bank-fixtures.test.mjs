@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseInput,parseQIF,parseCSV,isoDate,totals,toQuickBooksCSV,
+  guessMapping,csvColumnEvidence,suggestCSVDescriptionRemap,
   genericCSVExportPlan,validateQuickBooksCSVParts
 } from '../src/core.mjs';
 import {reconcileLocalPair} from '../scripts/uat-local-check.mjs';
@@ -83,4 +84,45 @@ test('QIF apostrophe dates are converted only with explicit century marker',()=>
   for(const ambiguous of ['03/15/24','03/15/99',"03/15'100","13/15'24","02/30'24"]){
     assert.throws(()=>parseQIF('!Type:Bank\nD'+ambiguous+'\nT-1.25\nPExample\n^\n'),/date|Invalid/);
   }
+});
+
+test('Wells-style empty Payee is detected from every transaction and only explicitly remapped to Memo',()=>{
+  const sample=externalSamples.find(x=>x.requiresExplicitDescriptionRemap);
+  const rows=parseCSV(sample.text),guessed=guessMapping(rows[0]);
+  assert.equal(guessed.description,3);
+  assert.equal(guessed.memo,4);
+  const evidence=csvColumnEvidence(rows);
+  assert.deepEqual(evidence.populated,[5,5,5,0,5]);
+  assert.equal(evidence.rowCount,5);
+  const recommendation=suggestCSVDescriptionRemap(evidence,guessed);
+  assert.deepEqual(recommendation,{descriptionIndex:3,memoIndex:4,rowsChecked:5});
+  assert.throws(()=>parseInput(sample.text,'csv',{mapping:guessed}),/Description is empty/);
+  const explicit={...guessed,description:recommendation.memoIndex,memo:-1};
+  const accepted=parseInput(sample.text,'csv',{mapping:explicit});
+  assert.equal(accepted.transactions.length,5);
+  assert.equal(accepted.transactions[0].description,'GAS STATION 4471 PURCHASE AUTHORIZED');
+  assert.equal(accepted.transactions[0].memo,'');
+  assert.equal(totals(accepted.transactions).net,'1119.22');
+});
+test('no suggestion unless every real row has populated Memo and empty selected Description',()=>{
+  const rows=parseCSV('Date,Payee,Memo,Amount\n01/01/2024,,Note 1,-2.00\n01/02/2024,Primary,Note 2,10.00\n');
+  const map=guessMapping(rows[0]);
+  assert.equal(suggestCSVDescriptionRemap(csvColumnEvidence(rows),map),null);
+  const partial=parseCSV('Date,Payee,Memo,Amount\n01/01/2024,,Note 1,-2.00\n01/02/2024,,,10.00\n');
+  assert.equal(suggestCSVDescriptionRemap(csvColumnEvidence(partial),map),null);
+  const alternate={...map,memo:-1};
+  assert.equal(suggestCSVDescriptionRemap(csvColumnEvidence(rows),alternate),null);
+  const genericMemo=parseCSV('Date,Payee,Remarks,Amount\n01/01/2024,,Note,-2.00\n');
+  const remap={date:0,description:1,memo:2,amount:3,debit:-1,credit:-1,id:-1};
+  assert.equal(suggestCSVDescriptionRemap(csvColumnEvidence(genericMemo),remap),null);
+});
+test('realistic posted and transaction date headers are recognized without inferring target account semantics',()=>{
+  const rows=parseCSV('Trans. Date,Post Date,Description,Amount\n01/31/2024,02/01/2024,Purchase,10.00\n');
+  const guessed=guessMapping(rows[0]);
+  assert.equal(guessed.date,1,'posting date preferred for bank statement date by default');
+  assert.equal(guessed.description,2);
+  const parsed=parseInput(rows,'csv',{mapping:guessed});
+  assert.equal(parsed.transactions[0].date,'2024-02-01');
+  assert.equal(guessMapping(['Check or Slip #']).id,0);
+  assert.equal(guessMapping(['Credit Card Number']).id,-1,'do not misinterpret account number as transaction reference');
 });
