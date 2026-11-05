@@ -268,3 +268,27 @@ test('OFX/QBO/QFX pages disclose exact mixed-XML text preservation and XML entit
  assert.match(parser,/function ofxTextSegments\(fragment,xml=false\)/);
  assert.match(parser,/Malformed or unsupported OFX XML character entity/);
 });
+
+
+test('every converter includes Memo mapping, explicit coverage and optional export UI without losing noindex',()=>{
+ const tools=JSON.parse(readFileSync(path.join(root,'data/tools.json'),'utf8'));
+ assert.equal(tools.length,12);
+ for(const tool of tools){
+  const html=read('tools/'+tool.slug+'/index.html');
+  for(const id of ['map-memo','preview-memo-head','memo-coverage','memo-toggle-label','include-memo'])
+   assert.ok(html.includes('id="'+id+'"'),tool.slug+' is missing Memo UI '+id);
+  if(tool.input!=='csv'){
+   assert.ok(html.includes('id="batch-include-memo"'),tool.slug+' missing independent batch Memo control');
+  }
+  assert.match(html,/noindex,nofollow/);
+ }
+ const app=readFileSync(path.join(root,'src','app.mjs'),'utf8');
+ assert.match(app,/function updateMemoCoverage\(\)/);
+ assert.match(app,/QuickBooks Online requires exactly three CSV columns/);
+ assert.match(app,/batchInfo=batchConvert\(texts,\{target,source,dateFormat:.*includeMemo:/);
+ const core=readFileSync(path.join(root,'src','core.mjs'),'utf8');
+ assert.match(core,/memo:\['memo','memo text','transaction memo'/);
+ assert.match(core,/memo=map.memo>=0\?String/);
+ const batch=readFileSync(path.join(root,'src','batch.mjs'),'utf8');
+ assert.match(batch,/memoRowsOmitted:includeMemo\?0:memoRowsWithContent/);
+});
