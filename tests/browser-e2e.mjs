@@ -568,7 +568,8 @@ try{
        await page.locator('#map-'+field).selectOption(String(sample.mapping[field]));
      }
    }
-   await page.locator('#preview-button').click();
+   if(sample.input==='csv')await page.locator('#preview-button').click();
+   else await page.locator('#preview-panel').waitFor({state:'visible'});
    const count=await page.locator('#summary-count').textContent();
    const net=await page.locator('#summary-net').textContent();
    assert.equal(count.trim(),String(sample.count),'browser source row count for '+sample.name);
