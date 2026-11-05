@@ -1209,3 +1209,65 @@ test('IIF rejects invalid/empty header columns and missing or corrupted money al
  ];
  for(const [source,pattern]of rows)assert.throws(()=>parseIIF(source),pattern);
 });
+
+
+test('money signs: parentheses and leading minus each mean debit, never cancel each other',()=>{
+ const valid=[
+  ['(12.34)','-12.34'],
+  ['($1,234.50)','-1234.50'],
+  ['-12.34','-12.34'],
+  ['-$1,234.50','-1234.50'],
+  ['+12.34','12.34'],
+  ['+$1,234.50','1234.50'],
+  ['$1,234.50','1234.50'],
+  ['0.00','0.00'],
+  ['(0.00)','0.00']
+ ];
+ for(const [raw,canonical] of valid)
+  assert.equal(fromMinorUnits(toMinorUnits(raw)),canonical,raw);
+ for(const ambiguous of [
+  '(-12.34)','(-$12.34)','(+$12.34)','(+12.34)',
+  '($-12.34)','($+12.34)','(-0.00)','-+12.34',
+  '+-12.34','$-12.34','-$-12.34','(-1,200.00)'
+ ]){
+  assert.throws(()=>toMinorUnits(ambiguous),/Conflicting amount signs/,ambiguous);
+ }
+ assert.throws(()=>toMinorUnits('($12.34'),/Invalid amount parentheses/);
+ assert.throws(()=>toMinorUnits('$12.34)'),/Invalid amount parentheses/);
+});
+
+test('ambiguous money cannot reverse a CSV, QIF, OFX or IIF transaction sign',()=>{
+ const sourceCSV='Date,Description,Amount\n11/04/2026,Private bookshop,(-12.34)\n';
+ const sourceQIF='!Type:Bank\nD11/04/2026\nT(-12.34)\nPPrivate bookshop\n^\n';
+ const sourceOFX='<OFX><STMTTRN><DTPOSTED>20261104<TRNAMT>(-12.34)<NAME>Private bookshop</STMTTRN></OFX>';
+ const sourceIIF='!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tAMOUNT\tMEMO\n'+
+   'TRNS\t11/04/2026\t(-12.34)\tPrivate bookshop\nSPL\t12.34\tExpense\nENDTRNS\n';
+ const cases=[
+  ()=>csvTransactions(parseCSV(sourceCSV)),
+  ()=>parseQIF(sourceQIF),
+  ()=>parseOFX(sourceOFX),
+  ()=>parseIIF(sourceIIF)
+ ];
+ for(const run of cases){
+  try{run();assert.fail('Expected ambiguous sign to fail instead of becoming positive');}
+  catch(error){
+   if(error.code==='ERR_ASSERTION')throw error;
+   assert.match(error.message,/Conflicting amount signs/);
+   assert.ok(!error.message.includes('Private bookshop'),
+    'error must not reveal bank description');
+  }
+ }
+});
+
+test('unambiguous parenthesized debits retain exact cents across CSV, QIF, OFX and IIF',()=>{
+ const c=csvTransactions(parseCSV('Date,Description,Amount\n11/04/2026,Coffee,(12.34)\n'));
+ const q=parseQIF('!Type:Bank\nD11/04/2026\nT(12.34)\nPCoffee\n^\n');
+ const o=parseOFX('<OFX><STMTTRN><DTPOSTED>20261104<TRNAMT>(12.34)<NAME>Coffee</STMTTRN></OFX>');
+ const i=parseIIF('!TRNS\tDATE\tAMOUNT\tMEMO\n!SPL\tAMOUNT\tMEMO\n'+
+  'TRNS\t11/04/2026\t(12.34)\tCoffee\nSPL\t12.34\tExpense\nENDTRNS\n');
+ for(const result of [c,q,o,i]){
+  assert.equal(result.transactions.length,1);
+  assert.equal(result.transactions[0].amount,'-12.34');
+  assert.equal(result.transactions[0].date,'2026-11-04');
+ }
+});
