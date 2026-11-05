@@ -34,9 +34,9 @@ export function toMinorUnits(input) {
   if (s.startsWith('$')) s = s.slice(1);
   if (/^[+-]/.test(s))
     fail('Conflicting amount signs. Use one leading sign.');
-  if (/\s/.test(s)) fail('Invalid amount spacing: ' + input + '.');
+  if (/\s/.test(s)) fail('Invalid amount spacing. Use a continuous numeric amount, such as 1234.56.');
   if (/^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(s)) s = s.replaceAll(',', '');
-  if (!/^\d+(\.\d{1,2})?$/.test(s)) fail('Invalid amount: ' + input + '. Use a period for decimals.');
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) fail('Invalid amount format. Use a period for decimals and at most two decimal places.');
   const parts = s.split('.');
   const cents = BigInt(parts[0]) * 100n + BigInt((parts[1] || '').padEnd(2, '0'));
   if (cents > 999999999999999n) fail('Amount is above the supported limit.');
@@ -293,7 +293,13 @@ export function isAmbiguousNumericDate(input){
 export function csvTransactions(data, mapping={}, dateFormat='us') {
   if(!['us','eu'].includes(dateFormat))fail('Unsupported source date format; choose US or day-first.');
   const rows=typeof data==='string' ? parseCSV(data) : data;
+  if(!Array.isArray(rows)||!Array.isArray(rows[0])||rows[0].length<2)
+    fail('CSV needs a valid table header with at least two columns.');
   if (rows.length<2) fail('CSV has no transaction rows.');
+  // The direct parsed-row API must enforce the same rectangularity contract
+  // as parseCSV(text). A missing trailing Amount/Memo cell is NOT zero.
+  for(let i=1;i<rows.length;i++)if(!Array.isArray(rows[i])||rows[i].length!==rows[0].length)
+    fail('CSV row '+(i+1)+': expected '+rows[0].length+' columns, found '+(Array.isArray(rows[i])?rows[i].length:'invalid')+'. Fix the source row before previewing.');
   const guesses=guessMapping(rows[0]);
   const headerReview=csvHeaderReview(rows[0]);
   const map={...guesses,...mapping};
