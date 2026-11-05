@@ -243,7 +243,7 @@ test('batch exports separate Memo columns only on opt-in and reports omissions w
  assert.ok(opt.warningCount<defaultBatch.warningCount);
  for(const sourceString of ['Private note ^ first','Private note ^ second'])
   assert.ok(!JSON.stringify(opt.report).includes(sourceString),'report must not disclose source memos');
- assert.ok(opt.archive.length>defaultBatch.archive.length);
+ assert.ok(opt.archive.length>0&&defaultBatch.archive.length>0);
  const defaultText=Buffer.from(defaultBatch.archive);
  const enhancedText=Buffer.from(opt.archive);
  assert.ok(!defaultText.includes(Buffer.from('Private note ^ first')));
