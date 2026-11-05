@@ -277,3 +277,9 @@
 - Fixed rejected legacy Quicken QIF apostrophe-year convention (`03/15'24` => 2024-03-15) with explicit 20YY warning, without guessing ambiguous two-digit slash-years.
 - Known limitations: Wells Fargo-like blank Payee requires explicit Memo-to-Description mapping; Amex/Discover positive credit-card purchase amount polarity requires actual target account type review. No auto-inversion or certification.
 - Authentic bank export cases reviewed: **0**. QuickBooks app target imports: **0**. See [independent sample report](INDEPENDENT-SAMPLE-VERIFICATION.md).
+
+## V2.11 — downloaded XLSX and split QuickBooks ZIP cross-file UAT (2026-11-05)
+
+- Previously unsupported private input-original → downloaded XLSX now has independent strict ZIP central/local, stored member, CRC32, inline text and XML worksheet inspection. Exact dates, numeric signed cents, references, descriptions, order and opt-in Memo must match the parsed original. A missing nonempty source Memo blocks approval. Tampered data and unexpected formula content are rejected.
+- QuickBooks multipart ZIP is checked across all consecutively numbered CSV parts and bundled manifest, including row/cent/source order. No missing parts, silent shifts or report alterations are permitted. No Web Connect .qbo writing is claimed.
+- These checks require original downloaded bytes, not files re-saved in an unrelated compression dialect. Existing original-banking and target-software acceptance **remain 0 observed**. Search publication remains blocked until real-bank owner-reviewed evidence.
