@@ -500,7 +500,10 @@ try{
  output=await dl('#export-button');
  assert.ok(output.name.endsWith('.zip'));
  const mappedRows=parseInput(manyCSV,'csv',{mapping:{date:0,description:1,amount:2,debit:-1,credit:-1,id:3,memo:-1}}).transactions;
- assert.deepEqual({rows:inspectQuickBooksZIP(output.content,mappedRows).rows,parts:2},{rows:1001,parts:2});
+ const independentZip=inspectQuickBooksZIP(output.content,mappedRows);
+ assert.equal(independentZip.rows,1001);
+ assert.equal(independentZip.parts,2);
+ assert.equal(independentZip.netCents,'1001');
  const split=storedZip(output.content);
  const first=split.get('quickbooks-online-part-001.csv');
  const second=split.get('quickbooks-online-part-002.csv');
