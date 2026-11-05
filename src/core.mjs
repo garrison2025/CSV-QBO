@@ -523,6 +523,44 @@ function ofxField(block,key,xml=false){
   const raw=source.slice(offset,end<0?source.length:offset+end);
   return ofxTextSegments(raw,xml);
 }
+/**
+ * Inspect OFX balance AGGREGATES without inventing an opening balance.
+ * Source balances are used solely for validation, then discarded: reports
+ * retain only presence and as-of dates, never private balance amounts.
+ * A valid balance is NOT proof of complete transaction history.
+ */
+function inspectOFXBalanceMetadata(original,structure,xml){
+  const readBlock=name=>{
+    const tokens=[...structure.matchAll(new RegExp('<\\/?'+name+'\\b[^>]*>','gi'))];
+    if(!tokens.length)return {present:false,asOfDate:null};
+    if(tokens.length!==2||/^<\//.test(tokens[0][0])||!/^<\//.test(tokens[1][0]))
+      fail('Multiple or incomplete OFX '+name+' balance groups. No transactions were exported.');
+    const start=tokens[0].index+tokens[0][0].length,end=tokens[1].index;
+    if(end<start)fail('Malformed OFX '+name+' balance group. No transactions were exported.');
+    const content=original.slice(start,end);
+    // Nested balance elements cannot be safely resolved as one closing
+    // ledger/available value, even if outer tag count is plausible.
+    if(/<\/?(?:LEDGERBAL|AVAILBAL)\b/i.test(ofxViews(content).structure))
+      fail('Nested OFX balance groups are not supported. No transactions were exported.');
+    let amt,date;
+    try{
+      amt=ofxField(content,'BALAMT',xml);
+      date=ofxField(content,'DTASOF',xml);
+      if(!amt||!date)fail('Missing balance amount or as-of date.');
+      toMinorUnits(amt); // exact signed USD cents; never leak or retain amount
+      return {present:true,asOfDate:isoDate(date)};
+    }catch{
+      fail('Invalid OFX '+name+' balance amount, as-of date or field structure. No transactions were exported.');
+    }
+  };
+  const ledger=readBlock('LEDGERBAL');
+  const available=readBlock('AVAILBAL');
+  return {
+    ledgerBalancePresent:ledger.present,availableBalancePresent:available.present,
+    ledgerAsOfDate:ledger.asOfDate,availableAsOfDate:available.asOfDate,
+    independentReconciliationPerformed:false
+  };
+}
 export function parseOFX(text) {
   const original=String(text);
   const {structure}=ofxViews(original);
@@ -543,6 +581,7 @@ export function parseOFX(text) {
   if(accountFromCount>1)
     fail('Multiple bank/card account-from declarations in one OFX source. Export one complete account at a time; no transactions were exported.');
   if(/<INVSTMTMSGSRSV1\b|<INVSTMTRS\b/i.test(structure))fail('Investment OFX feeds are not supported. No transactions were exported.');
+  const balanceReview=inspectOFXBalanceMetadata(original,structure,xml);
 
   // BANKTRANLIST is a single bank statement aggregate, not an arbitrary
   // concatenation of transactions from independent source windows.
@@ -653,9 +692,12 @@ export function parseOFX(text) {
     integrity:{check:'ofx_statement_records',status:'passed',recordCount,missingReferenceCount,missingTypeCount,inconsistentTypeSignCount,repeatedFitidCount,
       declaredCurrency:currencyTags.length?'USD':null,
       statementRange:reportedStartDate||reportedEndDate?{startInclusive:reportedStartDate,endExclusive:reportedEndDate}:null,
-      postedBeforeRangeCount,postedAfterRangeCount},
+      postedBeforeRangeCount,postedAfterRangeCount,balanceReview},
     warnings:[
       'Read-only transaction extraction. This does not validate bank institution identities or QuickBooks imports.',
+      ...((balanceReview.ledgerBalancePresent||balanceReview.availableBalancePresent)?[
+        'OFX bank-reported balance metadata was syntactically checked, NOT independently reconciled: no verified opening balance or complete bank posting history is available. The sum of extracted transactions is not a confirmed change in closing ledger balance.'
+      ]:[]),
       ...(!currencyTags.length?['This source does not declare its currency. Verify currency before using exported amounts.']:[]),
       ...(missingReferenceCount?[missingReferenceCount+' OFX transaction(s) have no FITID; duplicate/reference checks may be incomplete.']:[]),
       ...(repeatedFitidCount?[repeatedFitidCount+' repeated FITID occurrence(s) contain identical transaction data within this account. They are preserved, NOT automatically deleted. Review possible duplicate downloads before import.']:[]),
