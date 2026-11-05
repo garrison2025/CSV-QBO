@@ -93,6 +93,8 @@ export function makePublicRegistry(privateRegistry){
 
 export function validatePublicRegistry(registry){
   assert(registry?.schema_version===1&&Array.isArray(registry.cases),'Public UAT registry version 1 required');
+  noUnknownKeys(registry,['schema_version','description','cases'],'public registry');
+  assert(registry.description==='Owner-reviewed UAT evidence summaries only; no transaction data','Public registry description must remain fixed');
   const ids=new Set();
   const keys=['case_id','route_slug','public_bank_label','source_variant','region','input_format','output_format','parser_commit','tested_at','evidence_digest','evidence_scope','target_product','target_version','reimport_result','review_state'];
   for(const c of registry.cases){
