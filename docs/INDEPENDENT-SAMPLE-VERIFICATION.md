@@ -43,3 +43,7 @@ Independent sources:
 ## V2.12 — observed UX mapping failure and corrected guidance
 
 The external Wells Fargo-style fictional sample has a blank Payee and populated Memo on all five records. An automatic column-header guess selects Payee as Description and therefore correctly refuses preview; it must NOT silently take Memo without an operator decision. The browser now displays a privacy-preserving all-row fill audit and a **Use Memo as Description** action. On explicit click, the file remains untouched, Description is remapped to Memo, duplicate Memo mapping is cleared, and export remains disabled until Preview completes. Positive/negative amount labels are neutral so American Express/Discover-like source sign conventions are not mislabeled as deposits or withdrawals. Target QuickBooks bank vs credit-card account polarity remains unverified.
+
+## V2.13 — date/amount safety edge cases
+
+Synthetic CSV regression cases test genuinely ambiguous month/day order (e.g. 03/04/2026) and ensure changing from US to day-first alters only the intended calendar interpretation, not amounts or record order. An all-blank Debit/Credit row fails rather than fabricating a zero-dollar transaction. Explicit 0.00 and amounts of USD 1,000,000 or greater are preserved, but require a visible review acknowledgment in the website. These are safety and usability results on mock data, not authentic bank compatibility or actual QuickBooks upload acceptance.

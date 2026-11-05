@@ -245,7 +245,19 @@ export function suggestCSVDescriptionRemap(evidence,mapping){
   return {descriptionIndex:description,memoIndex:memo,rowsChecked:evidence.rowCount};
 }
 
+/**
+ * A slash/dot/dash numeric date is ambiguous only when BOTH calendar orders
+ * yield distinct valid dates. Invalid dates are not silently "corrected".
+ * This reports risk; it never changes the user's date-format selection.
+ */
+export function isAmbiguousNumericDate(input){
+  const v=String(input??'').trim();
+  if(!/^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}$/.test(v))return false;
+  try{return isoDate(v,'us')!==isoDate(v,'eu');}
+  catch{return false;}
+}
 export function csvTransactions(data, mapping={}, dateFormat='us') {
+  if(!['us','eu'].includes(dateFormat))fail('Unsupported source date format; choose US or day-first.');
   const rows=typeof data==='string' ? parseCSV(data) : data;
   if (rows.length<2) fail('CSV has no transaction rows.');
   const guesses=guessMapping(rows[0]);
@@ -267,11 +279,13 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
   }
 
   const transactions=[];
+  let ambiguousDateRows=0;
   for(let i=1;i<rows.length;i++) {
     const r=rows[i]; if(r.every(c=>!String(c??'').trim())) continue;
     const getRaw=key=>map[key]>=0?String(r[map[key]]??''):'';
     const get=key=>getRaw(key).trim();
     try {
+      if(map.amount<0&&!get('debit')&&!get('credit'))fail('Debit and Credit are both blank. A dated row with no amount cannot be converted into a zero transaction.');
       const credit=map.credit>=0?toMinorUnits(get('credit')||'0'):0n;
       const debit=map.debit>=0?toMinorUnits(get('debit')||'0'):0n;
       if(map.amount<0&&(credit<0n||debit<0n))fail('Debit and Credit columns cannot contain negative values; choose a signed Amount column instead.');
@@ -281,11 +295,20 @@ export function csvTransactions(data, mapping={}, dateFormat='us') {
       // Date/amount syntax may have outer whitespace, but quoted payees,
       // references and Memo are real source text and must never be trimmed.
       const memo=getRaw('memo');
-      transactions.push({date:isoDate(get('date'),dateFormat),description:getRaw('description'),amount:fromMinorUnits(amount),id:getRaw('id'),memo});
+      const dateRaw=get('date');
+      const date=isoDate(dateRaw,dateFormat);
+      if(isAmbiguousNumericDate(dateRaw))ambiguousDateRows++;
+      transactions.push({date,description:getRaw('description'),amount:fromMinorUnits(amount),id:getRaw('id'),memo});
     } catch (e) { fail('CSV row '+(i+1)+': '+e.message); }
   }
   if(!transactions.length) fail('No transactions found.');
-  return {transactions,warnings:[],source:'CSV'};
+  const warnings=[];
+  if(ambiguousDateRows){
+    const selected=dateFormat==='us'?'US month-first (MM/DD/YYYY)':'day-first (DD/MM/YYYY)';
+    warnings.push(ambiguousDateRows+' of '+transactions.length+' numeric date(s) are valid but DIFFERENT in US and day-first order. '+
+      'The '+selected+' selection was applied exactly as chosen; confirm the original bank date order before downloading. No date order was guessed.');
+  }
+  return {transactions,warnings,source:'CSV',dateReview:{ambiguousDateRows,selectedDateFormat:dateFormat}};
 }
 
 /**
@@ -868,6 +891,8 @@ export function validateQuickBooksCSVParts(transactions,parts,limits={}){
   if(sourceAudit.csvFormulaGuardCount){
     warnings.push(sourceAudit.csvFormulaGuardCount+' formula-like description(s) were prefixed with an apostrophe to reduce spreadsheet injection risk.');
   }
+  if(sourceAudit.zeroAmountCount)warnings.push(sourceAudit.zeroAmountCount+' zero-amount transaction(s) preserved. Check target acceptance before import.');
+  if(sourceAudit.largeAmountCount)warnings.push(sourceAudit.largeAmountCount+' transaction(s) at or above the USD 1,000,000 REVIEW threshold. Not a rejection or currency conversion.');
   return {
     reportType:'Finance File Lab QuickBooks CSV preflight v2',
     outputFormat:'QuickBooks Online manual-upload 3-column CSV',
@@ -880,6 +905,8 @@ export function validateQuickBooksCSVParts(transactions,parts,limits={}){
     duplicateReferenceCount:sourceAudit.duplicateIds.length,
     possibleDuplicateCount:sourceAudit.possibleDuplicates.length,
     csvEscapedDescriptionCount:sourceAudit.csvFormulaGuardCount,
+    zeroAmountReviewCount:sourceAudit.zeroAmountCount,
+    largeAmountReviewCount:sourceAudit.largeAmountCount,
     partCount:summaries.length,parts:summaries,warnings
   };
 }
@@ -893,9 +920,15 @@ export function quickBooksCSVExportPlan(transactions,limits={}){
 export function auditTransactions(transactions){
   if(!Array.isArray(transactions)||!transactions.length)fail('No transactions to audit.');
   const idIndex=new Map(),fingerprints=new Map(),duplicateIds=[],possibleDuplicates=[];
-  let csvFormulaGuardCount=0;
+  let csvFormulaGuardCount=0,zeroAmountCount=0,largeAmountCount=0;
+  // $1,000,000 is a transparent review heuristic, NOT a correctness limit.
+  // Legitimate values are never deleted, capped or automatically adjusted.
+  const LARGE_REVIEW_CENTS=100000000n;
   const normalized=transactions.map((t,i)=>{
     const date=isoDate(t.date),amount=fromMinorUnits(toMinorUnits(t.amount));
+    const cents=toMinorUnits(amount);
+    if(cents===0n)zeroAmountCount++;
+    if((cents<0n?-cents:cents)>=LARGE_REVIEW_CENTS)largeAmountCount++;
     const description=String(t.description??'').trim();
     if(!description)fail('Transaction '+(i+1)+' has no description.');
     if(needsCsvFormulaGuard(description))csvFormulaGuardCount++;
@@ -914,7 +947,9 @@ export function auditTransactions(transactions){
   if(duplicateIds.length)warnings.push(duplicateIds.length+' repeated transaction reference(s) found. Review before importing; no rows were deleted.');
   if(possibleDuplicates.length)warnings.push(possibleDuplicates.length+' possible same-date, same-amount and same-description duplicate(s). Review; no rows were deleted.');
   if(csvFormulaGuardCount)warnings.push(csvFormulaGuardCount+' spreadsheet formula-like description(s) will be prefixed with an apostrophe in CSV exports. Review the descriptions before import.');
-  return {summary,duplicateIds,possibleDuplicates,csvFormulaGuardCount,warnings};
+  if(zeroAmountCount)warnings.push(zeroAmountCount+' transaction(s) have an exactly zero amount. They are preserved; confirm these are real transactions and the target application accepts them.');
+  if(largeAmountCount)warnings.push(largeAmountCount+' transaction(s) have an absolute amount of at least USD 1,000,000. This is a REVIEW threshold, not an invalid amount; verify the original bank statement and units before exporting.');
+  return {summary,duplicateIds,possibleDuplicates,csvFormulaGuardCount,zeroAmountCount,largeAmountCount,warnings};
 }
 export function totals(transactions){
   let debit=0n,credit=0n;

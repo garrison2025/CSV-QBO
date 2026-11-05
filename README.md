@@ -1,3 +1,11 @@
+## V2.13 — numeric date ambiguity and abnormal amount preflight (2026-11-05)
+
+- CSV numeric dates that are **valid calendar days in both MM/DD/YYYY and DD/MM/YYYY but yield different dates** now trigger an explicit warning and disable download until review. The current selected order (US/day-first) is preserved, never auto-guessed, and any date-order change clears the previous preview/download permission. Invalid calendar dates still fail.
+- Rows with both Debit and Credit columns entirely blank are **rejected** instead of silently turned into a financial zero. Explicit zero values remain valid but flagged for review and target application acceptance.
+- Independently and without modifying input, the parser flags exactly zero amounts and absolute values at or above **USD 1,000,000** for manual review. The latter is a transparent conservative **review heuristic**, not an amount limit; legitimate large transactions remain downloadable after acknowledgment.
+- Downloadable local validation summaries and QuickBooks multi-part ZIP reports contain only aggregate risk counts, never transaction values or descriptions. Node and Chrome automated regression tests check US/EU previews, date-change invalidation, strict amount omissions and exact data preservation.
+- The site remains noindex until authentic bank samples and target imports are independently verified. This is source-format preflight, not proof of QuickBooks import success.
+
 ## V2.12 — safer CSV field mapping and accurate signed-amount labels (2026-11-05)
 
 - The converter recognizes a specific high-risk bank CSV layout: selected Payee/Description is completely blank but Memo has a description on **every** populated transaction row. The site recommends an **explicit, one-click** Memo → Description mapping change, clears the duplicate Memo selection, and requires a new preview; it never silently changes transaction data or signs.
