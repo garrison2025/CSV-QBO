@@ -270,3 +270,10 @@
 - SEO publish mode now requires custom HTTPS domain, explicit owner approval per route, corresponding privacy-reviewed real-bank read UAT case and KD<=29. Without approvals, even PUBLISH_SEO=true stays noindex/robots-disallow with no sitemap.
 - The technical gate cannot verify the truth of human observations and does not constitute bank or Intuit certification. Browser and synthetic CI tests remain separate evidence classes.
 - Official source: https://static.developer.intuit.com/output_html/qbo/docs/develop/sandboxes/sandbox-faqs.html; import instructions: https://quickbooks.intuit.com/learn-support/en-us/help-article/import-transactions/manually-upload-transactions-quickbooks-online/L0rE9OXBz_US_en_US
+
+## V2.10 — independently authored fictional bank-format samples (2026-11-05)
+
+- New independent third-party Apache-2.0 fictional source suite: six bank-style CSV shapes (Chase, Bank of America, Wells Fargo, American Express, Capital One, Discover) and legacy Quicken QIF; hard-coded expected row counts and signed totals; Chrome browser upload-to-download coverage.
+- Fixed rejected legacy Quicken QIF apostrophe-year convention (`03/15'24` => 2024-03-15) with explicit 20YY warning, without guessing ambiguous two-digit slash-years.
+- Known limitations: Wells Fargo-like blank Payee requires explicit Memo-to-Description mapping; Amex/Discover positive credit-card purchase amount polarity requires actual target account type review. No auto-inversion or certification.
+- Authentic bank export cases reviewed: **0**. QuickBooks app target imports: **0**. See [independent sample report](INDEPENDENT-SAMPLE-VERIFICATION.md).

@@ -1,3 +1,11 @@
+## V2.10 — independent external bank-style sample checks (2026-11-05)
+
+- Added an independently authored, Apache-2.0 licensed fictional fixture dataset with 6 bank-shaped CSV files + 1 Quicken QIF; tests independently pin expected counts and signed totals and exercise real Chrome upload/preview/download.
+- Fixed a real QIF interoperability limitation: explicitly marked `month/day'YY` dates now parse as 20YY with a user-visible warning. Ambiguous slash-separated 2-digit years still reject instead of guessing.
+- Wells Fargo-style fictional CSV has empty Payee with descriptions in Memo. Correct conversion requires explicit Memo → Description mapping. American Express and Discover-style credit-card exports have opposite polarity conventions from checking accounts; no blind sign reversal or target-app compatibility claim.
+- Detailed evidence and provenance: [docs/INDEPENDENT-SAMPLE-VERIFICATION.md](docs/INDEPENDENT-SAMPLE-VERIFICATION.md).
+- **Still 0 authentic bank-export acceptance cases and 0 target QuickBooks import observations.** External fictional files do not count as genuine bank compatibility evidence and do not enable SEO publishing.
+
 ## V2.9 — evidence-backed publication gate and correct QuickBooks target UAT (2026-11-05)
 
 - Discovered an important target-test restriction from Intuit: **QuickBooks Online Developer Sandbox cannot import or export data files**. The Test Drive demo does not establish a real manual banking import. Genuine CSV target acceptance requires an authorized upload-capable company or trial and recorded QuickBooks UI result; zero such imports have been performed.
