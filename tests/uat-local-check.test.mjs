@@ -46,7 +46,7 @@ test('compares QuickBooks Online 3-column CSV wires but never claims actual impo
 test('rejects changed QuickBooks output signs, missing rows or column header',()=>{
   assert.throws(()=>reconcileLocalPair({route_slug:'quickbooks-csv-formatter',source_bytes:bytes(srcCSV),output_bytes:bytes(qbOutput.replace('-12.50','12.50')),mapping}),/mismatch/);
   assert.throws(()=>reconcileLocalPair({route_slug:'quickbooks-csv-formatter',source_bytes:bytes(srcCSV),output_bytes:bytes(qbOutput.replace('Date,Description,Amount','Date,Payee,Amount')),mapping}),/header/);
-  assert.throws(()=>reconcileLocalPair({route_slug:'quickbooks-csv-formatter',source_bytes:bytes(srcCSV),output_bytes:bytes(qbOutput.replace(/11\/05\/2026[^\r\n]+/,'').replace(/\r\n\r\n/,'\r\n')),mapping}),/rows|mismatch/);
+  assert.throws(()=>reconcileLocalPair({route_slug:'quickbooks-csv-formatter',source_bytes:bytes(srcCSV),output_bytes:bytes(qbOutput.replace(/11\/05\/2026[^\r\n]+/,'').replace(/\r\n\r\n/,'\r\n')),mapping}),/row counts|mismatch/);
 });
 test('requires explicit CSV mapping and exact independent signed cents',()=>{
   assert.throws(()=>reconcileLocalPair({route_slug:'quickbooks-csv-formatter',source_bytes:bytes(srcCSV),output_bytes:bytes(qbOutput)}),/explicit column positions/);
