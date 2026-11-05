@@ -1,3 +1,12 @@
+## V2.19 — manually selected Windows-1252 for legacy bank CSV / TSV (2026-11-05)
+
+- CSV/TSV uploads now offer an explicit **CSV/TSV character encoding** selector: `Automatic (UTF-8 or UTF BOM)` by default, or `Windows-1252` when the user knows a bank export is legacy-encoded. The default never guesses Windows-1252 after UTF-8 fails. QBO/QFX/OFX retain their existing declared-charset behavior; QIF and IIF remain unchanged.
+- A user-specified legacy encoding decodes the **original source bytes** again; it never transcodes previously decoded/possibly damaged strings. BOM-marked UTF-8/UTF-16 files **cannot** be manually overridden as Windows-1252. Invalid Windows-1252 C1 values (bytes 81/8D/8F/90/9D) are rejected even though some text decoders preserve them as controls; null bytes, replacement characters, invalid CSV structure and invalid USD amounts still fail closed.
+- Re-selecting the source encoding invalidates the previous transaction preview, mapping, report-download status and any warning acknowledgment. A manual Windows-1252 upload produces an explicit local decoding warning during preview, **requiring acknowledgment** before any export. `Clear workspace` returns encoding to Automatic.
+- This allows properly formatted **legacy bank CSV/TSV** with accented payees (for example *Café*) and exact signed cents/leading-zero references to be converted in the browser **without uploads, server processing, paid APIs or invented field corrections**. The user must independently confirm the bank's source encoding and map financial columns.
+- Synthetic Node and real Chrome end-to-end tests cover fail-closed default, explicit local Windows-1252 import, TSV, UTF BOM precedence, undefined byte rejection, bytes→payee preservation, CSV output, warnings, previous-download permission resets and privacy-sensitive errors.
+- Still **0 bank-issued original file acceptances** and **0 real QuickBooks imports verified**. No financial reconciliation or bank-specific certification. SEO stays `noindex,nofollow` while using Cloudflare Pages without a purchased domain.
+
 ## V2.18 — CSV header ambiguity, source-line errors and no-silent money mapping (2026-11-05)
 
 - CSV/TSV input already rejected malformed quotes, header/row width mismatches and extra/absent fields. **V2.18 does not claim those old safeguards as new.**
