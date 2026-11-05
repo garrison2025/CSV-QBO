@@ -891,6 +891,8 @@ export function validateQuickBooksCSVParts(transactions,parts,limits={}){
   if(sourceAudit.csvFormulaGuardCount){
     warnings.push(sourceAudit.csvFormulaGuardCount+' formula-like description(s) were prefixed with an apostrophe to reduce spreadsheet injection risk.');
   }
+  if(sourceAudit.zeroAmountCount)warnings.push(sourceAudit.zeroAmountCount+' zero-amount transaction(s) preserved. Check target acceptance before import.');
+  if(sourceAudit.largeAmountCount)warnings.push(sourceAudit.largeAmountCount+' transaction(s) at or above the USD 1,000,000 REVIEW threshold. Not a rejection or currency conversion.');
   return {
     reportType:'Finance File Lab QuickBooks CSV preflight v2',
     outputFormat:'QuickBooks Online manual-upload 3-column CSV',
@@ -903,6 +905,8 @@ export function validateQuickBooksCSVParts(transactions,parts,limits={}){
     duplicateReferenceCount:sourceAudit.duplicateIds.length,
     possibleDuplicateCount:sourceAudit.possibleDuplicates.length,
     csvEscapedDescriptionCount:sourceAudit.csvFormulaGuardCount,
+    zeroAmountReviewCount:sourceAudit.zeroAmountCount,
+    largeAmountReviewCount:sourceAudit.largeAmountCount,
     partCount:summaries.length,parts:summaries,warnings
   };
 }
