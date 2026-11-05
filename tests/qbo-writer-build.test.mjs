@@ -25,6 +25,13 @@ test('CSV-QBO experimental route remains outside SEO tool registry',()=>{
    const ref=readFileSync(path.join(folder,'samples','sonomir-synthetic-reference-test-only.qbo'));
    assert.equal(ref.length,923);
    assert.equal(createHash('sha256').update(ref).digest('hex'),'00e5202de9a425ed3d0c4fba337271e54cfe8e48a87538c394c378ae95a74e69');
+   const paired=readFileSync(path.join(folder,'samples','sonomir-synthetic-source-test-only.csv'));
+   assert.equal(createHash('sha256').update(paired).digest('hex'),'fcd3ccce6ad75502788e588ac78765954fa16e02d88b409d83f6317ce5de2cd9');
+   const csv=paired.toString('utf8');
+   assert.match(page,/sonomir-synthetic-source-test-only\.csv/);
+   assert.match(csv,/Fictional Espresso,-12\.50,SYN001/);
+   assert.match(csv,/Fictional Refund,20\.75,SYN002/);
+
    assert.equal(existsSync(path.join(folder,'tools','csv-to-qbo','index.html')),false);
  }finally{rmSync(folder,{recursive:true,force:true});}
 });
