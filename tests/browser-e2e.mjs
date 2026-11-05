@@ -153,6 +153,23 @@ try{
   'CSV guard must neutralize formula-like Memo values');
  console.log('PASS Chrome QIF-to-CSV Memo option and formula-injection guard');
 
+ // Source whitespace in merchant/reference IDs is meaningful in quoted CSV
+ // and must survive local parsing plus the new exact row-by-row CSV preflight.
+ await page.goto(base+'/tools/qif-to-csv/');
+ const paddedQIF='!Type:Bank\nD11/04/2026\nT-4.01\nP  Café Trading  \nN  0000456  \nM  Optional note  \n^\n';
+ await page.locator('#file-input').setInputFiles(file('padded.qif',paddedQIF));
+ await page.locator('#preview-panel').waitFor({state:'visible'});
+ assert.equal(await page.locator('#summary-count').textContent(),'1');
+ assert.equal(await page.locator('#summary-net').textContent(),'-4.01');
+ await page.locator('#include-memo').check();
+ output=await dl('#export-button');
+ const paddedCSV=output.content.toString('utf8');
+ assert.match(paddedCSV,/date,description,amount,id,memo\r\n/);
+ assert.match(paddedCSV,/2026-11-04,  Café Trading  ,-4\.01,  0000456  ,  Optional note  \r\n/);
+ assert.equal(paddedCSV.split(/\r\n/).length,3);
+ console.log('PASS Chrome generic CSV reparse preflight preserves original payee/reference/Memo whitespace');
+
+
  // QuickBooks Online bank-upload format stays strictly three columns. A CSV
  // source with independent Memo explicitly discloses exclusion before download.
  await page.goto(base+'/tools/quickbooks-csv-formatter/');
@@ -344,6 +361,19 @@ try{
  assert.match(qifMemoDownload,/PBookshop\r\nN000891\r\nMSeparate source Memo\r\n\^\r\n/);
  assert.match(qifMemoDownload,/D11\/04\/2026\r\nT-4\.25\r\n/);
  console.log('PASS Chrome CSV mapped Memo exports as separate QIF M field with identical date and cents');
+
+ // CSV source quoted payee/reference whitespace must survive parsing and QIF
+ // serialization, rather than being silently trimmed away.
+ const sourceWhitespace='Date,Description,Memo,Amount,Reference\n'+
+ '11/04/2026,"  Café & Co  ","  receipt  ",-1.50,"  00077  "\n';
+ await page.locator('#file-input').setInputFiles(file('whitespace.csv',sourceWhitespace));
+ await page.locator('#mapping-panel').waitFor({state:'visible'});
+ await page.locator('#preview-button').click();
+ assert.match(await page.locator('#preview-body tr').first().textContent(),/  Café & Co  /);
+ output=await dl('#export-button');
+ assert.match(output.content.toString('utf8'),/P  Café & Co  \r\nN  00077  \r\nM  receipt  \r\n\^\r\n/);
+ console.log('PASS Chrome CSV source quoted payee/reference/Memo spaces survive QIF output');
+
 
 
  // QIF fields are line-oriented; source payee newlines must fail rather than
