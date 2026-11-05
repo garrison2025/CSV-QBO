@@ -10,11 +10,48 @@ const source="Date,Description,Amount,Reference,Memo\n11/04/2026,Books,-12.50,00
 const mapping={date:0,description:1,amount:2,debit:-1,credit:-1,id:3,memo:4};
 const b=s=>Buffer.from(s,'utf8');
 const tx=parseInput(source,'csv',{mapping}).transactions;
+// Test-only in-place same-size mutation of a STORED ZIP member, followed by
+// repair of BOTH local and central CRC values. This ensures the checker
+// catches changed financial XML, not merely a broken ZIP checksum.
+function crc(bytes){
+  let n=0xffffffff;
+  for(const b of bytes){
+    n^=b;
+    for(let i=0;i<8;i++)n=(n>>>1)^(0xedb88320&-(n&1));
+  }
+  return (n^0xffffffff)>>>0;
+}
+function memberLocation(zip,name){
+  const end=zip.length-22;
+  let pos=zip.readUInt32LE(end+16),count=zip.readUInt16LE(end+10);
+  for(let i=0;i<count;i++){
+    const n=zip.readUInt16LE(pos+28),x=zip.readUInt16LE(pos+30),c=zip.readUInt16LE(pos+32);
+    if(zip.subarray(pos+46,pos+46+n).toString('utf8')===name){
+      const local=zip.readUInt32LE(pos+42),len=zip.readUInt32LE(pos+24);
+      const start=local+30+zip.readUInt16LE(local+26)+zip.readUInt16LE(local+28);
+      return {pos,local,start,len,nameLength:n};
+    }
+    pos+=46+n+x+c;
+  }
+  throw Error('Missing member in test fixture: '+name);
+}
 function repack(bytes,name,transform){
-  const map=inspectStoredArchive(bytes);
-  const updated=transform(map.get(name).toString('utf8'));
-  map.set(name,Buffer.from(updated,'utf8'));
-  return toZIP(Object.fromEntries(map.entries()));
+  const zip=Buffer.from(bytes), loc=memberLocation(zip,name);
+  const oldBody=zip.subarray(loc.start,loc.start+loc.len).toString('utf8');
+  const newBody=Buffer.from(transform(oldBody),'utf8');
+  assert.equal(newBody.length,loc.len,'Test mutation must preserve member size');
+  newBody.copy(zip,loc.start);
+  const sum=crc(newBody);
+  zip.writeUInt32LE(sum,loc.local+14);
+  zip.writeUInt32LE(sum,loc.pos+16);
+  return zip;
+}
+function renameStoredMember(bytes,oldName,newName){
+  const zip=Buffer.from(bytes),loc=memberLocation(zip,oldName);
+  assert.equal(Buffer.byteLength(oldName),Buffer.byteLength(newName));
+  Buffer.from(newName).copy(zip,loc.pos+46);
+  Buffer.from(newName).copy(zip,loc.local+30);
+  return zip;
 }
 function qaInput(input='qif'){
   if(input==='qif')return "!Type:Bank\nD11/04/2026\nT-12.50\nPFormula & <tag>\nN00001234\nMSecond memo\n^\nD11/05/2026\nT120.00\nPRefund\nN00001111\n^\n";
@@ -47,9 +84,9 @@ test('independent XLSX checker catches tampered Excel date, cents, payee, IDs an
   for(const [oldVal,newVal] of [
     ['<v>46330</v>','<v>46331</v>'],
     ['<v>-12.50</v>','<v>-12.49</v>'],
-    ['Formula &amp; &lt;tag&gt;','Hacked &amp; &lt;tag&gt;'],
+    ['Formula &amp; &lt;tag&gt;','Hacked! &amp; &lt;tag&gt;'],
     ['00001234','99991234'],
-    ['Second memo','Changed memo']
+    ['Second memo','Changed mem']
   ]){
     const changed=repack(original,xml,s=>{
       assert.ok(s.includes(oldVal),'fixture missing '+oldVal);
@@ -64,12 +101,12 @@ test('XLSX checker rejects actual damaged CRC, unexpected file, XML formula and 
   assert.ok(index>0);
   bad[index]^=1;
   assert.throws(()=>inspectStoredArchive(bad),/CRC checksum mismatch/);
-  const extra=inspectStoredArchive(original);extra.set('extraneous.xml',Buffer.from('<x/>'));
-  assert.throws(()=>inspectExactXLSX(toZIP(Object.fromEntries(extra)),sourceTx),/missing or unexpected/);
+  const renamed=renameStoredMember(original,'xl/styles.xml','xl/broken.xml');
+  assert.throws(()=>inspectExactXLSX(renamed,sourceTx),/missing or unexpected/);
   const xml='xl/worksheets/sheet1.xml';
-  const formula=repack(original,xml,s=>s.replace('<v>-12.50</v>','<f>2+2</f><v>-12.50</v>'));
+  const formula=repack(original,xml,s=>s.replace('<v>-12.50</v>','<f>1</f>.....'));
   assert.throws(()=>inspectExactXLSX(formula,sourceTx),/contains formulas/);
-  const styles=repack(original,'xl/styles.xml',s=>s.replace('formatCode="yyyy-mm-dd"','formatCode="mm-dd-yy"'));
+  const styles=repack(original,'xl/styles.xml',s=>s.replace('formatCode="yyyy-mm-dd"','formatCode="mm-dd-yyyy"'));
   assert.throws(()=>inspectExactXLSX(styles,sourceTx),/Date number format/);
 });
 test('real downloaded multipart QuickBooks ZIP compares every CSV part and bundled report to the source',()=>{
