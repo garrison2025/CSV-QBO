@@ -20,7 +20,7 @@ test('current registry has zero bank-original UAT but owner-approved competitor 
 });
 test('Pages deployment and localhost never index merely from publish flag',()=>{
   for(const siteUrl of ['https://csv-qbo.pages.dev','https://localhost','http://example.org']){
-    const r=assessProductionRelease({approval,registry,tools,siteUrl,publishSeo:true});
+    const r=assessProductionRelease({approval,registry,competitorEvidence,tools,siteUrl,publishSeo:true});
     assert.equal(r.production,false);
   }
 });
