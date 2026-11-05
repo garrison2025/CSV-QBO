@@ -1,3 +1,9 @@
+## External official-source verification — 2026-11-05
+
+A real Chrome browser attempted [Intuit public Test Drive](https://qbo.intuit.com/redir/testdrive) during [GitHub run 41979602693](https://github.com/garrison2025/CSV-QBO/actions/runs/41979602693). It reached the **QuickBooks Online Security Verification** human gate, but could not reach bank CSV upload without human verification; no bypass, account signup, payment, CSV upload or import took place. The one-time external test was removed from recurring CI.
+
+The independent Node suite now also covers an Intuit published 3-column CSV example and **reconstructed issuer-documented banking layouts** from CitiDirect and Co-operative Bank. These are official **format documentation** checks, not real bank originals. See [full source-backed audit](docs/INTUIT-REAL-IMPORT-UAT-BLOCKERS-20261105.md). Real bank UAT **0**; actual QuickBooks import UAT **0**; preview stays noindex.
+
 ## 2026-11-05 independent Intuit published-spec audit and external UAT gate
 
 The latest published Intuit QuickBooks Online CSV field/size/upload rules and its **sandbox no-import/no-export** restriction were independently checked and documented in [official import UAT blocker audit](docs/INTUIT-REAL-IMPORT-UAT-BLOCKERS-20261105.md). This is source-backed **public-spec review, not actual QuickBooks CSV upload**. Authentic issuer original file count remains **0**; observed QuickBooks imports **0**; noindex is unchanged. A real QBO test company and bank issuer originals must be authorized before any acceptance is recorded.

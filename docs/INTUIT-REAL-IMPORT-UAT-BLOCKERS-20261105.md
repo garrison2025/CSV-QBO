@@ -41,3 +41,19 @@
 ## Decision
 
 Official rule review and synthetic/source-format regression are useful engineering evidence and can be self-run, but **cannot substitute** for bank-account-original verification or observed QBO UI import. No assertion of issuer compatibility, QBO certification, or production release is made by this audit. No custom domain, server-side bank uploads, paid APIs, or indexing changes are authorized by it.
+
+## Follow-up: actual Chrome access to official Test Drive, 2026-11-05
+
+A real Google Chrome session on GitHub Actions [run 41979602693](https://github.com/garrison2025/CSV-QBO/actions/runs/41979602693) visited Intuit's public [Test Drive](https://qbo.intuit.com/redir/testdrive). Observed at 2026-11-05 06:19:48 UTC: host qbo.intuit.com; path /api/samplecompany/validated; page title **QuickBooks Online Security Verification**. Probe status: **blocked_by_public_testdrive_human_verification**. No login/CAPTCHA bypass, paid account, bank connection, CSV file upload, or QBO import was attempted. The run archived its JSON result and screenshot as a 7-day artifact. **This is an observed authentication barrier, not a rejected CSV, and not a completed import test.** We removed its one-time trigger from recurring CI after evidence collection.
+
+Intuit [Test Drive official instructions](https://quickbooks.intuit.com/learn-support/en-us/help-article/small-business-processes/test-drive-quickbooks-online/L9C12ODlA_US_en_US) (updated Aug 5, 2026) prohibit connecting a bank to the sample company. [Free trial details](https://quickbooks.intuit.com/free-trial/) say actual QBO trial account registration is required; no account or identity was fabricated.
+
+### Separate official-format verification, NOT actual bank originals
+
+New regression suite: [tests/issuer-published-documentation-examples.test.mjs](../tests/issuer-published-documentation-examples.test.mjs).
+
+- **Intuit official three-column example:** two published fictional Date/Description/Amount rows with -100.00 and +200.00; the site's local format parser and QuickBooks CSV preflight compare dates, rows and exact cents. This is **official-spec conformance**, not successful upload into QuickBooks.
+- **CitiDirect Comprehensive Account Statement:** a **reconstructed** example of its issuer-documented wide report layout, showing Account Currency GBP, Value Date, Bank Reference, Transaction Description and Transaction Amount. Source GBP must block all USD-only export even with explicitly mapped columns. Citi document: https://www.citibank.com/tts/docs/cbs36222-TTS-Comprehensive-Account-Statement-Report-A4-v3.pdf
+- **Co-operative Bank Business Online:** a **reconstructed** example of documented first blank column, multiple statement heading lines and trailing footer. Site must reject unknown preamble rather than silently delete bank rows; a file cleaned externally and explicitly mapped can pass local exact-cents validation. Bank guide: https://www.test.developer.co-operativebank.co.uk/pdfs/bank/business/online-banking/Business-Online-Banking-User-Guide.pdf
+
+**Evidence boundaries:** issuer-authored public manuals are not private customer exports; reconstructed test fixtures are not unchanged bank-issued CSV bytes. They do not satisfy the real-bank acceptance gate. Counts remain **0 issuer original acceptance / 0 observed QBO imports**. Never claim certified compatibility or publish these as real acceptance records.
