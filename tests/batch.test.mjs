@@ -222,3 +222,46 @@ test('one malformed CR-only QIF record blocks the complete batch archive',()=>{
   {name:'ok.qif',text:valid},{name:'truncated.qif',text:invalid}
  ]),/Batch file 2: QIF final transaction lacks terminating \^/);
 });
+
+
+test('batch exports separate Memo columns only on opt-in and reports omissions without private text',()=>{
+ const source='!Type:Bank\nD11/04/2026\nT-1.00\nPCafé\nMPrivate note ^ first\nN0012\n^\n';
+ const second='!Type:Bank\nD11/05/2026\nT2.00\nPRefund\nMPrivate note ^ second\nN0013\n^\n';
+ const inputs=[{name:'account-a.qif',text:source},{name:'account-b.qif',text:second}];
+ const defaultBatch=batchConvert(inputs,{target:'csv'});
+ assert.equal(defaultBatch.report.memoIncluded,false);
+ assert.equal(defaultBatch.report.memoRowsWithContent,2);
+ assert.equal(defaultBatch.report.memoRowsOmitted,2);
+ assert.deepEqual(defaultBatch.report.files.map(f=>f.memoRowsOmitted),[1,1]);
+ assert.ok(defaultBatch.report.files.every(f=>f.warnings.some(w=>/separate Memo values that are omitted/.test(w))));
+ assert.ok(defaultBatch.warningCount>=2,'default Memo omission requires acknowledgement');
+ const opt=batchConvert(inputs,{target:'csv',includeMemo:true});
+ assert.equal(opt.report.memoIncluded,true);
+ assert.equal(opt.report.memoRowsWithContent,2);
+ assert.equal(opt.report.memoRowsOmitted,0);
+ assert.deepEqual(opt.report.files.map(f=>f.memoRowsIncluded),[1,1]);
+ assert.ok(opt.warningCount<defaultBatch.warningCount);
+ for(const sourceString of ['Private note ^ first','Private note ^ second'])
+  assert.ok(!JSON.stringify(opt.report).includes(sourceString),'report must not disclose source memos');
+ assert.ok(opt.archive.length>defaultBatch.archive.length);
+ const defaultText=Buffer.from(defaultBatch.archive);
+ const enhancedText=Buffer.from(opt.archive);
+ assert.ok(!defaultText.includes(Buffer.from('Private note ^ first')));
+ assert.ok(enhancedText.includes(Buffer.from('Private note ^ first')));
+ assert.ok(enhancedText.includes(Buffer.from('Private note ^ second')));
+ assert.throws(()=>batchConvert(inputs,{includeMemo:'yes'}),/Unsupported Memo-column/);
+});
+test('batch optional Excel Memo remains source-order text with true numeric cents',()=>{
+ const source='!Type:Bank\nD11/04/2026\nT-0.01\nPShop\nM=FORMULA(1)\nN0001\n^\n';
+ const result=batchConvert([{name:'memo.qif',text:source}],{target:'xlsx',includeMemo:true});
+ assert.equal(result.report.totalTransactions,1);
+ assert.equal(result.report.memoIncluded,true);
+ assert.equal(result.report.memoRowsWithContent,1);
+ assert.equal(result.report.memoRowsOmitted,0);
+ const bytes=Buffer.from(result.archive);
+ assert.ok(bytes.includes(Buffer.from('E2')));
+ // XLSX is itself nested in the outer ZIP; these markers belong to the
+ // metadata report. A real workbook XML assertion is in core + Chrome E2E.
+ assert.equal(result.report.files[0].memoRowsIncluded,1);
+ assert.equal(result.report.files[0].net,'-0.01');
+});
