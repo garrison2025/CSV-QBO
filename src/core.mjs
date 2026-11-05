@@ -269,7 +269,7 @@ function financialLines(text){
 export function parseQIF(text, dateFormat='us') {
   const lines=financialLines(text);
   const transactions=[];
-  let entry={},kind='',splits=0,categories=0,ignoredMetadata=0,redundantAmounts=0;
+  let entry={},kind='',splits=0,categories=0,ignoredMetadata=0,redundantAmounts=0,apostropheDates=0;
   let recordLine=0,recordSeen=false;
   const commit=()=>{
     if(!Object.keys(entry).length){
@@ -284,7 +284,16 @@ export function parseQIF(text, dateFormat='us') {
     }
     const description=entry.description||entry.memo||'';
     if(!description.trim())fail('QIF transaction near line '+recordLine+' has no payee or memo.');
-    transactions.push({date:isoDate(entry.date,dateFormat),description,
+    // Quicken QIF convention: month/day'YY explicitly denotes 20YY.
+    // Some legacy Quicken exports also use spaces: 3/ 1' 8.
+    // Do NOT guess slash-separated two-digit years; the century is ambiguous.
+    const legacyDate=String(entry.date).match(/^(\d{1,2})\/\s*(\d{1,2})'\s*(\d{1,2})$/);
+    const normalizedDate=legacyDate
+      ? legacyDate[1]+'/'+legacyDate[2]+'/'+String(2000+Number(legacyDate[3]))
+      : entry.date;
+    const parsedDate=isoDate(normalizedDate,dateFormat);
+    if(legacyDate)apostropheDates++;
+    transactions.push({date:parsedDate,description,
       amount:fromMinorUnits(toMinorUnits(entry.amount)),id:entry.id||'',memo:entry.memo||''});
     entry={};recordLine=0;recordSeen=false;
   };
@@ -328,10 +337,11 @@ export function parseQIF(text, dateFormat='us') {
   if(splits||categories)warnings.push('QIF category/split allocations are not preserved in this transaction export.');
   if(ignoredMetadata)warnings.push(ignoredMetadata+' QIF cleared-state, flag or address metadata field(s) were not preserved in the transaction summary.');
   if(redundantAmounts)warnings.push(redundantAmounts+' QIF redundant U amount field(s) agreed with T and were not duplicated.');
+  if(apostropheDates)warnings.push(apostropheDates+' QIF apostrophe-year date(s) interpreted as 20YY. Confirm the source file uses the Quicken convention.');
   return {transactions,source:'QIF',
     integrity:{check:'qif_bank_records',status:'passed',recordCount:transactions.length,
       ignoredCategorySplitFields:splits+categories,ignoredMetadataFields:ignoredMetadata,
-      consistentRedundantAmounts:redundantAmounts},
+      consistentRedundantAmounts:redundantAmounts,apostropheYearDates:apostropheDates},
     warnings};
 }
 
