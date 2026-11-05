@@ -20,12 +20,32 @@ jobs:
           grep -q 'noindex,nofollow' dist/index.html
           grep -q 'Disallow: /' dist/robots.txt
           test ! -f dist/sitemap.xml
-      - name: Reject accidental production indexing without real-bank UAT approval
+      - name: Keep Cloudflare previews and reserved example domains noindex even with competitor acceptance
         run: |
-          SITE_URL=https://example-finance-tool.com PUBLISH_SEO=true npm run build
+          SITE_URL=https://prelaunch-finance.example PUBLISH_SEO=true npm run build
           grep -q 'noindex,nofollow' dist/index.html
           grep -q 'Disallow: /' dist/robots.txt
           test ! -f dist/sitemap.xml
+          npm run build
+      - name: Verify release scope on a simulated custom HTTPS host (no external publishing)
+        run: |
+          SITE_URL=https://finance-launch-ci-check.com PUBLISH_SEO=true npm run build
+          grep -q 'index,follow' dist/index.html
+          grep -q 'sitemap.xml' dist/robots.txt
+          grep -q 'tools/qbo-to-csv/' dist/sitemap.xml
+          grep -q 'tools/qbo-to-excel/' dist/sitemap.xml
+          if grep -q 'tools/quickbooks-csv-formatter/' dist/sitemap.xml; then exit 1; fi
+          if grep -q 'tools/csv-to-qbo/' dist/sitemap.xml; then exit 1; fi
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const m=JSON.parse(fs.readFileSync('dist/build-manifest.json','utf8'));
+          if(m.releaseMode!=='production'||m.realBankEvidenceCases!==0||
+             m.targetApplicationImportEvidenceCases!==0||
+             m.competitorReadEvidenceCases!==1||
+             m.releaseEvidenceScope!=='independent_competitor_generated_synthetic_qbo_read'||
+             JSON.stringify(m.approvedIndexableRoutes)!==JSON.stringify(['qbo-to-csv','qbo-to-excel']))
+             throw Error('Unexpected SEO evidence or route scope; refuse release.');
+          NODE
           npm run build
       - name: Independently validate synthetic XLSX with Python OOXML reader
         run: |
@@ -46,19 +66,6 @@ jobs:
           command -v google-chrome
           npm install --no-save --no-package-lock playwright-core@1.55.0
           npm run test:browser
-      - name: One-time independent free CSV-QBO competitor conversion comparison
-        if: github.head_ref == 'test/alternative-competitor-qbo-blackbox-20261105'
-        run: node scripts/probe-alternative-qbo-competitors.mjs
-      - name: Archive alternative competitor synthetic-only comparison
-        if: github.head_ref == 'test/alternative-competitor-qbo-blackbox-20261105'
-        uses: actions/upload-artifact@v4
-        with:
-          name: alternative-competitor-csv-qbo
-          path: |
-            alternative-competitor-probe.json
-            alternate-competitor-sonomir.png
-          if-no-files-found: ignore
-          retention-days: 7
       - name: Upload synthetic browser failure screenshot
         if: failure()
         uses: actions/upload-artifact@v4
