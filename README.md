@@ -1,3 +1,11 @@
+## V2.7 — real-bank and QuickBooks import acceptance evidence (2026-11-05)
+
+- Added the documented real-bank UAT and QuickBooks Online/Quicken test procedure in [docs/REAL-BANK-UAT.md](docs/REAL-BANK-UAT.md). This is a **manual, private-first** evidence requirement, not another claim of simulated compatibility.
+- Each acceptance case links authorized source provenance, original/converted file SHA-256, a specific banking-export dialect, parser commit, exact row and signed-cent comparisons, and (only for target-import paths) real destination app/version/account testing and repeated-import observations.
+- Validation CLI: `node scripts/uat-evidence.mjs check-private "<PRIVATE-UAT-JSON>"`, then `export-public` to produce the allow-listed public registry; `npm run uat:check-public` checks the public shape. The private original, hash, merchant details, account IDs, screenshots and reconciliation amounts remain outside GitHub.
+- The built [/compatibility/](https://csv-qbo.pages.dev/compatibility/) page reads approved cases from `data/uat-public.json`; **there are currently ZERO real-bank/QuickBooks cases**. Build and CI reject malformed or incorrectly scoped evidence, but cannot independently prove the reality of a bank export or a QuickBooks UI result. Owner review of private proof is mandatory.
+- QBO Web Connect writer, IIF writer, bank-specific guarantees, paid features and production indexing remain **blocked**. Preview remains noindex.
+
 # Finance File Lab (CSV–QBO tool matrix)
 
 A **browser-local financial file conversion site** developed from the user-provided [CSV/QBO V3.0 build specification](docs/PLAN-V3.md), with an audit trail of **250 unique US Semrush keywords** from DocuClipper and AccountingConverter.
