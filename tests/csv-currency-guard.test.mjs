@@ -72,8 +72,7 @@ test('CSV with no recognized currency column is NOT labeled as verified USD',()=
   allRecognizedCurrencyCellsUSD:false,currencyConversionPerformed:false
  });
  assert.equal(parsed.transactions.length,1);
- assert.match(parsed.warnings.join(' '),/no recognized Currency column/);
- assert.match(parsed.warnings.join(' '),/already USD before downloading/);
+ assert.equal(parsed.warnings.length,0,'unknown source currency is a visible disclosure, not an invented conversion error');
  assert.equal(parsed.transactions[0].amount,'-12.50');
 });
 
@@ -107,5 +106,5 @@ test('currency labels that are NOT recognized must not be falsely claimed as che
  '2026-11-04,Unverified,-2.00,EUR\n','csv');
  assert.equal(parsed.currencyReview.recognizedCurrencyColumnCount,0);
  assert.equal(parsed.currencyReview.allRecognizedCurrencyCellsUSD,false);
- assert.match(parsed.warnings.join(' '),/no recognized Currency column/);
+ assert.equal(parsed.warnings.length,0);
 });
