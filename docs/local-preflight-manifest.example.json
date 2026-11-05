@@ -1,0 +1,19 @@
+{
+  "route_slug": "quickbooks-csv-formatter",
+  "source_file": "C:\\private\\bank-original.csv",
+  "output_file": "C:\\private\\quickbooks-output.csv",
+  "report_file": "C:\\private\\private-uat-draft.json",
+  "date_format": "us",
+  "mapping": {
+    "date": 0,
+    "description": 1,
+    "amount": 2,
+    "debit": -1,
+    "credit": -1,
+    "id": 3,
+    "memo": -1
+  },
+  "expected_rows": null,
+  "expected_net_cents": null,
+  "parser_commit": "REPLACE_WITH_ACTUAL_GIT_COMMIT"
+}
